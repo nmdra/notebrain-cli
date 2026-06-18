@@ -1,0 +1,15 @@
+{
+  "current_version": "0.1.0",
+  "compatibility_matrix": {
+    "0.1.0": {
+      "go_constraint": "^0.1.x",
+      "rust_versions": ["0.1.0"],
+      "description": "Initial ABI version with basic tokenizer FFI interface"
+    }
+  },
+  "notes": [
+    "ABI version must be updated when FFI interface changes",
+    "Go constraint in tokenizers.go must match current_version",
+    "Rust ABI_VERSION in src/lib.rs must match current_version"
+  ]
+}

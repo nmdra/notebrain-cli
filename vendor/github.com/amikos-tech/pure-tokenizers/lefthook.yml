@@ -1,0 +1,5 @@
+pre-commit:
+  commands:
+    go-security:
+      glob: "*.{go,mod,sum}"
+      run: ./scripts/security_checks.sh
