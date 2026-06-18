@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.0.0-beta] - 2026-06-18
+
+### Added
+- **Content Hashing**: Introduced SHA-256 hashing during the ingest pipeline to safely and instantly skip re-ingesting files that haven't changed.
+
+### Changed
+- **Performance**: Greatly improved test coverage (up to 74.1%) across parser, store, and ingest systems.
+- **Refactoring**: Stripped over-engineered code: removed `obsidian` package, removed abstract embedder interfaces, and inlined custom sorting functions.
+
 ## [v1.0.0-alpha] - 2026-06-18
 
 ### Added
