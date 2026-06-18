@@ -38,12 +38,14 @@ func hyperlinkSupported() bool {
 func obsidianURI(vaultName, filePath string) string {
 	filePath = strings.TrimSuffix(filePath, ".md")
 
-	q := url.Values{}
-	if vaultName != "" {
-		q.Set("vault", vaultName)
+	escape := func(s string) string {
+		return strings.ReplaceAll(url.QueryEscape(s), "+", "%20")
 	}
-	q.Set("file", filePath)
-	return "obsidian://open?" + q.Encode()
+
+	if vaultName != "" {
+		return "obsidian://open?vault=" + escape(vaultName) + "&file=" + escape(filePath)
+	}
+	return "obsidian://open?file=" + escape(filePath)
 }
 
 // hyperlink wraps visible text in an OSC 8 terminal hyperlink.

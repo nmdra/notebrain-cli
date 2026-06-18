@@ -11,14 +11,14 @@ func TestObsidianURI(t *testing.T) {
 		filePath string
 		expected string
 	}{
-		{"My Vault", "Projects/Alpha.md", "obsidian://open?file=Projects%2FAlpha&vault=My+Vault"},
+		{"My Vault", "Projects/Alpha.md", "obsidian://open?vault=My%20Vault&file=Projects%2FAlpha"},
 		{"", "Projects/Alpha", "obsidian://open?file=Projects%2FAlpha"},
-		{"Test Vault", "Folder/Note.md", "obsidian://open?file=Folder%2FNote&vault=Test+Vault"},
+		{"Test Vault", "Folder/Note.md", "obsidian://open?vault=Test%20Vault&file=Folder%2FNote"},
+		{"Second Brain 2.0", "00.Fleeting Notes/Platform Engineering/OpenChoreo/OpenChoreo.md", "obsidian://open?vault=Second%20Brain%202.0&file=00.Fleeting%20Notes%2FPlatform%20Engineering%2FOpenChoreo%2FOpenChoreo"},
 	}
 
 	for _, tt := range tests {
 		actual := obsidianURI(tt.vault, tt.filePath)
-		// url.Values.Encode() sorts keys, so 'file' is before 'vault'
 		if actual != tt.expected {
 			t.Errorf("obsidianURI(%q, %q) = %q, expected %q", tt.vault, tt.filePath, actual, tt.expected)
 		}
