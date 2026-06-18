@@ -2,6 +2,7 @@ package ingest
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"io/fs"
 	"os"
@@ -10,19 +11,21 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nmdra/notebrain-cli/internal/embedder"
-	"github.com/nmdra/notebrain-cli/internal/obsidian"
 	"github.com/nmdra/notebrain-cli/internal/parser"
 	"github.com/nmdra/notebrain-cli/internal/store"
 )
 
+type Embedder interface {
+	Embed(ctx context.Context, text string) ([]float32, error)
+}
+
 type Pipeline struct {
 	store    *store.Store
-	embedder embedder.Embedder
+	embedder Embedder
 	workers  int
 }
 
-func NewPipeline(s *store.Store, e embedder.Embedder, workers int) *Pipeline {
+func NewPipeline(s *store.Store, e Embedder, workers int) *Pipeline {
 	if workers <= 0 {
 		workers = 1
 	}
@@ -63,6 +66,11 @@ func (p *Pipeline) Run(ctx context.Context, vaultPath string, glob string) error
 
 	fmt.Printf("Found %d markdown files to ingest\n", len(files))
 
+	hashes, _ := p.store.GetNoteHashes(ctx)
+	if hashes == nil {
+		hashes = make(map[string]string)
+	}
+
 	var wg sync.WaitGroup
 	fileCh := make(chan string, len(files))
 	for _, f := range files {
@@ -77,7 +85,7 @@ func (p *Pipeline) Run(ctx context.Context, vaultPath string, glob string) error
 		go func() {
 			defer wg.Done()
 			for path := range fileCh {
-				if err := p.ingestFile(ctx, vaultPath, path); err != nil {
+				if err := p.ingestFile(ctx, vaultPath, path, hashes); err != nil {
 					errCh <- fmt.Errorf("file %s: %w", path, err)
 				}
 			}
@@ -98,7 +106,7 @@ func (p *Pipeline) Run(ctx context.Context, vaultPath string, glob string) error
 	return firstErr
 }
 
-func (p *Pipeline) ingestFile(ctx context.Context, vaultPath string, filePath string) error {
+func (p *Pipeline) ingestFile(ctx context.Context, vaultPath string, filePath string, knownHashes map[string]string) error {
 	relPath, err := filepath.Rel(vaultPath, filePath)
 	if err != nil {
 		return err
@@ -110,6 +118,14 @@ func (p *Pipeline) ingestFile(ctx context.Context, vaultPath string, filePath st
 	}
 
 	slug := parser.Slugify(relPath)
+
+	// Compute hash and check if unchanged
+	hash := fmt.Sprintf("%x", sha256.Sum256(content))
+	if knownHashes[slug] == hash {
+		fmt.Printf("Skipped %s (unchanged)\n", relPath)
+		return nil
+	}
+
 	title := parser.TitleFromPath(relPath)
 
 	text := parser.StripFrontmatter(string(content))
@@ -134,24 +150,17 @@ func (p *Pipeline) ingestFile(ctx context.Context, vaultPath string, filePath st
 		}
 
 		chunkRecords[i] = store.ChunkRecord{
-			ID:         fmt.Sprintf("%s:%d", slug, i),
-			NoteSlug:   slug,
-			Title:      title,
-			FilePath:   relPath,
-			ChunkIndex: c.Index,
-			Text:       c.Text,
-			Tags:       tags,
-			HasLinks:   len(links) > 0,
-			ModifiedMs: modTime.UnixMilli(),
-			Embedding:  emb,
-		}
-	}
-
-	linkRecords := make([]obsidian.LinkRecord, len(links))
-	for i, l := range links {
-		linkRecords[i] = obsidian.LinkRecord{
-			Path:        l.Target,
-			DisplayText: l.DisplayText,
+			ID:          fmt.Sprintf("%s:%d", slug, i),
+			NoteSlug:    slug,
+			Title:       title,
+			FilePath:    relPath,
+			ChunkIndex:  c.Index,
+			Text:        c.Text,
+			Tags:        tags,
+			HasLinks:    len(links) > 0,
+			ModifiedMs:  modTime.UnixMilli(),
+			ContentHash: hash,
+			Embedding:   emb,
 		}
 	}
 
@@ -161,7 +170,7 @@ func (p *Pipeline) ingestFile(ctx context.Context, vaultPath string, filePath st
 	if err := p.store.UpsertChunks(ctx, chunkRecords); err != nil {
 		return err
 	}
-	if err := p.store.UpsertLinks(ctx, slug, linkRecords); err != nil {
+	if err := p.store.UpsertLinks(ctx, slug, links); err != nil {
 		return err
 	}
 

@@ -7,26 +7,20 @@ import (
 	"github.com/amikos-tech/chroma-go/pkg/embeddings/ort"
 )
 
-type Embedder interface {
-	Embed(ctx context.Context, text string) ([]float32, error)
-	EmbedBatch(ctx context.Context, texts []string) ([][]float32, error)
-	Close() error
-}
-
-type defaultEmbedder struct {
+type LocalEmbedder struct {
 	ef      *ort.DefaultEmbeddingFunction
 	destroy func() error
 }
 
-func NewLocalEmbedder() (Embedder, error) {
+func NewLocalEmbedder() (*LocalEmbedder, error) {
 	ef, destroy, err := ort.NewDefaultEmbeddingFunction()
 	if err != nil {
 		return nil, fmt.Errorf("init local embedder: %w", err)
 	}
-	return &defaultEmbedder{ef: ef, destroy: destroy}, nil
+	return &LocalEmbedder{ef: ef, destroy: destroy}, nil
 }
 
-func (e *defaultEmbedder) Embed(ctx context.Context, text string) ([]float32, error) {
+func (e *LocalEmbedder) Embed(ctx context.Context, text string) ([]float32, error) {
 	batch, err := e.EmbedBatch(ctx, []string{text})
 	if err != nil {
 		return nil, err
@@ -37,7 +31,7 @@ func (e *defaultEmbedder) Embed(ctx context.Context, text string) ([]float32, er
 	return batch[0], nil
 }
 
-func (e *defaultEmbedder) EmbedBatch(ctx context.Context, texts []string) ([][]float32, error) {
+func (e *LocalEmbedder) EmbedBatch(ctx context.Context, texts []string) ([][]float32, error) {
 	// Filter out empty strings which cause ONNX errors
 	cleanTexts := make([]string, len(texts))
 	for i, t := range texts {
@@ -59,7 +53,7 @@ func (e *defaultEmbedder) EmbedBatch(ctx context.Context, texts []string) ([][]f
 	return out, nil
 }
 
-func (e *defaultEmbedder) Close() error {
+func (e *LocalEmbedder) Close() error {
 	var err1, err2 error
 	if e.destroy != nil {
 		err2 = e.destroy()

@@ -22,7 +22,6 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 
@@ -47,32 +46,6 @@ Examples:
   notebrain boosted "energy production" --seed "Mitochondria"
   notebrain stats
   notebrain reset`,
-	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		flags := cmd.Root().PersistentFlags()
-
-		_, err := flags.GetString("chroma-path")
-		if err != nil {
-			return fmt.Errorf("reading --chroma-path: %w", err)
-		}
-		_, err = flags.GetString("chroma-mode")
-		if err != nil {
-			return fmt.Errorf("reading --chroma-mode: %w", err)
-		}
-		_, err = flags.GetString("chroma-url")
-		if err != nil {
-			return fmt.Errorf("reading --chroma-url: %w", err)
-		}
-		_, err = flags.GetString("vault")
-		if err != nil {
-			return fmt.Errorf("reading --vault: %w", err)
-		}
-		_, err = flags.GetBool("verbose")
-		if err != nil {
-			return fmt.Errorf("reading --verbose: %w", err)
-		}
-
-		return nil
-	},
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.

@@ -5,25 +5,26 @@ import (
 	"fmt"
 	"math/rand"
 	"strconv"
+	"strings"
 
 	chroma "github.com/amikos-tech/chroma-go/pkg/api/v2"
 	"github.com/amikos-tech/chroma-go/pkg/embeddings"
-	"github.com/nmdra/notebrain-cli/internal/obsidian"
 	"github.com/nmdra/notebrain-cli/internal/parser"
 )
 
 // ChunkRecord holds everything needed to store one chunk.
 type ChunkRecord struct {
-	ID         string // "<slug>:<index>"
-	NoteSlug   string
-	Title      string
-	FilePath   string
-	ChunkIndex int
-	Text       string
-	Tags       []string
-	HasLinks   bool
-	ModifiedMs int64
-	Embedding  []float32
+	ID          string // "<slug>:<index>"
+	NoteSlug    string
+	Title       string
+	FilePath    string
+	ChunkIndex  int
+	Text        string
+	Tags        []string
+	HasLinks    bool
+	ModifiedMs  int64
+	ContentHash string
+	Embedding   []float32
 }
 
 // UpsertChunks stores a batch of chunks (upsert = insert or replace by ID).
@@ -62,7 +63,7 @@ func (s *Store) DeleteNoteChunks(ctx context.Context, noteSlug string) error {
 }
 
 // UpsertLinks replaces all outgoing links for a note.
-func (s *Store) UpsertLinks(ctx context.Context, noteSlug string, links []obsidian.LinkRecord) error {
+func (s *Store) UpsertLinks(ctx context.Context, noteSlug string, links []parser.Link) error {
 	// Delete old outgoing links for this note
 	if err := s.links.Delete(ctx,
 		chroma.WithWhere(chroma.EqString("source_slug", noteSlug)),
@@ -70,10 +71,10 @@ func (s *Store) UpsertLinks(ctx context.Context, noteSlug string, links []obsidi
 		return fmt.Errorf("delete old links for %s: %w", noteSlug, err)
 	}
 
-	var uniqueLinks []obsidian.LinkRecord
+	var uniqueLinks []parser.Link
 	seenSlugs := make(map[string]bool)
 	for _, l := range links {
-		targetSlug := parser.Slugify(l.Path)
+		targetSlug := parser.Slugify(l.Target)
 		if targetSlug == "" || seenSlugs[targetSlug] {
 			continue
 		}
@@ -90,7 +91,7 @@ func (s *Store) UpsertLinks(ctx context.Context, noteSlug string, links []obsidi
 	metas := make([]chroma.DocumentMetadata, len(uniqueLinks))
 
 	for i, l := range uniqueLinks {
-		targetSlug := parser.Slugify(l.Path) // derive slug from resolved path
+		targetSlug := parser.Slugify(l.Target) // derive slug from resolved path
 		ids[i] = chroma.DocumentID(noteSlug + "→" + targetSlug)
 		texts[i] = l.DisplayText
 		if texts[i] == "" {
@@ -99,7 +100,7 @@ func (s *Store) UpsertLinks(ctx context.Context, noteSlug string, links []obsidi
 		metaMap := map[string]interface{}{
 			"source_slug":  noteSlug,
 			"target_slug":  targetSlug,
-			"target_path":  l.Path,
+			"target_path":  l.Target,
 			"display_text": l.DisplayText,
 		}
 		metas[i], _ = chroma.NewDocumentMetadataFromMap(metaMap)
@@ -127,33 +128,19 @@ func (s *Store) UpsertLinks(ctx context.Context, noteSlug string, links []obsidi
 
 func buildChunkMeta(c ChunkRecord) map[string]interface{} {
 	meta := map[string]interface{}{
-		"note_slug":   c.NoteSlug,
-		"title":       c.Title,
-		"file_path":   c.FilePath,
-		"chunk_index": c.ChunkIndex,
-		"word_count":  len(splitWords(c.Text)),
-		"has_links":   c.HasLinks,
-		"modified_ms": int(c.ModifiedMs),
-		"tag_count":   len(c.Tags),
+		"note_slug":    c.NoteSlug,
+		"title":        c.Title,
+		"file_path":    c.FilePath,
+		"chunk_index":  c.ChunkIndex,
+		"word_count":   len(strings.Fields(c.Text)),
+		"has_links":    c.HasLinks,
+		"modified_ms":  int(c.ModifiedMs),
+		"content_hash": c.ContentHash,
+		"tag_count":    len(c.Tags),
 	}
 	// Encode tags as tag_0, tag_1, tag_2, ...
 	for i, tag := range c.Tags {
 		meta["tag_"+strconv.Itoa(i)] = tag
 	}
 	return meta
-}
-
-func splitWords(s string) []string {
-	// simple whitespace split for word count
-	var words []string
-	inWord := false
-	for _, r := range s {
-		if r == ' ' || r == '\t' || r == '\n' {
-			inWord = false
-		} else if !inWord {
-			inWord = true
-			words = append(words, "")
-		}
-	}
-	return words
 }

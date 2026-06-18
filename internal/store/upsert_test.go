@@ -2,10 +2,10 @@ package store_test
 
 import (
 	"context"
+	"github.com/nmdra/notebrain-cli/internal/parser"
 	"testing"
 	"time"
 
-	"github.com/nmdra/notebrain-cli/internal/obsidian"
 	"github.com/nmdra/notebrain-cli/internal/store"
 )
 
@@ -74,9 +74,9 @@ func TestUpsertLinks(t *testing.T) {
 	}
 	defer func() { _ = st.Close() }()
 
-	links := []obsidian.LinkRecord{
+	links := []parser.Link{
 		{
-			Path:        "Other Note.md",
+			Target:      "Other Note.md",
 			DisplayText: "Other",
 		},
 	}

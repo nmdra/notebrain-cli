@@ -2,10 +2,10 @@ package store_test
 
 import (
 	"context"
+	"github.com/nmdra/notebrain-cli/internal/parser"
 	"testing"
 	"time"
 
-	"github.com/nmdra/notebrain-cli/internal/obsidian"
 	"github.com/nmdra/notebrain-cli/internal/store"
 )
 
@@ -41,8 +41,8 @@ func setupTestData(t *testing.T, ctx context.Context, st *store.Store) {
 		t.Fatalf("setup chunks: %v", err)
 	}
 
-	err = st.UpsertLinks(ctx, "note-a", []obsidian.LinkRecord{
-		{Path: "Note B.md", DisplayText: "Note B"},
+	err = st.UpsertLinks(ctx, "note-a", []parser.Link{
+		{Target: "Note B.md", DisplayText: "Note B"},
 	})
 	if err != nil {
 		t.Fatalf("setup links: %v", err)
@@ -132,6 +132,28 @@ func TestQueries(t *testing.T) {
 		}
 		if !found {
 			t.Errorf("Expected note-b to share tags with note-a")
+		}
+	})
+
+	t.Run("GraphBoostedSearch", func(t *testing.T) {
+		qVec := []float32{1.0, 0.0, 0.0}
+		// Querying near note-a, with seed note-b and boost
+		res, err := st.GraphBoostedSearch(ctx, qVec, "note-b", 0.5, 10)
+		if err != nil {
+			t.Fatalf("GraphBoostedSearch failed: %v", err)
+		}
+		if len(res) == 0 {
+			t.Fatalf("Expected results, got none")
+		}
+
+		found := false
+		for _, r := range res {
+			if r.NoteSlug == "note-b" {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("Expected note-b in boosted results")
 		}
 	})
 }

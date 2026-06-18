@@ -36,6 +36,30 @@ func (s *Store) SemanticSearch(ctx context.Context, queryVec []float32, limit in
 	return deduplicateByNote(res, limit), nil
 }
 
+// ─── Metadata Queries ────────────────────────────────────────────
+
+// GetNoteHashes fetches the content_hash for all notes by reading chunk_index=0.
+// Returns a map of note_slug -> content_hash.
+func (s *Store) GetNoteHashes(ctx context.Context) (map[string]string, error) {
+	res, err := s.chunks.Get(ctx,
+		chroma.WithWhere(chroma.EqInt("chunk_index", 0)),
+		chroma.WithInclude(chroma.IncludeMetadatas),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("get note hashes: %w", err)
+	}
+
+	hashes := make(map[string]string)
+	for _, m := range res.GetMetadatas() {
+		slug := metaString(m, "note_slug")
+		hash := metaString(m, "content_hash")
+		if slug != "" && hash != "" {
+			hashes[slug] = hash
+		}
+	}
+	return hashes, nil
+}
+
 // ─── Backlinks ───────────────────────────────────────────────────
 
 // Backlinks returns all notes that link TO targetSlug.
@@ -64,7 +88,7 @@ func (s *Store) Backlinks(ctx context.Context, targetSlug string) ([]Result, err
 			Extra:    metaString(meta, "display_text"),
 		})
 	}
-	sortByTitle(out)
+	sort.Slice(out, func(i, j int) bool { return out[i].Title < out[j].Title })
 	return out, nil
 }
 
@@ -244,7 +268,7 @@ func deduplicateByNote(res chroma.QueryResult, limit int) []Result {
 	}
 	seen := map[string]*best{}
 	metas := groups[0]
-	
+
 	var dists []embeddings.Distance
 	distGroups := res.GetDistancesGroups()
 	if len(distGroups) > 0 {
@@ -338,7 +362,7 @@ func (s *Store) notesWithTag(ctx context.Context, tag string) []string {
 	if err != nil || len(res.GetMetadatas()) == 0 {
 		return nil
 	}
-	
+
 	seen := map[string]bool{}
 	var slugs []string
 	for _, m := range res.GetMetadatas() {
@@ -388,8 +412,4 @@ func decodeTags(m chroma.DocumentMetadata) []string {
 		tags = append(tags, metaString(m, key))
 	}
 	return tags
-}
-
-func sortByTitle(r []Result) {
-	sort.Slice(r, func(i, j int) bool { return r[i].Title < r[j].Title })
 }
