@@ -21,8 +21,12 @@ THE SOFTWARE.
 */
 package main
 
-import "github.com/nmdra/notebrain-cli/cmd"
+import (
+	"github.com/joho/godotenv"
+	"github.com/nmdra/notebrain-cli/cmd"
+)
 
 func main() {
+	_ = godotenv.Load() // Load .env file if it exists
 	cmd.Execute()
 }

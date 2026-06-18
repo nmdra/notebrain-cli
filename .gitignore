@@ -33,3 +33,4 @@ chroma_data/
 
 # Build artifacts
 dist/
+.env
