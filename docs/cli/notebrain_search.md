@@ -18,8 +18,11 @@ notebrain search <query> [flags]
 ### Options
 
 ```
-  -h, --help        help for search
-      --limit int   maximum number of results to return (default 10)
+      --has-code         only return chunks that contain code blocks
+      --has-tasks        only return chunks that contain task lists
+  -h, --help             help for search
+      --limit int        maximum number of results to return (default 10)
+      --section string   filter by heading path (e.g. 'Project > Tasks')
 ```
 
 ### Options inherited from parent commands
@@ -28,6 +31,7 @@ notebrain search <query> [flags]
       --chroma-mode string   ChromaDB client mode ("persistent" or "http") (default "persistent")
       --chroma-path string   path to ChromaDB persistent storage (default "/home/nimendra/.notebrain/chroma")
       --chroma-url string    ChromaDB server URL (used when --chroma-mode=http) (default "http://localhost:8000")
+      --no-hyperlinks        Disable OSC 8 terminal hyperlinks in output
       --vault string         Obsidian vault name
       --verbose              enable verbose output
 ```

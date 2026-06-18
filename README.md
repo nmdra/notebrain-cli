@@ -9,9 +9,27 @@ NoteBrain is a high-performance Go CLI tool designed to index an Obsidian vault 
 - **Blazing Fast Ingestion**: Uses Go concurrency and local ONNX embedding models to index your Markdown files rapidly.
 - **Embedded ChromaDB**: Stores vectors directly on disk using `chroma-go` v2 (no external database server required).
 - **Semantic Search**: Find notes by meaning, not just keywords.
+- **Goldmark AST-Aware Chunking**: Intelligently chunks markdown sections according to header hierarchies instead of arbitrary character splits, preserving code blocks and structural metadata.
+- **Advanced Filtering**: Use `--section`, `--has-code`, and `--has-tasks` to filter searches precisely by document structures.
+- **OSC 8 Terminal Hyperlinks**: Automatically renders clickable `obsidian://open` links right in your CLI for seamlessly opening matched chunks inside Obsidian (supported terminals only).
 - **Graph Traversal**: Explores your Obsidian wikilinks graph (`[[Note]]`).
 - **Hidden Connections**: Discovers notes that are semantically identical but not explicitly linked.
 - **Graph-Boosted Search**: Combines semantic search scores with structural graph proximities.
+
+## Configuration (.env)
+
+You can manage global variables to streamline NoteBrain usage via a `.env` file. Copy `.env.example` to `.env` in the project root:
+
+```env
+# The absolute path to your Obsidian vault on disk (used by 'ingest')
+OBSIDIAN_VAULT_PATH="/path/to/Second Brain 2.0"
+
+# The name of your Obsidian vault (used by 'search' for obsidian:// URIs)
+OBSIDIAN_VAULT_NAME="Second Brain 2.0"
+
+# Set to 1 to globally disable OSC 8 terminal hyperlinks in output
+# NO_HYPERLINKS=1
+```
 
 ## Quick Start
 

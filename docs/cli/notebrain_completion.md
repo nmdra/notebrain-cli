@@ -20,6 +20,7 @@ See each sub-command's help for details on how to use the generated script.
       --chroma-mode string   ChromaDB client mode ("persistent" or "http") (default "persistent")
       --chroma-path string   path to ChromaDB persistent storage (default "/home/nimendra/.notebrain/chroma")
       --chroma-url string    ChromaDB server URL (used when --chroma-mode=http) (default "http://localhost:8000")
+      --no-hyperlinks        Disable OSC 8 terminal hyperlinks in output
       --vault string         Obsidian vault name
       --verbose              enable verbose output
 ```
