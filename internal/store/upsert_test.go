@@ -2,7 +2,6 @@ package store_test
 
 import (
 	"context"
-	"github.com/nmdra/notebrain-cli/internal/parser"
 	"testing"
 	"time"
 
@@ -74,12 +73,7 @@ func TestUpsertLinks(t *testing.T) {
 	}
 	defer func() { _ = st.Close() }()
 
-	links := []parser.Link{
-		{
-			Target:      "Other Note.md",
-			DisplayText: "Other",
-		},
-	}
+	links := []string{"other-note"}
 
 	err = st.UpsertLinks(ctx, "test-note", links)
 	if err != nil {

@@ -5,6 +5,10 @@ go 1.26.3
 require (
 	github.com/amikos-tech/chroma-go v0.4.1
 	github.com/spf13/cobra v1.10.2
+	github.com/yuin/goldmark v1.8.2
+	github.com/yuin/goldmark-meta v1.1.0
+	go.abhg.dev/goldmark/hashtag v0.4.0
+	go.abhg.dev/goldmark/wikilink v0.6.0
 )
 
 require (
@@ -15,6 +19,7 @@ require (
 	github.com/cpuguy83/go-md2man/v2 v2.0.6 // indirect
 	github.com/creasty/defaults v1.8.0 // indirect
 	github.com/ebitengine/purego v0.10.0 // indirect
+	github.com/forPelevin/gomoji v1.3.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.12 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
@@ -25,6 +30,7 @@ require (
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
+	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/spf13/pflag v1.0.9 // indirect
 	go.uber.org/multierr v1.10.0 // indirect
@@ -33,4 +39,5 @@ require (
 	golang.org/x/crypto v0.46.0 // indirect
 	golang.org/x/sys v0.41.0 // indirect
 	golang.org/x/text v0.32.0 // indirect
+	gopkg.in/yaml.v2 v2.3.0 // indirect
 )

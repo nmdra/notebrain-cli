@@ -24,6 +24,7 @@ package cmd
 import (
 	"fmt"
 
+	chroma "github.com/amikos-tech/chroma-go/pkg/api/v2"
 	"github.com/nmdra/notebrain-cli/internal/embedder"
 	"github.com/nmdra/notebrain-cli/internal/store"
 	"github.com/spf13/cobra"
@@ -66,7 +67,27 @@ Examples:
 			return err
 		}
 
-		results, err := st.SemanticSearch(ctx, qVec, limit)
+		// Build filters based on flags
+		var filters []chroma.WhereClause
+
+		if section, _ := cmd.Flags().GetString("section"); section != "" {
+			filters = append(filters, chroma.EqString("heading_path", section))
+		}
+		if hasTasks, _ := cmd.Flags().GetBool("has-tasks"); hasTasks {
+			filters = append(filters, chroma.EqBool("has_task", true))
+		}
+		if hasCode, _ := cmd.Flags().GetBool("has-code"); hasCode {
+			filters = append(filters, chroma.EqBool("has_code", true))
+		}
+
+		var whereFilter chroma.WhereFilter
+		if len(filters) == 1 {
+			whereFilter = filters[0]
+		} else if len(filters) > 1 {
+			whereFilter = chroma.And(filters...)
+		}
+
+		results, err := st.SemanticSearch(ctx, qVec, limit, whereFilter)
 		if err != nil {
 			return err
 		}
@@ -83,4 +104,7 @@ func init() {
 	rootCmd.AddCommand(searchCmd)
 
 	searchCmd.Flags().Int("limit", 10, "maximum number of results to return")
+	searchCmd.Flags().String("section", "", "filter by heading path (e.g. 'Project > Tasks')")
+	searchCmd.Flags().Bool("has-tasks", false, "only return chunks that contain task lists")
+	searchCmd.Flags().Bool("has-code", false, "only return chunks that contain code blocks")
 }

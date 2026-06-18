@@ -12,19 +12,23 @@ import (
 	"github.com/nmdra/notebrain-cli/internal/parser"
 )
 
-// ChunkRecord holds everything needed to store one chunk.
 type ChunkRecord struct {
-	ID          string // "<slug>:<index>"
-	NoteSlug    string
-	Title       string
-	FilePath    string
-	ChunkIndex  int
-	Text        string
-	Tags        []string
-	HasLinks    bool
-	ModifiedMs  int64
-	ContentHash string
-	Embedding   []float32
+	ID           string // "<slug>:<index>"
+	NoteSlug     string
+	Title        string
+	FilePath     string
+	ChunkIndex   int
+	Text         string
+	Tags         []string
+	HasLinks     bool
+	HeadingPath  string
+	HeadingLevel int
+	CodeBlocks   int
+	HasTable     bool
+	HasTask      bool
+	ModifiedMs   int64
+	ContentHash  string
+	Embedding    []float32
 }
 
 // UpsertChunks stores a batch of chunks (upsert = insert or replace by ID).
@@ -63,7 +67,7 @@ func (s *Store) DeleteNoteChunks(ctx context.Context, noteSlug string) error {
 }
 
 // UpsertLinks replaces all outgoing links for a note.
-func (s *Store) UpsertLinks(ctx context.Context, noteSlug string, links []parser.Link) error {
+func (s *Store) UpsertLinks(ctx context.Context, noteSlug string, links []string) error {
 	// Delete old outgoing links for this note
 	if err := s.links.Delete(ctx,
 		chroma.WithWhere(chroma.EqString("source_slug", noteSlug)),
@@ -71,10 +75,10 @@ func (s *Store) UpsertLinks(ctx context.Context, noteSlug string, links []parser
 		return fmt.Errorf("delete old links for %s: %w", noteSlug, err)
 	}
 
-	var uniqueLinks []parser.Link
+	var uniqueLinks []string
 	seenSlugs := make(map[string]bool)
 	for _, l := range links {
-		targetSlug := parser.Slugify(l.Target)
+		targetSlug := parser.Slugify(l)
 		if targetSlug == "" || seenSlugs[targetSlug] {
 			continue
 		}
@@ -91,17 +95,17 @@ func (s *Store) UpsertLinks(ctx context.Context, noteSlug string, links []parser
 	metas := make([]chroma.DocumentMetadata, len(uniqueLinks))
 
 	for i, l := range uniqueLinks {
-		targetSlug := parser.Slugify(l.Target) // derive slug from resolved path
+		targetSlug := parser.Slugify(l) // derive slug from resolved path
 		ids[i] = chroma.DocumentID(noteSlug + "→" + targetSlug)
-		texts[i] = l.DisplayText
+		texts[i] = l
 		if texts[i] == "" {
 			texts[i] = "-"
 		}
 		metaMap := map[string]interface{}{
 			"source_slug":  noteSlug,
 			"target_slug":  targetSlug,
-			"target_path":  l.Target,
-			"display_text": l.DisplayText,
+			"target_path":  l,
+			"display_text": l,
 		}
 		metas[i], _ = chroma.NewDocumentMetadataFromMap(metaMap)
 	}
@@ -128,15 +132,21 @@ func (s *Store) UpsertLinks(ctx context.Context, noteSlug string, links []parser
 
 func buildChunkMeta(c ChunkRecord) map[string]interface{} {
 	meta := map[string]interface{}{
-		"note_slug":    c.NoteSlug,
-		"title":        c.Title,
-		"file_path":    c.FilePath,
-		"chunk_index":  c.ChunkIndex,
-		"word_count":   len(strings.Fields(c.Text)),
-		"has_links":    c.HasLinks,
-		"modified_ms":  int(c.ModifiedMs),
-		"content_hash": c.ContentHash,
-		"tag_count":    len(c.Tags),
+		"note_slug":     c.NoteSlug,
+		"title":         c.Title,
+		"file_path":     c.FilePath,
+		"chunk_index":   c.ChunkIndex,
+		"word_count":    len(strings.Fields(c.Text)),
+		"has_links":     c.HasLinks,
+		"heading_path":  c.HeadingPath,
+		"heading_level": c.HeadingLevel,
+		"has_table":     c.HasTable,
+		"has_task":      c.HasTask,
+		"code_blocks":   c.CodeBlocks,
+		"has_code":      c.CodeBlocks > 0,
+		"modified_ms":   int(c.ModifiedMs),
+		"content_hash":  c.ContentHash,
+		"tag_count":     len(c.Tags),
 	}
 	// Encode tags as tag_0, tag_1, tag_2, ...
 	for i, tag := range c.Tags {

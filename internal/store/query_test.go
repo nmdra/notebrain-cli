@@ -2,7 +2,6 @@ package store_test
 
 import (
 	"context"
-	"github.com/nmdra/notebrain-cli/internal/parser"
 	"testing"
 	"time"
 
@@ -41,10 +40,8 @@ func setupTestData(t *testing.T, ctx context.Context, st *store.Store) {
 		t.Fatalf("setup chunks: %v", err)
 	}
 
-	err = st.UpsertLinks(ctx, "note-a", []parser.Link{
-		{Target: "Note B.md", DisplayText: "Note B"},
-	})
-	if err != nil {
+	links := []string{"note-b"}
+	if err := st.UpsertLinks(ctx, "note-a", links); err != nil {
 		t.Fatalf("setup links: %v", err)
 	}
 }
@@ -60,7 +57,7 @@ func TestQueries(t *testing.T) {
 	setupTestData(t, ctx, st)
 
 	t.Run("SemanticSearch", func(t *testing.T) {
-		res, err := st.SemanticSearch(ctx, []float32{1.0, 0.0, 0.0}, 10)
+		res, err := st.SemanticSearch(ctx, []float32{1.0, 0.0, 0.0}, 10, nil)
 		if err != nil {
 			t.Fatalf("SemanticSearch failed: %v", err)
 		}

@@ -23,13 +23,18 @@ type Result struct {
 
 // SemanticSearch finds the most similar chunks to queryVec.
 // Returns deduplicated notes (best chunk per note).
-func (s *Store) SemanticSearch(ctx context.Context, queryVec []float32, limit int) ([]Result, error) {
+func (s *Store) SemanticSearch(ctx context.Context, queryVec []float32, limit int, whereFilter chroma.WhereFilter) ([]Result, error) {
 	// Fetch 3× limit to allow deduplication across chunks of same note
-	res, err := s.chunks.Query(ctx,
+	opts := []chroma.QueryOption{
 		chroma.WithQueryEmbeddings(embeddings.NewEmbeddingFromFloat32(queryVec)),
-		chroma.WithNResults(limit*3),
+		chroma.WithNResults(limit * 3),
 		chroma.WithInclude(chroma.IncludeMetadatas, chroma.IncludeDistances),
-	)
+	}
+	if whereFilter != nil {
+		opts = append(opts, chroma.WithWhere(whereFilter))
+	}
+
+	res, err := s.chunks.Query(ctx, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("semantic search: %w", err)
 	}
@@ -164,7 +169,7 @@ func (s *Store) HiddenConnections(ctx context.Context, queryVec []float32, seedS
 	linked[seedSlug] = true
 
 	// 2. Wide semantic search
-	candidates, err := s.SemanticSearch(ctx, queryVec, limit*5)
+	candidates, err := s.SemanticSearch(ctx, queryVec, limit*5, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -232,7 +237,7 @@ func (s *Store) SharedTags(ctx context.Context, noteSlug string, minShared int) 
 func (s *Store) GraphBoostedSearch(ctx context.Context, queryVec []float32, seedSlug string, boost float64, limit int) ([]Result, error) {
 	linked := s.linkedSlugs(ctx, seedSlug)
 
-	candidates, err := s.SemanticSearch(ctx, queryVec, limit*3)
+	candidates, err := s.SemanticSearch(ctx, queryVec, limit*3, nil)
 	if err != nil {
 		return nil, err
 	}

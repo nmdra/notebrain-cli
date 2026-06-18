@@ -128,17 +128,21 @@ func (p *Pipeline) ingestFile(ctx context.Context, vaultPath string, filePath st
 
 	title := parser.TitleFromPath(relPath)
 
-	text := parser.StripFrontmatter(string(content))
-	links := parser.ExtractLinks(text)
-	tags := parser.ExtractTags(text, "") // frontmatter parsing skipped for now
+	// Use goldmark to parse AST, extract frontmatter, tags, links, and text chunks
+	astRes := parser.ParseAST(string(content), slug, 300)
 
-	parsedChunks := parser.ChunkText(text, 300, 50)
-	if len(parsedChunks) == 0 {
-		parsedChunks = []parser.Chunk{{Index: 0, Text: " "}}
+	// If frontmatter provides a title, prefer it
+	if ft, ok := astRes.Frontmatter["title"].(string); ok && ft != "" {
+		title = ft
 	}
 
-	chunkRecords := make([]store.ChunkRecord, len(parsedChunks))
-	for i, c := range parsedChunks {
+	if len(astRes.Chunks) == 0 {
+		// create a dummy chunk for empty files
+		astRes.Chunks = []parser.ASTChunk{{NoteSlug: slug, Index: 0, Text: " "}}
+	}
+
+	chunkRecords := make([]store.ChunkRecord, len(astRes.Chunks))
+	for i, c := range astRes.Chunks {
 		emb, err := p.embedder.Embed(ctx, c.Text)
 		if err != nil {
 			return err
@@ -150,17 +154,22 @@ func (p *Pipeline) ingestFile(ctx context.Context, vaultPath string, filePath st
 		}
 
 		chunkRecords[i] = store.ChunkRecord{
-			ID:          fmt.Sprintf("%s:%d", slug, i),
-			NoteSlug:    slug,
-			Title:       title,
-			FilePath:    relPath,
-			ChunkIndex:  c.Index,
-			Text:        c.Text,
-			Tags:        tags,
-			HasLinks:    len(links) > 0,
-			ModifiedMs:  modTime.UnixMilli(),
-			ContentHash: hash,
-			Embedding:   emb,
+			ID:           fmt.Sprintf("%s:%d", slug, i),
+			NoteSlug:     slug,
+			Title:        title,
+			FilePath:     relPath,
+			ChunkIndex:   c.Index,
+			Text:         c.Text,
+			Tags:         astRes.Tags,
+			HasLinks:     len(astRes.Links) > 0,
+			HeadingPath:  c.HeadingPath,
+			HeadingLevel: c.Level,
+			CodeBlocks:   c.CodeBlocks,
+			HasTable:     c.HasTable,
+			HasTask:      c.HasTask,
+			ModifiedMs:   modTime.UnixMilli(),
+			ContentHash:  hash,
+			Embedding:    emb,
 		}
 	}
 
@@ -170,10 +179,10 @@ func (p *Pipeline) ingestFile(ctx context.Context, vaultPath string, filePath st
 	if err := p.store.UpsertChunks(ctx, chunkRecords); err != nil {
 		return err
 	}
-	if err := p.store.UpsertLinks(ctx, slug, links); err != nil {
+	if err := p.store.UpsertLinks(ctx, slug, astRes.Links); err != nil {
 		return err
 	}
 
-	fmt.Printf("Ingested %s (%d chunks)\n", relPath, len(parsedChunks))
+	fmt.Printf("Ingested %s (%d chunks)\n", relPath, len(astRes.Chunks))
 	return nil
 }
