@@ -92,10 +92,7 @@ Examples:
 			return err
 		}
 
-		fmt.Printf("Search Results for: %q\n\n", query)
-		for _, r := range results {
-			fmt.Printf("■ %s\n  Distance: %.4f | File: %s\n\n", r.Title, r.Score, r.FilePath)
-		}
+		printResults(fmt.Sprintf("Semantic Search: %q", query), results)
 		return nil
 	},
 }

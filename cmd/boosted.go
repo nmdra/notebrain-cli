@@ -73,10 +73,7 @@ Examples:
 			return err
 		}
 
-		fmt.Printf("Graph-Boosted Search Results for: %q (seed: %s, boost: %.2f)\n\n", query, seedSlug, boost)
-		for _, r := range results {
-			fmt.Printf("■ %s\n  Boosted Score: %.4f | File: %s\n\n", r.Title, r.Score, r.FilePath)
-		}
+		printResults(fmt.Sprintf("Graph-Boosted Search Results for: %q (seed: %s, boost: %.2f)", query, seedSlug, boost), results)
 		return nil
 	},
 }

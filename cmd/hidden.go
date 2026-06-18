@@ -71,14 +71,7 @@ Examples:
 			return err
 		}
 
-		fmt.Printf("Hidden connections for: %q (slug: %s)\n\n", targetNote, targetSlug)
-		if len(results) == 0 {
-			fmt.Println("No hidden connections found.")
-			return nil
-		}
-		for _, r := range results {
-			fmt.Printf("■ %s\n  Distance: %.4f | File: %s\n\n", r.Title, r.Score, r.FilePath)
-		}
+		printResults(fmt.Sprintf("Hidden connections for: %q (slug: %s)", targetNote, targetSlug), results)
 		return nil
 	},
 }

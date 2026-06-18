@@ -59,14 +59,7 @@ Examples:
 			return err
 		}
 
-		fmt.Printf("Notes sharing tags with: %q (slug: %s) [Min Shared: %d]\n\n", targetNote, targetSlug, minShared)
-		if len(nodes) == 0 {
-			fmt.Println("No related notes found.")
-			return nil
-		}
-		for _, n := range nodes {
-			fmt.Printf("■ %s\n", n.Title)
-		}
+		printResults(fmt.Sprintf("Notes sharing tags with: %q (slug: %s) [Min Shared: %d]", targetNote, targetSlug, minShared), nodes)
 		return nil
 	},
 }

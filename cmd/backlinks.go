@@ -57,14 +57,7 @@ Examples:
 			return err
 		}
 
-		fmt.Printf("Backlinks for: %q (slug: %s)\n\n", targetNote, targetSlug)
-		if len(links) == 0 {
-			fmt.Println("No backlinks found.")
-			return nil
-		}
-		for _, l := range links {
-			fmt.Printf("■ %s\n", l.Title)
-		}
+		printResults(fmt.Sprintf("Backlinks for: %q (slug: %s)", targetNote, targetSlug), links)
 		return nil
 	},
 }

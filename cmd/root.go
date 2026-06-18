@@ -57,7 +57,17 @@ func Execute() {
 	}
 }
 
+var (
+	noHyperlinks   bool
+	printVaultName string
+)
+
 func init() {
+	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
+		vault, _ := cmd.Flags().GetString("vault")
+		printVaultName = vault
+	}
+
 	home, err := os.UserHomeDir()
 	if err != nil {
 		home = "."
@@ -69,4 +79,5 @@ func init() {
 	rootCmd.PersistentFlags().String("chroma-url", "http://localhost:8000", "ChromaDB server URL (used when --chroma-mode=http)")
 	rootCmd.PersistentFlags().String("vault", "", "Obsidian vault name")
 	rootCmd.PersistentFlags().Bool("verbose", false, "enable verbose output")
+	rootCmd.PersistentFlags().BoolVar(&noHyperlinks, "no-hyperlinks", false, "Disable OSC 8 terminal hyperlinks in output")
 }

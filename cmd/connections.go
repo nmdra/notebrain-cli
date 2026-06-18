@@ -59,14 +59,7 @@ Examples:
 			return err
 		}
 
-		fmt.Printf("Graph Connections from: %q (slug: %s) [Hops: %d]\n\n", targetNote, targetSlug, hops)
-		if len(nodes) == 0 {
-			fmt.Println("No connections found.")
-			return nil
-		}
-		for _, n := range nodes {
-			fmt.Printf("■ %s\n", n.Title) // the exact distance isn't returned by Connections currently
-		}
+		printResults(fmt.Sprintf("Graph Connections from: %q (slug: %s) [Hops: %d]", targetNote, targetSlug, hops), nodes)
 		return nil
 	},
 }
