@@ -53,6 +53,6 @@ func hyperlink(uri, text string) string {
 	if !hyperlinkSupported() {
 		return text
 	}
-	// OSC 8 format: ESC ] 8 ; params ; uri ST  text  ESC ] 8 ; ; ST
-	return fmt.Sprintf("\x1b]8;;%s\x07%s\x1b]8;;\x07", uri, text)
+	// OSC 8 format: ESC ] 8 ; params ; uri ESC \  text  ESC ] 8 ; ; ESC \
+	return fmt.Sprintf("\x1b]8;;%s\x1b\\%s\x1b]8;;\x1b\\", uri, text)
 }

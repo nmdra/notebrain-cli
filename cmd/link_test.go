@@ -43,7 +43,7 @@ func TestHyperlink(t *testing.T) {
 	defer func() { _ = os.Unsetenv("TERM_PROGRAM") }()
 
 	res = hyperlink("obsidian://open?file=Note", "My Note")
-	expected := "\x1b]8;;obsidian://open?file=Note\x07My Note\x1b]8;;\x07"
+	expected := "\x1b]8;;obsidian://open?file=Note\x1b\\My Note\x1b]8;;\x1b\\"
 	if res != expected {
 		t.Errorf("Expected hyperlink to return %q, got %q", expected, res)
 	}
