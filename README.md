@@ -25,12 +25,38 @@ NoteBrain is a high-performance Go CLI tool designed to index an Obsidian vault 
    notebrain search "how do message brokers work?" --limit 5
    ```
 
+## Architecture
+
+```mermaid
+flowchart TD
+    A[Obsidian Vault] -->|Markdown Files| B(Parser Engine)
+    B -->|Chunks & Frontmatter| C{Ingestion Pipeline}
+    B -->|Wikilinks| C
+    
+    C -->|SHA-256 Hash Check| D[ChromaDB Local Vector Store]
+    C -->|ONNX Embeddings| D
+    
+    E[CLI Commands] -->|Query| D
+    D -->|Semantic Search| E
+    D -->|BFS Graph Traversal| E
+```
+
 ## Documentation
 
 Comprehensive documentation is available in the `wiki/` directory:
 - [Installation Guide](wiki/Installation.md)
-- [Commands Reference](wiki/Commands.md)
-- [Architecture & Design](wiki/Architecture.md)
+- [Architecture Details](wiki/Architecture.md)
+
+### CLI Command Reference
+Full auto-generated documentation for the CLI commands:
+- [notebrain](docs/cli/notebrain.md)
+- [notebrain ingest](docs/cli/notebrain_ingest.md)
+- [notebrain search](docs/cli/notebrain_search.md)
+- [notebrain backlinks](docs/cli/notebrain_backlinks.md)
+- [notebrain connections](docs/cli/notebrain_connections.md)
+- [notebrain hidden](docs/cli/notebrain_hidden.md)
+- [notebrain tags](docs/cli/notebrain_tags.md)
+- [notebrain boosted](docs/cli/notebrain_boosted.md)
 
 ## License
 MIT License
