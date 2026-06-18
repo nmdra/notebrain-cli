@@ -23,7 +23,6 @@ package cmd
 
 import (
 	"fmt"
-	"path/filepath"
 
 	"github.com/nmdra/notebrain-cli/internal/parser"
 	"github.com/nmdra/notebrain-cli/internal/store"
@@ -65,11 +64,8 @@ Examples:
 			fmt.Println("No connections found.")
 			return nil
 		}
-		vaultPath, _ := cmd.Flags().GetString("vault")
-		vaultName := filepath.Base(vaultPath)
-
 		for _, n := range nodes {
-			fmt.Printf("■ %s\n", formatObsidianLink(vaultName, n.Title, n.FilePath)) // the exact distance isn't returned by Connections currently
+			fmt.Printf("■ %s\n", n.Title) // the exact distance isn't returned by Connections currently
 		}
 		return nil
 	},

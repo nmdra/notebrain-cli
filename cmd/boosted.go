@@ -23,7 +23,6 @@ package cmd
 
 import (
 	"fmt"
-	"path/filepath"
 
 	"github.com/nmdra/notebrain-cli/internal/embedder"
 	"github.com/nmdra/notebrain-cli/internal/parser"
@@ -75,11 +74,8 @@ Examples:
 		}
 
 		fmt.Printf("Graph-Boosted Search Results for: %q (seed: %s, boost: %.2f)\n\n", query, seedSlug, boost)
-		vaultPath, _ := cmd.Flags().GetString("vault")
-		vaultName := filepath.Base(vaultPath)
-
 		for _, r := range results {
-			fmt.Printf("■ %s\n  Boosted Score: %.4f | File: %s\n\n", formatObsidianLink(vaultName, r.Title, r.FilePath), r.Score, r.FilePath)
+			fmt.Printf("■ %s\n  Boosted Score: %.4f | File: %s\n\n", r.Title, r.Score, r.FilePath)
 		}
 		return nil
 	},
