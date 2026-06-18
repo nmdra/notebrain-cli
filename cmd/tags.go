@@ -23,6 +23,7 @@ package cmd
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/nmdra/notebrain-cli/internal/parser"
 	"github.com/nmdra/notebrain-cli/internal/store"
@@ -64,8 +65,11 @@ Examples:
 			fmt.Println("No related notes found.")
 			return nil
 		}
+		vaultPath, _ := cmd.Flags().GetString("vault")
+		vaultName := filepath.Base(vaultPath)
+
 		for _, n := range nodes {
-			fmt.Printf("■ %s\n", n.Title)
+			fmt.Printf("■ %s\n", formatObsidianLink(vaultName, n.Title, n.FilePath))
 		}
 		return nil
 	},

@@ -23,6 +23,7 @@ package cmd
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/nmdra/notebrain-cli/internal/parser"
 	"github.com/nmdra/notebrain-cli/internal/store"
@@ -62,8 +63,11 @@ Examples:
 			fmt.Println("No backlinks found.")
 			return nil
 		}
+		vaultPath, _ := cmd.Flags().GetString("vault")
+		vaultName := filepath.Base(vaultPath)
+
 		for _, l := range links {
-			fmt.Printf("■ %s\n", l.Title)
+			fmt.Printf("■ %s\n", formatObsidianLink(vaultName, l.Title, l.FilePath))
 		}
 		return nil
 	},
