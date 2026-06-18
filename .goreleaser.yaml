@@ -1,0 +1,99 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+version: 2
+
+project_name: notebrain-cli
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: notebrain
+    main: .
+    binary: notebrain
+    env:
+      - CGO_ENABLED=1
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+      - -extldflags "-static"
+
+archives:
+  - id: notebrain
+    ids: [notebrain]
+    formats: ["tar.gz"]
+    name_template: >-
+      notebrain_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+    files:
+      - README.md
+    format_overrides:
+      - goos: windows
+        formats: ["zip"]
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  use: github
+  groups:
+    - title: "🚀 Features"
+      regexp: "^feat"
+      order: 0
+    - title: "🐛 Bug Fixes"
+      regexp: "^fix"
+      order: 1
+    - title: "⚡ Performance"
+      regexp: "^perf"
+      order: 2
+    - title: "🔒 Security"
+      regexp: "^sec"
+      order: 3
+    - title: "Other"
+      order: 999
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "^ci:"
+      - "Merge pull request"
+
+release:
+  github:
+    owner: nmdra
+    name: notebrain-cli
+  draft: false
+  prerelease: auto
+  name_template: "NoteBrain CLI {{.Tag}}"
+  footer: |
+    ---
+    **Full Changelog**: https://github.com/nmdra/notebrain-cli/compare/{{ .PreviousTag }}...{{ .Tag }}
+    Released by [GoReleaser](https://goreleaser.com).
+
+sboms:
+  - artifacts: archive
+
+signs:
+  - cmd: cosign
+    args:
+      - "sign-blob"
+      - "--bundle=${signature}"
+      - "${artifact}"
+      - "--yes"
+    artifacts: checksum
+
+snapshot:
+  version_template: "{{ .Tag }}-next"
