@@ -66,7 +66,20 @@ func init() {
 	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
 		vault, _ := cmd.Flags().GetString("vault")
 		if vault == "" {
-			vault = os.Getenv("OBSIDIAN_VAULT")
+			// If no flag provided, try the explicitly named vault env var first
+			vault = os.Getenv("OBSIDIAN_VAULT_NAME")
+			if vault == "" {
+				// Fall back to the legacy one or extracting the name from the path
+				legacyVault := os.Getenv("OBSIDIAN_VAULT")
+				if legacyVault != "" {
+					vault = legacyVault
+				} else {
+					vaultPath := os.Getenv("OBSIDIAN_VAULT_PATH")
+					if vaultPath != "" {
+						vault = vaultPath
+					}
+				}
+			}
 		}
 		if vault != "" {
 			vault = filepath.Base(vault)

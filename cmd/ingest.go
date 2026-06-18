@@ -23,6 +23,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/nmdra/notebrain-cli/internal/embedder"
 	"github.com/nmdra/notebrain-cli/internal/ingest"
@@ -47,7 +48,10 @@ Examples:
 		workers, _ := cmd.Flags().GetInt("workers")
 		vaultPath, _ := cmd.Flags().GetString("vault")
 		if vaultPath == "" {
-			return fmt.Errorf("--vault must be specified")
+			vaultPath = os.Getenv("OBSIDIAN_VAULT_PATH")
+		}
+		if vaultPath == "" {
+			return fmt.Errorf("--vault flag or OBSIDIAN_VAULT_PATH env var must be specified")
 		}
 
 		glob := ""
