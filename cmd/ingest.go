@@ -63,14 +63,14 @@ Examples:
 		if err != nil {
 			return err
 		}
-		defer st.Close()
+		defer func() { _ = st.Close() }()
 
 		fmt.Println("Initializing embedded ONNX vector models...")
 		emb, err := embedder.NewLocalEmbedder()
 		if err != nil {
 			return err
 		}
-		defer emb.Close()
+		defer func() { _ = emb.Close() }()
 
 		fmt.Printf("Starting ingestion pipeline with %d workers...\n", workers)
 		pipeline := ingest.NewPipeline(st, emb, workers)

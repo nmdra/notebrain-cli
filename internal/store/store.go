@@ -34,13 +34,13 @@ func Open(ctx context.Context, path string) (*Store, error) {
 
 	chunks, err := client.GetOrCreateCollection(ctx, CollectionChunks)
 	if err != nil {
-		client.Close()
+		_ = client.Close()
 		return nil, fmt.Errorf("get/create chunks collection: %w", err)
 	}
 
 	links, err := client.GetOrCreateCollection(ctx, CollectionLinks)
 	if err != nil {
-		client.Close()
+		_ = client.Close()
 		return nil, fmt.Errorf("get/create links collection: %w", err)
 	}
 

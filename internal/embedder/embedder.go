@@ -61,10 +61,6 @@ func (e *defaultEmbedder) EmbedBatch(ctx context.Context, texts []string) ([][]f
 
 func (e *defaultEmbedder) Close() error {
 	var err1, err2 error
-	if e.ef != nil {
-		// Close might not be exposed on *DefaultEmbeddingFunction directly or it might
-		// but e.destroy handles environment cleanup.
-	}
 	if e.destroy != nil {
 		err2 = e.destroy()
 	}

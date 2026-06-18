@@ -15,7 +15,7 @@ func TestUpsertAndDeleteChunks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open failed: %v", err)
 	}
-	defer st.Close()
+	defer func() { _ = st.Close() }()
 
 	chunks := []store.ChunkRecord{
 		{
@@ -72,7 +72,7 @@ func TestUpsertLinks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open failed: %v", err)
 	}
-	defer st.Close()
+	defer func() { _ = st.Close() }()
 
 	links := []obsidian.LinkRecord{
 		{

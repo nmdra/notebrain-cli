@@ -7,13 +7,13 @@ import (
 
 func TestStoreOpenClose(t *testing.T) {
 	ctx := context.Background()
-	
+
 	// Open store with temp dir
 	st, err := Open(ctx, t.TempDir())
 	if err != nil {
 		t.Fatalf("Open failed: %v", err)
 	}
-	defer st.Close()
+	defer func() { _ = st.Close() }()
 
 	// Initial stats should be empty
 	stats, err := st.Stats(ctx)
@@ -35,7 +35,7 @@ func TestStoreReset(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open failed: %v", err)
 	}
-	defer st.Close()
+	defer func() { _ = st.Close() }()
 
 	err = st.Reset(ctx)
 	if err != nil {

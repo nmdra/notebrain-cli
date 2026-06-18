@@ -26,12 +26,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/nmdra/notebrain-cli/config"
 	"github.com/spf13/cobra"
 )
-
-// cfg holds the global configuration populated from persistent flags.
-var cfg *config.Config
 
 // rootCmd represents the base command when called without any subcommands.
 var rootCmd = &cobra.Command{
@@ -54,34 +50,27 @@ Examples:
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		flags := cmd.Root().PersistentFlags()
 
-		chromaPath, err := flags.GetString("chroma-path")
+		_, err := flags.GetString("chroma-path")
 		if err != nil {
 			return fmt.Errorf("reading --chroma-path: %w", err)
 		}
-		chromaMode, err := flags.GetString("chroma-mode")
+		_, err = flags.GetString("chroma-mode")
 		if err != nil {
 			return fmt.Errorf("reading --chroma-mode: %w", err)
 		}
-		chromaURL, err := flags.GetString("chroma-url")
+		_, err = flags.GetString("chroma-url")
 		if err != nil {
 			return fmt.Errorf("reading --chroma-url: %w", err)
 		}
-		vault, err := flags.GetString("vault")
+		_, err = flags.GetString("vault")
 		if err != nil {
 			return fmt.Errorf("reading --vault: %w", err)
 		}
-		verbose, err := flags.GetBool("verbose")
+		_, err = flags.GetBool("verbose")
 		if err != nil {
 			return fmt.Errorf("reading --verbose: %w", err)
 		}
 
-		cfg = &config.Config{
-			ChromaPath: chromaPath,
-			ChromaMode: chromaMode,
-			ChromaURL:  chromaURL,
-			VaultName:  vault,
-			Verbose:    verbose,
-		}
 		return nil
 	},
 }

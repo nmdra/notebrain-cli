@@ -53,13 +53,13 @@ Examples:
 		if err != nil {
 			return err
 		}
-		defer st.Close()
+		defer func() { _ = st.Close() }()
 
 		emb, err := embedder.NewLocalEmbedder()
 		if err != nil {
 			return err
 		}
-		defer emb.Close()
+		defer func() { _ = emb.Close() }()
 
 		qVec, err := emb.Embed(ctx, query)
 		if err != nil {

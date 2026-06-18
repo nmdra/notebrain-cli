@@ -55,7 +55,7 @@ func TestQueries(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open failed: %v", err)
 	}
-	defer st.Close()
+	defer func() { _ = st.Close() }()
 
 	setupTestData(t, ctx, st)
 
@@ -105,7 +105,7 @@ func TestQueries(t *testing.T) {
 				Embedding:  []float32{0.9, 0.0, 0.0},
 			},
 		}
-		st.UpsertChunks(ctx, chunks)
+		_ = st.UpsertChunks(ctx, chunks)
 
 		res, err := st.HiddenConnections(ctx, []float32{1.0, 0.0, 0.0}, "note-a", 10)
 		if err != nil {
