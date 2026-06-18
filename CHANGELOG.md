@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.0.0] - 2026-06-18
+
+### Official Release
+This marks the official stable release of **NoteBrain CLI v1.0.0**! This release successfully graduates all of our powerful experimental features from the alpha, beta, and release candidate channels into a robust, high-performance production version.
+
+**Highlights of v1.0.0 include:**
+- **Local Embedded AI**: Fully embedded `chroma-go` database and local ONNX embedding models right in the binary. No external servers needed.
+- **AST-Aware Intelligence**: Goldmark-based markdown parsing for highly accurate, structure-aware semantic chunking.
+- **Graph & Semantic Search Combined**: Search by vector similarity, explore wikilink connections (`--hops`), and run Graph-Boosted hybrid queries.
+- **Terminal Integration**: Clickable OSC 8 `obsidian://open` terminal hyperlinks integrated natively.
+- **Developer Experience**: Dotenv (`.env`) support, 74%+ test coverage, and automated `GoReleaser` pipelines.
+
 ## [v1.0.0-rc.1] - 2026-06-18
 
 ### Added
