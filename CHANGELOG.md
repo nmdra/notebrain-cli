@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.0.0-rc.1] - 2026-06-18
+
+### Added
+- **Goldmark AST-Aware Chunking**: Intelligently chunks markdown sections according to header hierarchies instead of arbitrary character splits, preserving code blocks and structural metadata.
+- **Advanced Filtering**: Use `--section`, `--has-code`, and `--has-tasks` flags on searches to filter precisely by document structure.
+- **OSC 8 Terminal Hyperlinks**: Automatically renders clickable `obsidian://open` links right in your CLI for seamlessly opening matched chunks inside Obsidian (supported terminals only). Added `--no-hyperlinks` flag to disable.
+- **Environment Configuration**: Added `.env` file support (via `godotenv`) to manage global configuration like `OBSIDIAN_VAULT_PATH` and `OBSIDIAN_VAULT_NAME` without repetitive flags.
+
 ## [v1.0.0-beta] - 2026-06-18
 
 ### Added
