@@ -24,6 +24,9 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/nmdra/notebrain-cli/internal/embedder"
+	"github.com/nmdra/notebrain-cli/internal/ingest"
+	"github.com/nmdra/notebrain-cli/internal/store"
 	"github.com/spf13/cobra"
 )
 
@@ -41,8 +44,37 @@ Examples:
   notebrain ingest "**/*.md"
   notebrain ingest --workers 8`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("ingest called")
-		return nil
+		workers, _ := cmd.Flags().GetInt("workers")
+		vaultPath, _ := cmd.Flags().GetString("vault")
+		if vaultPath == "" {
+			return fmt.Errorf("--vault must be specified")
+		}
+
+		glob := ""
+		if len(args) > 0 {
+			glob = args[0]
+		}
+
+		ctx := cmd.Context()
+		chromaPath, _ := cmd.Flags().GetString("chroma-path")
+
+		fmt.Println("Opening ChromaDB store...")
+		st, err := store.Open(ctx, chromaPath)
+		if err != nil {
+			return err
+		}
+		defer st.Close()
+
+		fmt.Println("Initializing embedded ONNX vector models...")
+		emb, err := embedder.NewLocalEmbedder()
+		if err != nil {
+			return err
+		}
+		defer emb.Close()
+
+		fmt.Printf("Starting ingestion pipeline with %d workers...\n", workers)
+		pipeline := ingest.NewPipeline(st, emb, workers)
+		return pipeline.Run(ctx, vaultPath, glob)
 	},
 }
 

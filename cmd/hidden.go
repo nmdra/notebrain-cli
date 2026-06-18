@@ -24,6 +24,9 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/nmdra/notebrain-cli/internal/embedder"
+	"github.com/nmdra/notebrain-cli/internal/parser"
+	"github.com/nmdra/notebrain-cli/internal/store"
 	"github.com/spf13/cobra"
 )
 
@@ -40,7 +43,42 @@ Examples:
   notebrain hidden "Mitochondria" --limit 5`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("hidden called")
+		targetNote := args[0]
+		targetSlug := parser.Slugify(targetNote)
+		limit, _ := cmd.Flags().GetInt("limit")
+		ctx := cmd.Context()
+
+		chromaPath, _ := cmd.Flags().GetString("chroma-path")
+		st, err := store.Open(ctx, chromaPath)
+		if err != nil {
+			return err
+		}
+		defer func() { _ = st.Close() }()
+
+		emb, err := embedder.NewLocalEmbedder()
+		if err != nil {
+			return err
+		}
+		defer func() { _ = emb.Close() }()
+
+		qVec, err := emb.Embed(ctx, targetNote) // Embed the note title as the search context
+		if err != nil {
+			return err
+		}
+
+		results, err := st.HiddenConnections(ctx, qVec, targetSlug, limit)
+		if err != nil {
+			return err
+		}
+
+		fmt.Printf("Hidden connections for: %q (slug: %s)\n\n", targetNote, targetSlug)
+		if len(results) == 0 {
+			fmt.Println("No hidden connections found.")
+			return nil
+		}
+		for _, r := range results {
+			fmt.Printf("■ %s\n  Distance: %.4f | File: %s\n\n", r.Title, r.Score, r.FilePath)
+		}
 		return nil
 	},
 }

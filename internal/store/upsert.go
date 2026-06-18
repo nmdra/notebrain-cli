@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"strconv"
 
 	chroma "github.com/amikos-tech/chroma-go/pkg/api/v2"
@@ -69,15 +70,26 @@ func (s *Store) UpsertLinks(ctx context.Context, noteSlug string, links []obsidi
 		return fmt.Errorf("delete old links for %s: %w", noteSlug, err)
 	}
 
-	if len(links) == 0 {
+	var uniqueLinks []obsidian.LinkRecord
+	seenSlugs := make(map[string]bool)
+	for _, l := range links {
+		targetSlug := parser.Slugify(l.Path)
+		if targetSlug == "" || seenSlugs[targetSlug] {
+			continue
+		}
+		seenSlugs[targetSlug] = true
+		uniqueLinks = append(uniqueLinks, l)
+	}
+
+	if len(uniqueLinks) == 0 {
 		return nil
 	}
 
-	ids := make([]chroma.DocumentID, len(links))
-	texts := make([]string, len(links)) // placeholder text — Chroma requires non-empty
-	metas := make([]chroma.DocumentMetadata, len(links))
+	ids := make([]chroma.DocumentID, len(uniqueLinks))
+	texts := make([]string, len(uniqueLinks)) // placeholder text — Chroma requires non-empty
+	metas := make([]chroma.DocumentMetadata, len(uniqueLinks))
 
-	for i, l := range links {
+	for i, l := range uniqueLinks {
 		targetSlug := parser.Slugify(l.Path) // derive slug from resolved path
 		ids[i] = chroma.DocumentID(noteSlug + "→" + targetSlug)
 		texts[i] = l.DisplayText
@@ -96,15 +108,17 @@ func (s *Store) UpsertLinks(ctx context.Context, noteSlug string, links []obsidi
 	// sb_links has no embedding function — pass zero-length embeddings or
 	// create the collection with no embedding function.
 	// Simplest: store links with a dummy 1-dim embedding.
-	dummyEmbs := make([]embeddings.Embedding, len(links))
-	for i := range dummyEmbs {
-		dummyEmbs[i] = embeddings.NewEmbeddingFromFloat32([]float32{0})
+	embs := make([]embeddings.Embedding, len(uniqueLinks))
+	// Add dummy 1-dimensional embeddings to bypass Chroma dimension checks (required)
+	// We use random values to prevent HNSW pathologically failing on identical vectors
+	for i := range uniqueLinks {
+		embs[i] = embeddings.NewEmbeddingFromFloat32([]float32{rand.Float32()})
 	}
 
 	return s.links.Upsert(ctx,
 		chroma.WithIDs(ids...),
 		chroma.WithTexts(texts...),
-		chroma.WithEmbeddings(dummyEmbs...),
+		chroma.WithEmbeddings(embs...),
 		chroma.WithMetadatas(metas...),
 	)
 }

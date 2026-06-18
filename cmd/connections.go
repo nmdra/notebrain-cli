@@ -24,6 +24,8 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/nmdra/notebrain-cli/internal/parser"
+	"github.com/nmdra/notebrain-cli/internal/store"
 	"github.com/spf13/cobra"
 )
 
@@ -40,7 +42,31 @@ Examples:
   notebrain connections "Mitochondria" --hops 3`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("connections called")
+		targetNote := args[0]
+		targetSlug := parser.Slugify(targetNote)
+		hops, _ := cmd.Flags().GetInt("hops")
+		ctx := cmd.Context()
+
+		chromaPath, _ := cmd.Flags().GetString("chroma-path")
+		st, err := store.Open(ctx, chromaPath)
+		if err != nil {
+			return err
+		}
+		defer func() { _ = st.Close() }()
+
+		nodes, err := st.Connections(ctx, targetSlug, hops)
+		if err != nil {
+			return err
+		}
+
+		fmt.Printf("Graph Connections from: %q (slug: %s) [Hops: %d]\n\n", targetNote, targetSlug, hops)
+		if len(nodes) == 0 {
+			fmt.Println("No connections found.")
+			return nil
+		}
+		for _, n := range nodes {
+			fmt.Printf("■ %s\n", n.Title) // the exact distance isn't returned by Connections currently
+		}
 		return nil
 	},
 }

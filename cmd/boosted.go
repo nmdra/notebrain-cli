@@ -24,6 +24,9 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/nmdra/notebrain-cli/internal/embedder"
+	"github.com/nmdra/notebrain-cli/internal/parser"
+	"github.com/nmdra/notebrain-cli/internal/store"
 	"github.com/spf13/cobra"
 )
 
@@ -40,7 +43,40 @@ Examples:
   notebrain boosted "cell biology" --seed "ATP" --boost 2.0 --limit 5`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("boosted called")
+		query := args[0]
+		seed, _ := cmd.Flags().GetString("seed")
+		seedSlug := parser.Slugify(seed)
+		boost, _ := cmd.Flags().GetFloat64("boost")
+		limit, _ := cmd.Flags().GetInt("limit")
+		ctx := cmd.Context()
+
+		chromaPath, _ := cmd.Flags().GetString("chroma-path")
+		st, err := store.Open(ctx, chromaPath)
+		if err != nil {
+			return err
+		}
+		defer func() { _ = st.Close() }()
+
+		emb, err := embedder.NewLocalEmbedder()
+		if err != nil {
+			return err
+		}
+		defer func() { _ = emb.Close() }()
+
+		qVec, err := emb.Embed(ctx, query)
+		if err != nil {
+			return err
+		}
+
+		results, err := st.GraphBoostedSearch(ctx, qVec, seedSlug, boost, limit)
+		if err != nil {
+			return err
+		}
+
+		fmt.Printf("Graph-Boosted Search Results for: %q (seed: %s, boost: %.2f)\n\n", query, seedSlug, boost)
+		for _, r := range results {
+			fmt.Printf("■ %s\n  Boosted Score: %.4f | File: %s\n\n", r.Title, r.Score, r.FilePath)
+		}
 		return nil
 	},
 }

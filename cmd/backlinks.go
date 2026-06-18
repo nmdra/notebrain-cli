@@ -24,6 +24,8 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/nmdra/notebrain-cli/internal/parser"
+	"github.com/nmdra/notebrain-cli/internal/store"
 	"github.com/spf13/cobra"
 )
 
@@ -39,7 +41,30 @@ Examples:
   notebrain backlinks "Daily Notes/2026-06-18"`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("backlinks called")
+		targetNote := args[0]
+		targetSlug := parser.Slugify(targetNote)
+		ctx := cmd.Context()
+
+		chromaPath, _ := cmd.Flags().GetString("chroma-path")
+		st, err := store.Open(ctx, chromaPath)
+		if err != nil {
+			return err
+		}
+		defer func() { _ = st.Close() }()
+
+		links, err := st.Backlinks(ctx, targetSlug)
+		if err != nil {
+			return err
+		}
+
+		fmt.Printf("Backlinks for: %q (slug: %s)\n\n", targetNote, targetSlug)
+		if len(links) == 0 {
+			fmt.Println("No backlinks found.")
+			return nil
+		}
+		for _, l := range links {
+			fmt.Printf("■ %s\n", l.Title)
+		}
 		return nil
 	},
 }

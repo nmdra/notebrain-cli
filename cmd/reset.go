@@ -27,6 +27,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/nmdra/notebrain-cli/internal/store"
 	"github.com/spf13/cobra"
 )
 
@@ -56,7 +57,20 @@ Examples:
 			return nil
 		}
 
-		fmt.Println("reset called")
+		ctx := cmd.Context()
+
+		chromaPath, _ := cmd.Flags().GetString("chroma-path")
+		st, err := store.Open(ctx, chromaPath)
+		if err != nil {
+			return err
+		}
+		defer func() { _ = st.Close() }()
+
+		if err := st.Reset(ctx); err != nil {
+			return err
+		}
+
+		fmt.Println("Database reset successful. All collections dropped.")
 		return nil
 	},
 }

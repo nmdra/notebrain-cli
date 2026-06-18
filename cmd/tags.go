@@ -24,6 +24,8 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/nmdra/notebrain-cli/internal/parser"
+	"github.com/nmdra/notebrain-cli/internal/store"
 	"github.com/spf13/cobra"
 )
 
@@ -40,7 +42,31 @@ Examples:
   notebrain tags "Mitochondria" --min-shared 2`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("tags called")
+		targetNote := args[0]
+		targetSlug := parser.Slugify(targetNote)
+		minShared, _ := cmd.Flags().GetInt("min-shared")
+		ctx := cmd.Context()
+
+		chromaPath, _ := cmd.Flags().GetString("chroma-path")
+		st, err := store.Open(ctx, chromaPath)
+		if err != nil {
+			return err
+		}
+		defer func() { _ = st.Close() }()
+
+		nodes, err := st.SharedTags(ctx, targetSlug, minShared)
+		if err != nil {
+			return err
+		}
+
+		fmt.Printf("Notes sharing tags with: %q (slug: %s) [Min Shared: %d]\n\n", targetNote, targetSlug, minShared)
+		if len(nodes) == 0 {
+			fmt.Println("No related notes found.")
+			return nil
+		}
+		for _, n := range nodes {
+			fmt.Printf("■ %s\n", n.Title)
+		}
 		return nil
 	},
 }

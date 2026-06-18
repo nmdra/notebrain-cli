@@ -24,6 +24,7 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/nmdra/notebrain-cli/internal/store"
 	"github.com/spf13/cobra"
 )
 
@@ -37,7 +38,24 @@ including the number of chunks, links, unique notes, and embedding dimensions.
 Examples:
   notebrain stats`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("stats called")
+		ctx := cmd.Context()
+
+		chromaPath, _ := cmd.Flags().GetString("chroma-path")
+		st, err := store.Open(ctx, chromaPath)
+		if err != nil {
+			return err
+		}
+		defer func() { _ = st.Close() }()
+
+		stats, err := st.Stats(ctx)
+		if err != nil {
+			return err
+		}
+
+		fmt.Println("NoteBrain ChromaDB Statistics")
+		fmt.Println("=============================")
+		fmt.Printf("Total Chunks : %d\n", stats["chunks"])
+		fmt.Printf("Total Links  : %d\n", stats["links"])
 		return nil
 	},
 }

@@ -24,6 +24,8 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/nmdra/notebrain-cli/internal/embedder"
+	"github.com/nmdra/notebrain-cli/internal/store"
 	"github.com/spf13/cobra"
 )
 
@@ -39,7 +41,40 @@ Examples:
   notebrain search "mitochondria energy" --limit 5`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("search called")
+		if len(args) < 1 {
+			return fmt.Errorf("search requires a query string")
+		}
+		query := args[0]
+		limit, _ := cmd.Flags().GetInt("limit")
+		ctx := cmd.Context()
+
+		chromaPath, _ := cmd.Flags().GetString("chroma-path")
+		st, err := store.Open(ctx, chromaPath)
+		if err != nil {
+			return err
+		}
+		defer st.Close()
+
+		emb, err := embedder.NewLocalEmbedder()
+		if err != nil {
+			return err
+		}
+		defer emb.Close()
+
+		qVec, err := emb.Embed(ctx, query)
+		if err != nil {
+			return err
+		}
+
+		results, err := st.SemanticSearch(ctx, qVec, limit)
+		if err != nil {
+			return err
+		}
+
+		fmt.Printf("Search Results for: %q\n\n", query)
+		for _, r := range results {
+			fmt.Printf("■ %s\n  Distance: %.4f | File: %s\n\n", r.Title, r.Score, r.FilePath)
+		}
 		return nil
 	},
 }
