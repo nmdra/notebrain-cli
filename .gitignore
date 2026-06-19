@@ -34,3 +34,6 @@ chroma_data/
 # Build artifacts
 dist/
 .env
+
+# graphify
+graphify-out
