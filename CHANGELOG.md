@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.1.0] - 2026-06-19
+
+### Added
+- **Beautiful TUI Integration**: Upgraded the CLI experience by integrating the `charm.land/bubbles v2` and `lipgloss v2` ecosystem.
+- **Interactive Result Browser**: Semantic searches and link traversals now open an interactive terminal UI (TUI) where you can fuzzy-find through results, view scores, and instantly open matched notes in Obsidian using the `Enter` key.
+- **Live Ingestion Progress**: Replaced the static progress output with a smooth, live-updating progress bar displaying exactly which files are being processed.
+
+### Changed
+- **CLI Framework Migration**: Completely migrated the CLI definition from `cobra` to `kong` for cleaner, declarative, struct-based command definitions, improving maintainability.
+- **Safe Pipeline Interruptions**: You can now safely cancel the multi-worker ingestion pipeline at any time by pressing `ctrl+c` (or `q`/`esc` in the TUI). All workers will cleanly abort.
+
+### Fixed
+- **Concurrency Crash**: Fixed a critical bug where embedded `hnswlib` (ChromaDB) would crash with a core dump (assertion failure) during concurrent ingestion. Database writes are now safely synchronized with mutexes.
+- **Missing FilePaths**: Fixed an issue where the `backlinks`, `connections`, `hidden`, and `tags` commands returned results missing `FilePath` metadata, meaning Obsidian URIs and the new interactive UI open feature now work perfectly for all commands.
+- **Zombie Process Leak**: Fixed an issue where opening a note via the terminal leaked zombie processes in the background.
+- **Chroma Path Resolution**: Fixed an issue where the `~` character in the database path was evaluated as a literal directory name instead of expanding to the user's home directory.
+
+
+
 ## [v1.0.0] - 2026-06-18
 
 ### Official Release
