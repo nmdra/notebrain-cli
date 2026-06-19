@@ -9,6 +9,7 @@ NoteBrain is a high-performance Go CLI tool designed to index an Obsidian vault 
 - **Blazing Fast Ingestion**: Uses Go concurrency and local ONNX embedding models to index your Markdown files rapidly.
 - **Embedded ChromaDB**: Stores vectors directly on disk using `chroma-go` v2 (no external database server required).
 - **Semantic Search**: Find notes by meaning, not just keywords.
+- **Beautiful TUI Integration**: Enjoy an interactive terminal UI for navigating search results with fuzzy-finding and live ingestion progress bars powered by `charm.land/bubbles`.
 - **Goldmark AST-Aware Chunking**: Intelligently chunks markdown sections according to header hierarchies instead of arbitrary character splits, preserving code blocks and structural metadata.
 - **Advanced Filtering**: Use `--section`, `--has-code`, and `--has-tasks` to filter searches precisely by document structures.
 - **OSC 8 Terminal Hyperlinks**: Automatically renders clickable `obsidian://open` links right in your CLI for seamlessly opening matched chunks inside Obsidian (supported terminals only).
@@ -66,15 +67,8 @@ Comprehensive documentation is available in the `wiki/` directory:
 - [Architecture Details](wiki/Architecture.md)
 
 ### CLI Command Reference
-Full auto-generated documentation for the CLI commands:
-- [notebrain](docs/cli/notebrain.md)
-- [notebrain ingest](docs/cli/notebrain_ingest.md)
-- [notebrain search](docs/cli/notebrain_search.md)
-- [notebrain backlinks](docs/cli/notebrain_backlinks.md)
-- [notebrain connections](docs/cli/notebrain_connections.md)
-- [notebrain hidden](docs/cli/notebrain_hidden.md)
-- [notebrain tags](docs/cli/notebrain_tags.md)
-- [notebrain boosted](docs/cli/notebrain_boosted.md)
+Full documentation for all NoteBrain commands:
+- [Commands Reference](wiki/Commands.md)
 
 ## License
 MIT License

@@ -2,6 +2,42 @@
 
 NoteBrain provides a variety of commands to ingest, query, and analyze your Obsidian vault.
 
+```text
+Usage: notebrain <command> [flags]
+
+Index and search your Obsidian vault with semantic intelligence
+
+Flags:
+  -h, --help             Show context-sensitive help.
+      --chroma-path="~/.notebrain/chroma"
+                         path to ChromaDB persistent storage
+      --chroma-mode="persistent"
+                         ChromaDB client mode ('persistent' or 'http')
+      --chroma-url="http://localhost:8000"
+                         ChromaDB server URL (used when --chroma-mode=http)
+      --vault=STRING     Obsidian vault name
+      --verbose          enable verbose output
+      --no-hyperlinks    Disable OSC 8 terminal hyperlinks in output
+
+Commands:
+  ingest         Ingest markdown files from a vault
+  search         Semantic search across indexed notes
+  backlinks      Find incoming links to a note
+  connections    Traverse graph connections
+  hidden         Discover hidden semantic links between unlinked notes
+  tags           Find notes sharing common tags
+  boosted        Graph-boosted semantic search
+  stats          Show collection statistics
+  reset          Reset the ChromaDB collections
+```
+
+### 🪄 Interactive Terminal UI
+For all query commands (`search`, `backlinks`, `connections`, `hidden`, `boosted`, `tags`), NoteBrain will launch a **beautiful interactive terminal UI**! 
+- Use the **Up/Down** arrow keys to navigate the results.
+- Press **/** to live-filter the results.
+- Press **Enter** to instantly open the selected note inside Obsidian!
+- Press **q** or **Esc** to exit.
+
 ## `ingest`
 Indexes your Obsidian vault into the local ChromaDB database.
 ```bash
