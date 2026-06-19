@@ -85,6 +85,12 @@ func ParseAndRun(ctx context.Context) error {
 	}
 	cli.VaultName = vault
 
+	if strings.HasPrefix(cli.ChromaPath, "~/") {
+		if home != "" && home != "." {
+			cli.ChromaPath = filepath.Join(home, cli.ChromaPath[2:])
+		}
+	}
+
 	return ctxParser.Run(&cli.Globals)
 }
 
