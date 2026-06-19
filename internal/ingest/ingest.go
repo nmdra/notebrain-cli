@@ -67,6 +67,11 @@ func (p *Pipeline) Run(ctx context.Context, vaultPath string, glob string, stdin
 	progressCh := make(chan tui.ProgressUpdate, p.workers*2)
 	errCh := make(chan error, totalFiles+1)
 
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	var done int32
+
 	// Launch UI program in background
 	pUI := tea.NewProgram(
 		tui.NewProgressModel(totalFiles, progressCh),
@@ -80,6 +85,9 @@ func (p *Pipeline) Run(ctx context.Context, vaultPath string, glob string, stdin
 		defer uiWg.Done()
 		if _, uiErr := pUI.Run(); uiErr != nil {
 			errCh <- fmt.Errorf("progress UI error: %w", uiErr)
+		}
+		if atomic.LoadInt32(&done) == 0 {
+			cancel() // Cancel workers if UI exits early (e.g. ctrl+c)
 		}
 	}()
 
@@ -125,6 +133,7 @@ fileLoop:
 
 	// Wait for all workers to finish, then signal the UI to quit
 	workerWg.Wait()
+	atomic.StoreInt32(&done, 1)
 	close(progressCh)
 	uiWg.Wait()
 	close(errCh)

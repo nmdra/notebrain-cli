@@ -3,6 +3,7 @@ package ingest
 import (
 	"bytes"
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -54,8 +55,12 @@ func TestPipelineRun(t *testing.T) {
 
 	p := NewPipeline(st, &mockEmbedder{}, 2)
 
-	var stdin, stdout bytes.Buffer
-	err = p.Run(ctx, vaultDir, "", &stdin, &stdout)
+	// Use an io.Pipe for stdin so Bubble Tea doesn't immediately exit due to EOF
+	pr, pw := io.Pipe()
+	defer func() { _ = pw.Close() }()
+
+	var stdout bytes.Buffer
+	err = p.Run(ctx, vaultDir, "", pr, &stdout)
 	if err != nil {
 		t.Fatalf("Pipeline.Run failed: %v", err)
 	}

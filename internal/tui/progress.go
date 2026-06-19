@@ -57,6 +57,12 @@ func waitForUpdate(ch <-chan ProgressUpdate) tea.Cmd {
 
 func (m ProgressModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch u := msg.(type) {
+	case tea.KeyMsg:
+		switch u.String() {
+		case "ctrl+c", "esc", "q":
+			return m, tea.Quit
+		}
+
 	case ProgressUpdate:
 		if u.Final {
 			m.finished = true

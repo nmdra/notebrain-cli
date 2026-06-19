@@ -34,6 +34,9 @@ type ChunkRecord struct {
 // UpsertChunks stores a batch of chunks (upsert = insert or replace by ID).
 // Call DeleteNoteChunks first to cleanly re-ingest a note.
 func (s *Store) UpsertChunks(ctx context.Context, chunks []ChunkRecord) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	if len(chunks) == 0 {
 		return nil
 	}
@@ -61,6 +64,9 @@ func (s *Store) UpsertChunks(ctx context.Context, chunks []ChunkRecord) error {
 
 // DeleteNoteChunks removes all chunks belonging to a note (before re-ingest).
 func (s *Store) DeleteNoteChunks(ctx context.Context, noteSlug string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	return s.chunks.Delete(ctx,
 		chroma.WithWhere(chroma.EqString("note_slug", noteSlug)),
 	)
@@ -68,6 +74,9 @@ func (s *Store) DeleteNoteChunks(ctx context.Context, noteSlug string) error {
 
 // UpsertLinks replaces all outgoing links for a note.
 func (s *Store) UpsertLinks(ctx context.Context, noteSlug string, links []string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	// Delete old outgoing links for this note
 	if err := s.links.Delete(ctx,
 		chroma.WithWhere(chroma.EqString("source_slug", noteSlug)),

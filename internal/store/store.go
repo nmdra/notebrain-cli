@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	chroma "github.com/amikos-tech/chroma-go/pkg/api/v2"
 )
@@ -17,6 +18,7 @@ type Store struct {
 	client chroma.Client
 	chunks chroma.Collection
 	links  chroma.Collection
+	mu     sync.Mutex
 }
 
 // Open creates or opens the persistent ChromaDB store at path.
