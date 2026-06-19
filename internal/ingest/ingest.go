@@ -4,27 +4,34 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/nmdra/notebrain-cli/internal/parser"
 	"github.com/nmdra/notebrain-cli/internal/store"
+	"github.com/nmdra/notebrain-cli/internal/tui"
 )
 
+// Embedder abstracts vector embedding so the pipeline can be tested with mocks.
 type Embedder interface {
 	Embed(ctx context.Context, text string) ([]float32, error)
 }
 
+// Pipeline orchestrates the ingestion of markdown files into the ChromaDB store.
 type Pipeline struct {
 	store    *store.Store
 	embedder Embedder
 	workers  int
 }
 
+// NewPipeline creates an ingestion pipeline with the given number of concurrent workers.
 func NewPipeline(s *store.Store, e Embedder, workers int) *Pipeline {
 	if workers <= 0 {
 		workers = 1
@@ -36,7 +43,108 @@ func NewPipeline(s *store.Store, e Embedder, workers int) *Pipeline {
 	}
 }
 
-func (p *Pipeline) Run(ctx context.Context, vaultPath string, glob string) error {
+// Run walks the vault directory, finds markdown files matching glob, and ingests
+// them into the store with a TUI progress bar rendered to stdout.
+func (p *Pipeline) Run(ctx context.Context, vaultPath string, glob string, stdin io.Reader, stdout io.Writer) error {
+	files, err := p.collectFiles(vaultPath, glob)
+	if err != nil {
+		return err
+	}
+
+	totalFiles := len(files)
+	_, _ = fmt.Fprintf(stdout, "Found %d markdown files to ingest\n", totalFiles)
+
+	if totalFiles == 0 {
+		return nil
+	}
+
+	hashes, _ := p.store.GetNoteHashes(ctx)
+	if hashes == nil {
+		hashes = make(map[string]string)
+	}
+
+	// +1 for the TUI goroutine's potential error
+	progressCh := make(chan tui.ProgressUpdate, p.workers*2)
+	errCh := make(chan error, totalFiles+1)
+
+	// Launch UI program in background
+	pUI := tea.NewProgram(
+		tui.NewProgressModel(totalFiles, progressCh),
+		tea.WithInput(stdin),
+		tea.WithOutput(stdout),
+	)
+
+	var uiWg sync.WaitGroup
+	uiWg.Add(1)
+	go func() {
+		defer uiWg.Done()
+		if _, uiErr := pUI.Run(); uiErr != nil {
+			errCh <- fmt.Errorf("progress UI error: %w", uiErr)
+		}
+	}()
+
+	// Atomic counter for monotonically increasing progress
+	var completed int64
+
+	var workerWg sync.WaitGroup
+	sem := make(chan struct{}, p.workers)
+
+fileLoop:
+	for _, file := range files {
+		// Check for context cancellation before spawning new work
+		select {
+		case <-ctx.Done():
+			break fileLoop
+		case sem <- struct{}{}:
+		}
+
+		if ctx.Err() != nil {
+			<-sem
+			break fileLoop
+		}
+
+		workerWg.Add(1)
+		go func(f string) {
+			defer func() {
+				<-sem
+				workerWg.Done()
+			}()
+
+			if err := p.ingestFile(ctx, vaultPath, f, hashes); err != nil {
+				errCh <- fmt.Errorf("file %s: %w", f, err)
+			}
+
+			n := atomic.AddInt64(&completed, 1)
+			progressCh <- tui.ProgressUpdate{
+				Done:    int(n),
+				Total:   totalFiles,
+				Current: filepath.Base(f),
+			}
+		}(file)
+	}
+
+	// Wait for all workers to finish, then signal the UI to quit
+	workerWg.Wait()
+	close(progressCh)
+	uiWg.Wait()
+	close(errCh)
+
+	var firstErr error
+	for e := range errCh {
+		if firstErr == nil {
+			firstErr = e
+		}
+		_, _ = fmt.Fprintf(stdout, "Error: %v\n", e)
+	}
+
+	if firstErr == nil && ctx.Err() != nil {
+		return ctx.Err()
+	}
+	return firstErr
+}
+
+// collectFiles walks the vault directory and returns all .md files matching glob.
+func (p *Pipeline) collectFiles(vaultPath, glob string) ([]string, error) {
 	var files []string
 	err := filepath.WalkDir(vaultPath, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -61,49 +169,9 @@ func (p *Pipeline) Run(ctx context.Context, vaultPath string, glob string) error
 		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("walk vault: %w", err)
+		return nil, fmt.Errorf("walk vault: %w", err)
 	}
-
-	fmt.Printf("Found %d markdown files to ingest\n", len(files))
-
-	hashes, _ := p.store.GetNoteHashes(ctx)
-	if hashes == nil {
-		hashes = make(map[string]string)
-	}
-
-	var wg sync.WaitGroup
-	fileCh := make(chan string, len(files))
-	for _, f := range files {
-		fileCh <- f
-	}
-	close(fileCh)
-
-	errCh := make(chan error, len(files))
-
-	for i := 0; i < p.workers; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for path := range fileCh {
-				if err := p.ingestFile(ctx, vaultPath, path, hashes); err != nil {
-					errCh <- fmt.Errorf("file %s: %w", path, err)
-				}
-			}
-		}()
-	}
-
-	wg.Wait()
-	close(errCh)
-
-	var firstErr error
-	for e := range errCh {
-		if firstErr == nil {
-			firstErr = e
-		}
-		fmt.Printf("Error: %v\n", e)
-	}
-
-	return firstErr
+	return files, nil
 }
 
 func (p *Pipeline) ingestFile(ctx context.Context, vaultPath string, filePath string, knownHashes map[string]string) error {
@@ -119,26 +187,27 @@ func (p *Pipeline) ingestFile(ctx context.Context, vaultPath string, filePath st
 
 	slug := parser.Slugify(relPath)
 
-	// Compute hash and check if unchanged
 	hash := fmt.Sprintf("%x", sha256.Sum256(content))
 	if knownHashes[slug] == hash {
-		fmt.Printf("Skipped %s (unchanged)\n", relPath)
 		return nil
 	}
 
 	title := parser.TitleFromPath(relPath)
-
-	// Use goldmark to parse AST, extract frontmatter, tags, links, and text chunks
 	astRes := parser.ParseAST(string(content), slug, 300)
 
-	// If frontmatter provides a title, prefer it
 	if ft, ok := astRes.Frontmatter["title"].(string); ok && ft != "" {
 		title = ft
 	}
 
 	if len(astRes.Chunks) == 0 {
-		// create a dummy chunk for empty files
 		astRes.Chunks = []parser.ASTChunk{{NoteSlug: slug, Index: 0, Text: " "}}
+	}
+
+	// Stat the file once, outside the chunk loop
+	info, _ := os.Stat(filePath)
+	modTime := time.Now()
+	if info != nil {
+		modTime = info.ModTime()
 	}
 
 	chunkRecords := make([]store.ChunkRecord, len(astRes.Chunks))
@@ -146,11 +215,6 @@ func (p *Pipeline) ingestFile(ctx context.Context, vaultPath string, filePath st
 		emb, err := p.embedder.Embed(ctx, c.Text)
 		if err != nil {
 			return err
-		}
-		info, _ := os.Stat(filePath)
-		modTime := time.Now()
-		if info != nil {
-			modTime = info.ModTime()
 		}
 
 		chunkRecords[i] = store.ChunkRecord{
@@ -183,6 +247,5 @@ func (p *Pipeline) ingestFile(ctx context.Context, vaultPath string, filePath st
 		return err
 	}
 
-	fmt.Printf("Ingested %s (%d chunks)\n", relPath, len(astRes.Chunks))
 	return nil
 }

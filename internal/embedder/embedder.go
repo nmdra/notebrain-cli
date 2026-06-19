@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/amikos-tech/chroma-go/pkg/embeddings/ort"
+	"github.com/nmdra/notebrain-cli/internal/tui"
 )
 
 type LocalEmbedder struct {
@@ -13,7 +15,21 @@ type LocalEmbedder struct {
 }
 
 func NewLocalEmbedder() (*LocalEmbedder, error) {
-	ef, destroy, err := ort.NewDefaultEmbeddingFunction()
+	var ef *ort.DefaultEmbeddingFunction
+	var destroy func() error
+	var err error
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		ef, destroy, err = ort.NewDefaultEmbeddingFunction()
+	}()
+
+	p := tea.NewProgram(tui.NewSpinner("Setting up MiniLM (first run downloads ~33 MB)...", done))
+	if _, pErr := p.Run(); pErr != nil {
+		return nil, fmt.Errorf("spinner error: %w", pErr)
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("init local embedder: %w", err)
 	}
@@ -54,12 +70,8 @@ func (e *LocalEmbedder) EmbedBatch(ctx context.Context, texts []string) ([][]flo
 }
 
 func (e *LocalEmbedder) Close() error {
-	var err1, err2 error
 	if e.destroy != nil {
-		err2 = e.destroy()
+		return e.destroy()
 	}
-	if err1 != nil {
-		return err1
-	}
-	return err2
+	return nil
 }

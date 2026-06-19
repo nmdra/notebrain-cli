@@ -1,6 +1,7 @@
 package ingest
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"path/filepath"
@@ -53,7 +54,8 @@ func TestPipelineRun(t *testing.T) {
 
 	p := NewPipeline(st, &mockEmbedder{}, 2)
 
-	err = p.Run(ctx, vaultDir, "")
+	var stdin, stdout bytes.Buffer
+	err = p.Run(ctx, vaultDir, "", &stdin, &stdout)
 	if err != nil {
 		t.Fatalf("Pipeline.Run failed: %v", err)
 	}

@@ -85,10 +85,11 @@ func (s *Store) Backlinks(ctx context.Context, targetSlug string) ([]Result, err
 			continue
 		}
 		seen[slug] = true
-		title := s.titleForSlug(ctx, slug)
+		title, filePath := s.noteInfoForSlug(ctx, slug)
 		out = append(out, Result{
 			NoteSlug: slug,
 			Title:    title,
+			FilePath: filePath,
 			Score:    1.0,
 			Extra:    metaString(meta, "display_text"),
 		})
@@ -143,9 +144,11 @@ func (s *Store) Connections(ctx context.Context, seedSlug string, maxHops int) (
 	delete(visited, seedSlug)
 	var out []Result
 	for slug, hop := range visited {
+		title, filePath := s.noteInfoForSlug(ctx, slug)
 		out = append(out, Result{
 			NoteSlug: slug,
-			Title:    s.titleForSlug(ctx, slug),
+			Title:    title,
+			FilePath: filePath,
 			Score:    float64(hop),
 			Extra:    fmt.Sprintf("%d hop(s)", hop),
 		})
@@ -219,9 +222,11 @@ func (s *Store) SharedTags(ctx context.Context, noteSlug string, minShared int) 
 		if count < minShared {
 			continue
 		}
+		title, filePath := s.noteInfoForSlug(ctx, slug)
 		out = append(out, Result{
 			NoteSlug: slug,
-			Title:    s.titleForSlug(ctx, slug),
+			Title:    title,
+			FilePath: filePath,
 			Score:    float64(count),
 			Extra:    strings.Join(noteTagNames[slug], ", "),
 		})
@@ -380,8 +385,8 @@ func (s *Store) notesWithTag(ctx context.Context, tag string) []string {
 	return slugs
 }
 
-// titleForSlug fetches the title of a note's first chunk.
-func (s *Store) titleForSlug(ctx context.Context, slug string) string {
+// noteInfoForSlug fetches the title and file path of a note's first chunk.
+func (s *Store) noteInfoForSlug(ctx context.Context, slug string) (title, filePath string) {
 	res, err := s.chunks.Get(ctx,
 		chroma.WithWhere(chroma.And(
 			chroma.EqString("note_slug", slug),
@@ -390,9 +395,15 @@ func (s *Store) titleForSlug(ctx context.Context, slug string) string {
 		chroma.WithInclude(chroma.IncludeMetadatas),
 	)
 	if err != nil || len(res.GetMetadatas()) == 0 {
-		return slug
+		return slug, ""
 	}
-	return metaString(res.GetMetadatas()[0], "title")
+	m := res.GetMetadatas()[0]
+	title = metaString(m, "title")
+	if title == "" {
+		title = slug
+	}
+	filePath = metaString(m, "file_path")
+	return title, filePath
 }
 
 // metaString safely reads a string from a DocumentMetadata.
