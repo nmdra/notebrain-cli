@@ -24,42 +24,36 @@ package cmd
 import (
 	"fmt"
 
+	"charm.land/lipgloss/v2"
 	"github.com/nmdra/notebrain-cli/internal/store"
-	"github.com/spf13/cobra"
 )
 
-// statsCmd represents the stats command.
-var statsCmd = &cobra.Command{
-	Use:   "stats",
-	Short: "Show collection statistics",
-	Long: `Display statistics for the ChromaDB collections used by NoteBrain,
-including the number of chunks, links, unique notes, and embedding dimensions.
-
-Examples:
-  notebrain stats`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx := cmd.Context()
-
-		chromaPath, _ := cmd.Flags().GetString("chroma-path")
-		st, err := store.Open(ctx, chromaPath)
-		if err != nil {
-			return err
-		}
-		defer func() { _ = st.Close() }()
-
-		stats, err := st.Stats(ctx)
-		if err != nil {
-			return err
-		}
-
-		fmt.Println("NoteBrain ChromaDB Statistics")
-		fmt.Println("=============================")
-		fmt.Printf("Total Chunks : %d\n", stats["chunks"])
-		fmt.Printf("Total Links  : %d\n", stats["links"])
-		return nil
-	},
+type StatsCmd struct {
 }
 
-func init() {
-	rootCmd.AddCommand(statsCmd)
+func (c *StatsCmd) Run(globals *Globals) error {
+
+	chromaPath := globals.ChromaPath
+	ctx := globals.Ctx
+	st, err := store.Open(ctx, chromaPath)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = st.Close() }()
+
+	stats, err := st.Stats(ctx)
+	if err != nil {
+		return err
+	}
+
+	rows := fmt.Sprintf(
+		"%s  %d\n%s  %d",
+		lipgloss.NewStyle().Bold(true).Render("Chunks"), stats["chunks"],
+		lipgloss.NewStyle().Bold(true).Render("Links "), stats["links"],
+	)
+
+	fmt.Println()
+	fmt.Println(boxStyle.Render(rows))
+	fmt.Println()
+	return nil
 }

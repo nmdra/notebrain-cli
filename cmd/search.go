@@ -24,84 +24,80 @@ package cmd
 import (
 	"fmt"
 
+	tea "charm.land/bubbletea/v2"
 	chroma "github.com/amikos-tech/chroma-go/pkg/api/v2"
+	"github.com/nmdra/notebrain-cli/cmd/tui"
 	"github.com/nmdra/notebrain-cli/internal/embedder"
 	"github.com/nmdra/notebrain-cli/internal/store"
-	"github.com/spf13/cobra"
 )
 
-// searchCmd represents the search command.
-var searchCmd = &cobra.Command{
-	Use:   "search <query>",
-	Short: "Semantic search across indexed notes",
-	Long: `Embed the query string and find the most semantically similar note
-chunks stored in ChromaDB. Results are ranked by cosine similarity.
-
-Examples:
-  notebrain search "how does photosynthesis work"
-  notebrain search "mitochondria energy" --limit 5`,
-	Args: cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		if len(args) < 1 {
-			return fmt.Errorf("search requires a query string")
-		}
-		query := args[0]
-		limit, _ := cmd.Flags().GetInt("limit")
-		ctx := cmd.Context()
-
-		chromaPath, _ := cmd.Flags().GetString("chroma-path")
-		st, err := store.Open(ctx, chromaPath)
-		if err != nil {
-			return err
-		}
-		defer func() { _ = st.Close() }()
-
-		emb, err := embedder.NewLocalEmbedder()
-		if err != nil {
-			return err
-		}
-		defer func() { _ = emb.Close() }()
-
-		qVec, err := emb.Embed(ctx, query)
-		if err != nil {
-			return err
-		}
-
-		// Build filters based on flags
-		var filters []chroma.WhereClause
-
-		if section, _ := cmd.Flags().GetString("section"); section != "" {
-			filters = append(filters, chroma.EqString("heading_path", section))
-		}
-		if hasTasks, _ := cmd.Flags().GetBool("has-tasks"); hasTasks {
-			filters = append(filters, chroma.EqBool("has_task", true))
-		}
-		if hasCode, _ := cmd.Flags().GetBool("has-code"); hasCode {
-			filters = append(filters, chroma.EqBool("has_code", true))
-		}
-
-		var whereFilter chroma.WhereFilter
-		if len(filters) == 1 {
-			whereFilter = filters[0]
-		} else if len(filters) > 1 {
-			whereFilter = chroma.And(filters...)
-		}
-
-		results, err := st.SemanticSearch(ctx, qVec, limit, whereFilter)
-		if err != nil {
-			return err
-		}
-
-		printResults(fmt.Sprintf("Semantic Search: %q", query), results)
-		return nil
-	},
+type SearchCmd struct {
+	Query       string `arg:"" help:"Search query"`
+	Limit       int    `help:"maximum number of results to return" default:"10"`
+	Section     string `help:"filter by heading path"`
+	HasTasks    bool   `help:"only return chunks that contain task lists"`
+	HasCode     bool   `help:"only return chunks that contain code blocks"`
+	Interactive bool   `help:"open interactive browser"`
 }
 
-func init() {
-	rootCmd.AddCommand(searchCmd)
+func (c *SearchCmd) Run(globals *Globals) error {
 
-	searchCmd.Flags().Int("limit", 10, "maximum number of results to return")
-	searchCmd.Flags().String("section", "", "filter by heading path (e.g. 'Project > Tasks')")
-	searchCmd.Flags().Bool("has-tasks", false, "only return chunks that contain task lists")
-	searchCmd.Flags().Bool("has-code", false, "only return chunks that contain code blocks")
+	query := c.Query
+	limit := c.Limit
+
+	chromaPath := globals.ChromaPath
+	ctx := globals.Ctx
+	st, err := store.Open(ctx, chromaPath)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = st.Close() }()
+
+	emb, err := embedder.NewLocalEmbedder()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = emb.Close() }()
+
+	qVec, err := emb.Embed(ctx, query)
+	if err != nil {
+		return err
+	}
+
+	// Build filters based on flags
+	var filters []chroma.WhereClause
+
+	if section := c.Section; section != "" {
+		filters = append(filters, chroma.EqString("heading_path", section))
+	}
+	if hasTasks := c.HasTasks; hasTasks {
+		filters = append(filters, chroma.EqBool("has_task", true))
+	}
+	if hasCode := c.HasCode; hasCode {
+		filters = append(filters, chroma.EqBool("has_code", true))
+	}
+
+	var whereFilter chroma.WhereFilter
+	if len(filters) == 1 {
+		whereFilter = filters[0]
+	} else if len(filters) > 1 {
+		whereFilter = chroma.And(filters...)
+	}
+
+	results, err := st.SemanticSearch(ctx, qVec, limit, whereFilter)
+	if err != nil {
+		return err
+	}
+
+	if c.Interactive {
+		header := fmt.Sprintf("Semantic Search: %q", query)
+		p := tea.NewProgram(tui.NewResultBrowser(header, globals.Vault, results))
+		if _, err := p.Run(); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	printResults(fmt.Sprintf("Semantic Search: %q", query), results, globals.VaultName, hyperlinkSupported(globals))
+	return nil
 }

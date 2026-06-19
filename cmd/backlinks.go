@@ -26,42 +26,29 @@ import (
 
 	"github.com/nmdra/notebrain-cli/internal/parser"
 	"github.com/nmdra/notebrain-cli/internal/store"
-	"github.com/spf13/cobra"
 )
 
-// backlinksCmd represents the backlinks command.
-var backlinksCmd = &cobra.Command{
-	Use:   "backlinks <note>",
-	Short: "Find notes linking to a given note",
-	Long: `Query the nb_links collection in ChromaDB to find every note that
-contains a wikilink pointing to the specified note.
-
-Examples:
-  notebrain backlinks "Mitochondria"
-  notebrain backlinks "Daily Notes/2026-06-18"`,
-	Args: cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		targetNote := args[0]
-		targetSlug := parser.Slugify(targetNote)
-		ctx := cmd.Context()
-
-		chromaPath, _ := cmd.Flags().GetString("chroma-path")
-		st, err := store.Open(ctx, chromaPath)
-		if err != nil {
-			return err
-		}
-		defer func() { _ = st.Close() }()
-
-		links, err := st.Backlinks(ctx, targetSlug)
-		if err != nil {
-			return err
-		}
-
-		printResults(fmt.Sprintf("Backlinks for: %q (slug: %s)", targetNote, targetSlug), links)
-		return nil
-	},
+type BacklinksCmd struct {
+	Note string `arg:"" help:"Note slug"`
 }
 
-func init() {
-	rootCmd.AddCommand(backlinksCmd)
+func (c *BacklinksCmd) Run(globals *Globals) error {
+	targetNote := c.Note
+	targetSlug := parser.Slugify(targetNote)
+
+	chromaPath := globals.ChromaPath
+	ctx := globals.Ctx
+	st, err := store.Open(ctx, chromaPath)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = st.Close() }()
+
+	links, err := st.Backlinks(ctx, targetSlug)
+	if err != nil {
+		return err
+	}
+
+	printResults(fmt.Sprintf("Backlinks for: %q (slug: %s)", targetNote, targetSlug), links, globals.VaultName, hyperlinkSupported(globals))
+	return nil
 }

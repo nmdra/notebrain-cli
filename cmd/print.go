@@ -2,36 +2,54 @@ package cmd
 
 import (
 	"fmt"
+
+	"charm.land/lipgloss/v2"
 	"github.com/nmdra/notebrain-cli/internal/store"
 )
 
-func printResults(header string, results []store.Result) {
-	useLinks := hyperlinkSupported()
+// hyperlink wraps visible text in an OSC 8 terminal hyperlink.
+func hyperlink(useLinks bool, uri, text string) string {
+	if !useLinks {
+		return text
+	}
+	// OSC 8 format: ESC ] 8 ; params ; uri ESC \  text  ESC ] 8 ; ; ESC \
+	return fmt.Sprintf("\x1b]8;;%s\x1b\\%s\x1b]8;;\x1b\\", uri, text)
+}
 
-	fmt.Printf("\n=== %s ===\n", header)
+// printResults renders a list of results to stdout with styled formatting.
+// vaultName is used for generating Obsidian URIs in hyperlinks.
+func printResults(header string, results []store.Result, vaultName string, useLinks bool) {
+	fmt.Println(headerStyle.Render(header))
+
 	if len(results) == 0 {
-		fmt.Println("(no results)")
+		fmt.Println(extraStyle.Render("  (no results)"))
 		return
 	}
 
 	for i, r := range results {
-		extra := ""
-		if r.Extra != "" {
-			extra = "  [" + r.Extra + "]"
-		}
+		rank := rankStyle.Render(fmt.Sprintf("%d.", i+1))
 
-		// Build the clickable title
-		title := r.Title
+		// Apply style and truncation first
+		paddedTitle := lipgloss.NewStyle().Width(42).Render(r.Title)
+		title := paddedTitle
+
+		// Then wrap with OSC 8 if supported
 		if useLinks && r.FilePath != "" {
-			uri := obsidianURI(printVaultName, r.FilePath)
-			title = hyperlink(uri, r.Title)
+			uri := store.ObsidianURI(vaultName, r.FilePath)
+			title = hyperlink(true, uri, paddedTitle)
 		}
 
-		fmt.Printf("%2d. %-42s  score=%.4f%s\n", i+1, title, r.Score, extra)
+		score := scoreStyle.Render(fmt.Sprintf("score=%.4f", r.Score))
+		line := fmt.Sprintf("%s %s  %s", rank, title, score)
+
+		if r.Extra != "" {
+			line += "  " + extraStyle.Render("["+r.Extra+"]")
+		}
+		fmt.Println(line)
 	}
 
 	if useLinks {
-		fmt.Println("\n  (Ctrl+click or Cmd+click a title to open in Obsidian)")
+		fmt.Println("\n  " + extraStyle.Render("(Ctrl+click or Cmd+click a title to open in Obsidian)"))
 	}
 	fmt.Println()
 }

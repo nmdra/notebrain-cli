@@ -27,57 +27,42 @@ import (
 	"github.com/nmdra/notebrain-cli/internal/embedder"
 	"github.com/nmdra/notebrain-cli/internal/parser"
 	"github.com/nmdra/notebrain-cli/internal/store"
-	"github.com/spf13/cobra"
 )
 
-// hiddenCmd represents the hidden command.
-var hiddenCmd = &cobra.Command{
-	Use:   "hidden <note>",
-	Short: "Find semantically similar but unlinked notes",
-	Long: `Discover "hidden connections" — notes that are semantically close to
-the given note but have no direct wikilink relationship. These are notes
-you might want to link together.
-
-Examples:
-  notebrain hidden "Mitochondria"
-  notebrain hidden "Mitochondria" --limit 5`,
-	Args: cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		targetNote := args[0]
-		targetSlug := parser.Slugify(targetNote)
-		limit, _ := cmd.Flags().GetInt("limit")
-		ctx := cmd.Context()
-
-		chromaPath, _ := cmd.Flags().GetString("chroma-path")
-		st, err := store.Open(ctx, chromaPath)
-		if err != nil {
-			return err
-		}
-		defer func() { _ = st.Close() }()
-
-		emb, err := embedder.NewLocalEmbedder()
-		if err != nil {
-			return err
-		}
-		defer func() { _ = emb.Close() }()
-
-		qVec, err := emb.Embed(ctx, targetNote) // Embed the note title as the search context
-		if err != nil {
-			return err
-		}
-
-		results, err := st.HiddenConnections(ctx, qVec, targetSlug, limit)
-		if err != nil {
-			return err
-		}
-
-		printResults(fmt.Sprintf("Hidden connections for: %q (slug: %s)", targetNote, targetSlug), results)
-		return nil
-	},
+type HiddenCmd struct {
+	Note  string `arg:"" help:"Note slug"`
+	Limit int    `help:"maximum number of hidden connections to return" default:"10"`
 }
 
-func init() {
-	rootCmd.AddCommand(hiddenCmd)
+func (c *HiddenCmd) Run(globals *Globals) error {
+	targetNote := c.Note
+	targetSlug := parser.Slugify(targetNote)
+	limit := c.Limit
 
-	hiddenCmd.Flags().Int("limit", 10, "maximum number of hidden connections to return")
+	chromaPath := globals.ChromaPath
+	ctx := globals.Ctx
+	st, err := store.Open(ctx, chromaPath)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = st.Close() }()
+
+	emb, err := embedder.NewLocalEmbedder()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = emb.Close() }()
+
+	qVec, err := emb.Embed(ctx, targetNote) // Embed the note title as the search context
+	if err != nil {
+		return err
+	}
+
+	results, err := st.HiddenConnections(ctx, qVec, targetSlug, limit)
+	if err != nil {
+		return err
+	}
+
+	printResults(fmt.Sprintf("Hidden connections for: %q (slug: %s)", targetNote, targetSlug), results, globals.VaultName, hyperlinkSupported(globals))
+	return nil
 }

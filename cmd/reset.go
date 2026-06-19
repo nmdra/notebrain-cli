@@ -28,53 +28,38 @@ import (
 	"strings"
 
 	"github.com/nmdra/notebrain-cli/internal/store"
-	"github.com/spf13/cobra"
 )
 
-// resetCmd represents the reset command.
-var resetCmd = &cobra.Command{
-	Use:   "reset",
-	Short: "Drop all collections and start fresh",
-	Long: `Delete the nb_chunks and nb_links collections from ChromaDB,
-removing all indexed data. This operation is irreversible.
-
-You will be prompted for confirmation before any data is deleted.
-
-Examples:
-  notebrain reset`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("WARNING: This will delete ALL indexed data (nb_chunks and nb_links).")
-		fmt.Print("Type 'yes' to confirm: ")
-
-		reader := bufio.NewReader(os.Stdin)
-		answer, err := reader.ReadString('\n')
-		if err != nil {
-			return fmt.Errorf("reading confirmation: %w", err)
-		}
-
-		if strings.TrimSpace(answer) != "yes" {
-			fmt.Println("Reset cancelled.")
-			return nil
-		}
-
-		ctx := cmd.Context()
-
-		chromaPath, _ := cmd.Flags().GetString("chroma-path")
-		st, err := store.Open(ctx, chromaPath)
-		if err != nil {
-			return err
-		}
-		defer func() { _ = st.Close() }()
-
-		if err := st.Reset(ctx); err != nil {
-			return err
-		}
-
-		fmt.Println("Database reset successful. All collections dropped.")
-		return nil
-	},
+type ResetCmd struct {
 }
 
-func init() {
-	rootCmd.AddCommand(resetCmd)
+func (c *ResetCmd) Run(globals *Globals) error {
+	fmt.Println("WARNING: This will delete ALL indexed data (nb_chunks and nb_links).")
+	fmt.Print("Type 'yes' to confirm: ")
+
+	reader := bufio.NewReader(os.Stdin)
+	answer, err := reader.ReadString('\n')
+	if err != nil {
+		return fmt.Errorf("reading confirmation: %w", err)
+	}
+
+	if strings.TrimSpace(answer) != "yes" {
+		fmt.Println("Reset cancelled.")
+		return nil
+	}
+
+	chromaPath := globals.ChromaPath
+	ctx := globals.Ctx
+	st, err := store.Open(ctx, chromaPath)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = st.Close() }()
+
+	if err := st.Reset(ctx); err != nil {
+		return err
+	}
+
+	fmt.Println("Database reset successful. All collections dropped.")
+	return nil
 }

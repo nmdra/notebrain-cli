@@ -28,62 +28,43 @@ import (
 	"github.com/nmdra/notebrain-cli/internal/embedder"
 	"github.com/nmdra/notebrain-cli/internal/ingest"
 	"github.com/nmdra/notebrain-cli/internal/store"
-	"github.com/spf13/cobra"
 )
 
-// ingestCmd represents the ingest command.
-var ingestCmd = &cobra.Command{
-	Use:   "ingest [glob]",
-	Short: "Index vault notes into ChromaDB",
-	Long: `Parse Markdown files from the configured Obsidian vault, extract
-chunks and metadata, compute embeddings, and upsert them into ChromaDB.
-
-An optional glob pattern filters which files to ingest (default: all .md files).
-
-Examples:
-  notebrain ingest
-  notebrain ingest "**/*.md"
-  notebrain ingest --workers 8`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		workers, _ := cmd.Flags().GetInt("workers")
-		vaultPath, _ := cmd.Flags().GetString("vault")
-		if vaultPath == "" {
-			vaultPath = os.Getenv("OBSIDIAN_VAULT_PATH")
-		}
-		if vaultPath == "" {
-			return fmt.Errorf("--vault flag or OBSIDIAN_VAULT_PATH env var must be specified")
-		}
-
-		glob := ""
-		if len(args) > 0 {
-			glob = args[0]
-		}
-
-		ctx := cmd.Context()
-		chromaPath, _ := cmd.Flags().GetString("chroma-path")
-
-		fmt.Println("Opening ChromaDB store...")
-		st, err := store.Open(ctx, chromaPath)
-		if err != nil {
-			return err
-		}
-		defer func() { _ = st.Close() }()
-
-		fmt.Println("Initializing embedded ONNX vector models...")
-		emb, err := embedder.NewLocalEmbedder()
-		if err != nil {
-			return err
-		}
-		defer func() { _ = emb.Close() }()
-
-		fmt.Printf("Starting ingestion pipeline with %d workers...\n", workers)
-		pipeline := ingest.NewPipeline(st, emb, workers)
-		return pipeline.Run(ctx, vaultPath, glob)
-	},
+type IngestCmd struct {
+	Glob    string `arg:"" optional:"" help:"glob pattern to ingest"`
+	Workers int    `help:"number of concurrent ingestion workers" default:"4"`
 }
 
-func init() {
-	rootCmd.AddCommand(ingestCmd)
+func (c *IngestCmd) Run(globals *Globals) error {
+	workers := c.Workers
+	vaultPath := globals.Vault
+	if vaultPath == "" {
+		vaultPath = os.Getenv("OBSIDIAN_VAULT_PATH")
+	}
+	if vaultPath == "" {
+		return fmt.Errorf("--vault flag or OBSIDIAN_VAULT_PATH env var must be specified")
+	}
 
-	ingestCmd.Flags().Int("workers", 4, "number of concurrent ingestion workers")
+	glob := c.Glob
+
+	chromaPath := globals.ChromaPath
+	ctx := globals.Ctx
+
+	fmt.Println("Opening ChromaDB store...")
+	st, err := store.Open(ctx, chromaPath)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = st.Close() }()
+
+	fmt.Println("Initializing embedded ONNX vector models...")
+	emb, err := embedder.NewLocalEmbedder()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = emb.Close() }()
+
+	fmt.Printf("Starting ingestion pipeline with %d workers...\n", workers)
+	pipeline := ingest.NewPipeline(st, emb, workers)
+	return pipeline.Run(ctx, vaultPath, glob, os.Stdin, os.Stdout)
 }

@@ -26,46 +26,31 @@ import (
 
 	"github.com/nmdra/notebrain-cli/internal/parser"
 	"github.com/nmdra/notebrain-cli/internal/store"
-	"github.com/spf13/cobra"
 )
 
-// connectionsCmd represents the connections command.
-var connectionsCmd = &cobra.Command{
-	Use:   "connections <note>",
-	Short: "Find notes connected via graph traversal",
-	Long: `Starting from the given note, perform a breadth-first traversal of
-the wikilink graph stored in nb_links. Returns all notes reachable within
-the specified number of hops.
-
-Examples:
-  notebrain connections "Mitochondria"
-  notebrain connections "Mitochondria" --hops 3`,
-	Args: cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		targetNote := args[0]
-		targetSlug := parser.Slugify(targetNote)
-		hops, _ := cmd.Flags().GetInt("hops")
-		ctx := cmd.Context()
-
-		chromaPath, _ := cmd.Flags().GetString("chroma-path")
-		st, err := store.Open(ctx, chromaPath)
-		if err != nil {
-			return err
-		}
-		defer func() { _ = st.Close() }()
-
-		nodes, err := st.Connections(ctx, targetSlug, hops)
-		if err != nil {
-			return err
-		}
-
-		printResults(fmt.Sprintf("Graph Connections from: %q (slug: %s) [Hops: %d]", targetNote, targetSlug, hops), nodes)
-		return nil
-	},
+type ConnectionsCmd struct {
+	Note string `arg:"" help:"Note slug"`
+	Hops int    `help:"maximum number of graph hops to traverse" default:"2"`
 }
 
-func init() {
-	rootCmd.AddCommand(connectionsCmd)
+func (c *ConnectionsCmd) Run(globals *Globals) error {
+	targetNote := c.Note
+	targetSlug := parser.Slugify(targetNote)
+	hops := c.Hops
 
-	connectionsCmd.Flags().Int("hops", 2, "maximum number of graph hops to traverse")
+	chromaPath := globals.ChromaPath
+	ctx := globals.Ctx
+	st, err := store.Open(ctx, chromaPath)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = st.Close() }()
+
+	nodes, err := st.Connections(ctx, targetSlug, hops)
+	if err != nil {
+		return err
+	}
+
+	printResults(fmt.Sprintf("Graph Connections from: %q (slug: %s) [Hops: %d]", targetNote, targetSlug, hops), nodes, globals.VaultName, hyperlinkSupported(globals))
+	return nil
 }

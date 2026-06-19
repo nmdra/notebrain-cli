@@ -26,46 +26,31 @@ import (
 
 	"github.com/nmdra/notebrain-cli/internal/parser"
 	"github.com/nmdra/notebrain-cli/internal/store"
-	"github.com/spf13/cobra"
 )
 
-// tagsCmd represents the tags command.
-var tagsCmd = &cobra.Command{
-	Use:   "tags <note>",
-	Short: "Find notes sharing tags with a given note",
-	Long: `Look up the tags on the specified note and find other indexed notes
-that share one or more of those tags. Results are ranked by the number of
-shared tags.
-
-Examples:
-  notebrain tags "Mitochondria"
-  notebrain tags "Mitochondria" --min-shared 2`,
-	Args: cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		targetNote := args[0]
-		targetSlug := parser.Slugify(targetNote)
-		minShared, _ := cmd.Flags().GetInt("min-shared")
-		ctx := cmd.Context()
-
-		chromaPath, _ := cmd.Flags().GetString("chroma-path")
-		st, err := store.Open(ctx, chromaPath)
-		if err != nil {
-			return err
-		}
-		defer func() { _ = st.Close() }()
-
-		nodes, err := st.SharedTags(ctx, targetSlug, minShared)
-		if err != nil {
-			return err
-		}
-
-		printResults(fmt.Sprintf("Notes sharing tags with: %q (slug: %s) [Min Shared: %d]", targetNote, targetSlug, minShared), nodes)
-		return nil
-	},
+type TagsCmd struct {
+	Note      string `arg:"" help:"Note slug"`
+	MinShared int    `help:"minimum number of shared tags to include a result" default:"1"`
 }
 
-func init() {
-	rootCmd.AddCommand(tagsCmd)
+func (c *TagsCmd) Run(globals *Globals) error {
+	targetNote := c.Note
+	targetSlug := parser.Slugify(targetNote)
+	minShared := c.MinShared
 
-	tagsCmd.Flags().Int("min-shared", 1, "minimum number of shared tags to include a result")
+	chromaPath := globals.ChromaPath
+	ctx := globals.Ctx
+	st, err := store.Open(ctx, chromaPath)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = st.Close() }()
+
+	nodes, err := st.SharedTags(ctx, targetSlug, minShared)
+	if err != nil {
+		return err
+	}
+
+	printResults(fmt.Sprintf("Notes sharing tags with: %q (slug: %s) [Min Shared: %d]", targetNote, targetSlug, minShared), nodes, globals.VaultName, hyperlinkSupported(globals))
+	return nil
 }

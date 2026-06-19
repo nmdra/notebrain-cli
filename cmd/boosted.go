@@ -27,62 +27,46 @@ import (
 	"github.com/nmdra/notebrain-cli/internal/embedder"
 	"github.com/nmdra/notebrain-cli/internal/parser"
 	"github.com/nmdra/notebrain-cli/internal/store"
-	"github.com/spf13/cobra"
 )
 
-// boostedCmd represents the boosted command.
-var boostedCmd = &cobra.Command{
-	Use:   "boosted <query>",
-	Short: "Graph-boosted semantic search",
-	Long: `Perform a semantic search and then boost the scores of results that
-are reachable from the seed note via the wikilink graph. This surfaces
-results that are both semantically relevant and structurally connected.
-
-Examples:
-  notebrain boosted "energy production" --seed "Mitochondria"
-  notebrain boosted "cell biology" --seed "ATP" --boost 2.0 --limit 5`,
-	Args: cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		query := args[0]
-		seed, _ := cmd.Flags().GetString("seed")
-		seedSlug := parser.Slugify(seed)
-		boost, _ := cmd.Flags().GetFloat64("boost")
-		limit, _ := cmd.Flags().GetInt("limit")
-		ctx := cmd.Context()
-
-		chromaPath, _ := cmd.Flags().GetString("chroma-path")
-		st, err := store.Open(ctx, chromaPath)
-		if err != nil {
-			return err
-		}
-		defer func() { _ = st.Close() }()
-
-		emb, err := embedder.NewLocalEmbedder()
-		if err != nil {
-			return err
-		}
-		defer func() { _ = emb.Close() }()
-
-		qVec, err := emb.Embed(ctx, query)
-		if err != nil {
-			return err
-		}
-
-		results, err := st.GraphBoostedSearch(ctx, qVec, seedSlug, boost, limit)
-		if err != nil {
-			return err
-		}
-
-		printResults(fmt.Sprintf("Graph-Boosted Search Results for: %q (seed: %s, boost: %.2f)", query, seedSlug, boost), results)
-		return nil
-	},
+type BoostedCmd struct {
+	Query string  `arg:"" help:"Search query"`
+	Limit int     `help:"maximum number of results to return" default:"10"`
+	Seed  string  `help:"seed note for graph-based score boosting" required:"true"`
+	Boost float64 `help:"multiplier applied to graph-connected results" default:"1.5"`
 }
 
-func init() {
-	rootCmd.AddCommand(boostedCmd)
+func (c *BoostedCmd) Run(globals *Globals) error {
+	query := c.Query
+	seed := c.Seed
+	seedSlug := parser.Slugify(seed)
+	boost := c.Boost
+	limit := c.Limit
 
-	boostedCmd.Flags().String("seed", "", "seed note for graph-based score boosting (required)")
-	_ = boostedCmd.MarkFlagRequired("seed")
-	boostedCmd.Flags().Float64("boost", 1.5, "multiplier applied to graph-connected results")
-	boostedCmd.Flags().Int("limit", 10, "maximum number of results to return")
+	chromaPath := globals.ChromaPath
+	ctx := globals.Ctx
+	st, err := store.Open(ctx, chromaPath)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = st.Close() }()
+
+	emb, err := embedder.NewLocalEmbedder()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = emb.Close() }()
+
+	qVec, err := emb.Embed(ctx, query)
+	if err != nil {
+		return err
+	}
+
+	results, err := st.GraphBoostedSearch(ctx, qVec, seedSlug, boost, limit)
+	if err != nil {
+		return err
+	}
+
+	printResults(fmt.Sprintf("Graph-Boosted Search Results for: %q (seed: %s, boost: %.2f)", query, seedSlug, boost), results, globals.VaultName, hyperlinkSupported(globals))
+	return nil
 }

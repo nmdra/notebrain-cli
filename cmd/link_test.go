@@ -1,8 +1,9 @@
 package cmd
 
 import (
-	"os"
 	"testing"
+
+	"github.com/nmdra/notebrain-cli/internal/store"
 )
 
 func TestObsidianURI(t *testing.T) {
@@ -18,31 +19,21 @@ func TestObsidianURI(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		actual := obsidianURI(tt.vault, tt.filePath)
+		actual := store.ObsidianURI(tt.vault, tt.filePath)
 		if actual != tt.expected {
-			t.Errorf("obsidianURI(%q, %q) = %q, expected %q", tt.vault, tt.filePath, actual, tt.expected)
+			t.Errorf("ObsidianURI(%q, %q) = %q, expected %q", tt.vault, tt.filePath, actual, tt.expected)
 		}
 	}
 }
 
 func TestHyperlink(t *testing.T) {
-	// Temporarily set an environment variable to force no hyperlinks
-	originalNoHyperlinks := noHyperlinks
-	noHyperlinks = true
-	defer func() { noHyperlinks = originalNoHyperlinks }()
-
-	// With noHyperlinks = true, it should just return the text
-	res := hyperlink("obsidian://open?file=Note", "My Note")
+	// With useLinks = false, it should just return the text
+	res := hyperlink(false, "obsidian://open?file=Note", "My Note")
 	if res != "My Note" {
 		t.Errorf("Expected hyperlink to return plain text 'My Note', got %q", res)
 	}
 
-	noHyperlinks = false
-	// Force hyperlink supported by setting TERM_PROGRAM
-	_ = os.Setenv("TERM_PROGRAM", "iTerm.app")
-	defer func() { _ = os.Unsetenv("TERM_PROGRAM") }()
-
-	res = hyperlink("obsidian://open?file=Note", "My Note")
+	res = hyperlink(true, "obsidian://open?file=Note", "My Note")
 	expected := "\x1b]8;;obsidian://open?file=Note\x1b\\My Note\x1b]8;;\x1b\\"
 	if res != expected {
 		t.Errorf("Expected hyperlink to return %q, got %q", expected, res)
