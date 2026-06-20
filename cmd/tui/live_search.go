@@ -176,8 +176,13 @@ func (m LiveSearchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.quitting = true
 			return m, tea.Quit
 
-		case "tab", "down":
-			// Tab or down from input moves focus to list
+		case "tab":
+			m.focus = focusInput
+			m.input.Focus()
+			return m, textinput.Blink
+
+		case "down":
+			// Down from input moves focus to list
 			if m.focus == focusInput && len(m.list.Items()) > 0 {
 				m.focus = focusList
 				m.input.Blur()
@@ -372,9 +377,9 @@ func (m LiveSearchModel) View() tea.View {
 	// Help bar
 	var help string
 	if m.focus == focusInput {
-		help = lsHelpStyle.Render("  tab/↓ → results · esc quit")
+		help = lsHelpStyle.Render("  ↓ → results · esc quit")
 	} else {
-		help = lsHelpStyle.Render("  ↑/↓ navigate · enter open · ↑ top → search · esc quit")
+		help = lsHelpStyle.Render("  ↑/↓ navigate · enter open · tab/↑ top → search · esc quit")
 	}
 
 	content := inputRendered + "\n" + statusLine + "\n" + tabs + "\n" + m.list.View() + "\n" + help
@@ -408,6 +413,48 @@ func SuppressStderr(fn func()) {
 		}()
 	}
 	defer func() { os.Stderr = orig }()
+	fn()
+}
+
+// SuppressOutputs redirects both stdout and stderr to /dev/null for the duration of fn,
+// then restores them. Used to silence ChromaDB/hnswlib integrity-check and stats noise.
+func SuppressOutputs(fn func()) {
+	devNull, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
+	if err != nil {
+		fn()
+		return
+	}
+	defer func() { _ = devNull.Close() }()
+
+	origStderr := os.Stderr
+	origStdout := os.Stdout
+	os.Stderr = devNull
+	os.Stdout = devNull
+
+	// Silence C-library side via dup2 for stdout (1) and stderr (2)
+	savedFd1, err1 := dupFd(1)
+	savedFd2, err2 := dupFd(2)
+
+	if err1 == nil {
+		_ = dup2(int(devNull.Fd()), 1)
+		defer func() {
+			_ = dup2(savedFd1, 1)
+			_ = closeFd(savedFd1)
+		}()
+	}
+	if err2 == nil {
+		_ = dup2(int(devNull.Fd()), 2)
+		defer func() {
+			_ = dup2(savedFd2, 2)
+			_ = closeFd(savedFd2)
+		}()
+	}
+
+	defer func() {
+		os.Stderr = origStderr
+		os.Stdout = origStdout
+	}()
+
 	fn()
 }
 

@@ -83,11 +83,18 @@ func (c *SearchCmd) Run(globals *Globals) error {
 
 		limit := c.Limit
 		searchFn := func(ctx context.Context, query string) ([]store.Result, error) {
-			qVec, err := emb.Embed(ctx, query)
-			if err != nil {
-				return nil, fmt.Errorf("embed query: %w", err)
-			}
-			return st.SemanticSearch(ctx, qVec, limit, whereFilter)
+			var results []store.Result
+			var err error
+			tui.SuppressOutputs(func() {
+				var qVec []float32
+				qVec, err = emb.Embed(ctx, query)
+				if err != nil {
+					err = fmt.Errorf("embed query: %w", err)
+					return
+				}
+				results, err = st.SemanticSearch(ctx, qVec, limit, whereFilter)
+			})
+			return results, err
 		}
 
 		model := tui.NewLiveSearch(searchFn, globals.Vault, limit, c.Query)
