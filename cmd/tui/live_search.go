@@ -3,6 +3,8 @@ package tui
 import (
 	"context"
 	"fmt"
+	"io"
+	"os"
 	"sync/atomic"
 	"time"
 
@@ -35,6 +37,15 @@ type resultsMsg struct {
 	err     error
 }
 
+// ─── Focus state ──────────────────────────────────────────────────
+
+type focusState int
+
+const (
+	focusInput focusState = iota // keyboard goes to textinput
+	focusList                    // keyboard goes to result list
+)
+
 // ─── Model ────────────────────────────────────────────────────────
 
 // LiveSearchModel is a Bubble Tea model for interactive live semantic search.
@@ -47,6 +58,7 @@ type LiveSearchModel struct {
 	list      list.Model
 	searchFn  SearchFunc
 	vaultName string
+	focus     focusState
 
 	// inflight is a pointer to an int64 counter used for debounce ID tracking.
 	// Using a pointer keeps the model copyable (Bubble Tea's interface requirement)
@@ -61,11 +73,17 @@ type LiveSearchModel struct {
 	height   int
 }
 
-// styles
+// ─── Styles ───────────────────────────────────────────────────────
+
 var (
-	lsInputBorderStyle = lipgloss.NewStyle().
+	lsInputBorderFocused = lipgloss.NewStyle().
 				Border(lipgloss.RoundedBorder()).
 				BorderForeground(lipgloss.Color("#5DCAA5")).
+				Padding(0, 1)
+
+	lsInputBorderBlurred = lipgloss.NewStyle().
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(lipgloss.Color("#555555")).
 				Padding(0, 1)
 
 	lsStatusStyle = lipgloss.NewStyle().
@@ -73,11 +91,20 @@ var (
 			Italic(true)
 
 	lsHelpStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#888780"))
+			Foreground(lipgloss.Color("#555555"))
 
 	lsLoadingStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#5DCAA5"))
+
+	lsTabActiveStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#5DCAA5")).
+				Bold(true)
+
+	lsTabInactiveStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#888780"))
 )
+
+// ─── Constructor ──────────────────────────────────────────────────
 
 // NewLiveSearch creates a LiveSearchModel.
 // searchFn wraps embed+query so the TUI has no direct dependency on the
@@ -85,13 +112,14 @@ var (
 func NewLiveSearch(searchFn SearchFunc, vaultName string, limit int, initialQuery string) LiveSearchModel {
 	ti := textinput.New()
 	ti.Placeholder = "type to search your vault…"
+	ti.Prompt = "  "
 	ti.Focus()
 	if initialQuery != "" {
 		ti.SetValue(initialQuery)
 	}
 
 	l := list.New(nil, list.NewDefaultDelegate(), 0, 0)
-	l.Title = "🔍  NoteBrain Live Search"
+	l.SetShowTitle(false)
 	l.SetShowStatusBar(false)
 	l.SetFilteringEnabled(false) // we own the search; list filtering would interfere
 	l.SetShowHelp(false)
@@ -102,6 +130,7 @@ func NewLiveSearch(searchFn SearchFunc, vaultName string, limit int, initialQuer
 		list:      l,
 		searchFn:  searchFn,
 		vaultName: vaultName,
+		focus:     focusInput,
 		inflight:  &inflightCounter,
 		debounce:  300 * time.Millisecond,
 		status:    "start typing to search…",
@@ -127,49 +156,96 @@ func (m LiveSearchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		inputH := 3 // border + 1 line input
-		helpH := 2
-		statusH := 1
-		listH := m.height - inputH - helpH - statusH - 2
-		if listH < 1 {
-			listH = 1
-		}
-		m.input.SetWidth(m.width - 4) // account for border padding
-		m.list.SetSize(m.width, listH)
+		m = m.recalcLayout()
 
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "ctrl+c", "esc":
+
+		case "ctrl+c":
 			m.quitting = true
 			return m, tea.Quit
 
-		case "up", "down":
-			var listCmd tea.Cmd
-			m.list, listCmd = m.list.Update(msg)
-			return m, listCmd
-
-		case "enter", "o":
-			// Open the selected note in Obsidian.
-			if item, ok := m.list.SelectedItem().(resultItem); ok {
-				_ = openInObsidian(m.vaultName, item.FilePath)
+		case "esc":
+			// If we're in list focus, escape returns to input focus
+			if m.focus == focusList {
+				m.focus = focusInput
+				m.input.Focus()
+				return m, textinput.Blink
 			}
-			return m, nil
+			// If we're in input focus, escape exits
+			m.quitting = true
+			return m, tea.Quit
+
+		case "tab", "down":
+			// Tab or down from input moves focus to list
+			if m.focus == focusInput && len(m.list.Items()) > 0 {
+				m.focus = focusList
+				m.input.Blur()
+				return m, nil
+			}
+			if m.focus == focusList {
+				var listCmd tea.Cmd
+				m.list, listCmd = m.list.Update(msg)
+				return m, listCmd
+			}
+
+		case "up":
+			if m.focus == focusList {
+				// If at top of list, move focus back to input
+				if m.list.Index() == 0 {
+					m.focus = focusInput
+					m.input.Focus()
+					return m, textinput.Blink
+				}
+				var listCmd tea.Cmd
+				m.list, listCmd = m.list.Update(msg)
+				return m, listCmd
+			}
+
+		case "enter":
+			// Enter only opens a note when the list has focus
+			if m.focus == focusList {
+				if item, ok := m.list.SelectedItem().(resultItem); ok {
+					_ = openInObsidian(m.vaultName, item.FilePath)
+				}
+				return m, nil
+			}
+			// In input focus, enter does nothing (search is debounced on keypress)
+
+		case "o":
+			// 'o' opens the selected note only when list has focus
+			if m.focus == focusList {
+				if item, ok := m.list.SelectedItem().(resultItem); ok {
+					_ = openInObsidian(m.vaultName, item.FilePath)
+				}
+				return m, nil
+			}
+			// In input focus, 'o' is just a character — fall through to textinput
+			fallthrough
 
 		default:
-			// Let textinput handle the key.
-			prevVal := m.input.Value()
-			var tiCmd tea.Cmd
-			m.input, tiCmd = m.input.Update(msg)
-			newVal := m.input.Value()
+			// All other keys go to textinput when it has focus
+			if m.focus == focusInput {
+				prevVal := m.input.Value()
+				var tiCmd tea.Cmd
+				m.input, tiCmd = m.input.Update(msg)
+				newVal := m.input.Value()
 
-			var debounceCmd tea.Cmd
-			if newVal != prevVal {
-				id := atomic.AddInt64(m.inflight, 1)
-				debounceCmd = m.triggerSearch(newVal, id)
-				m.loading = true
-				m.status = ""
+				var debounceCmd tea.Cmd
+				if newVal != prevVal {
+					id := atomic.AddInt64(m.inflight, 1)
+					debounceCmd = m.triggerSearch(newVal, id)
+					m.loading = true
+					m.status = ""
+				}
+				return m, tea.Batch(tiCmd, debounceCmd)
 			}
-			return m, tea.Batch(tiCmd, debounceCmd)
+			// List focus: pass to list
+			if m.focus == focusList {
+				var listCmd tea.Cmd
+				m.list, listCmd = m.list.Update(msg)
+				return m, listCmd
+			}
 		}
 
 	case searchMsg:
@@ -183,11 +259,12 @@ func (m LiveSearchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.list.SetItems(nil)
 			return m, nil
 		}
-		// Capture the current inflight pointer for the closure.
+		// Fire the actual search in a goroutine.
 		searchID := msg.id
 		searchFn := m.searchFn
+		query := msg.query
 		return m, func() tea.Msg {
-			results, err := searchFn(context.Background(), msg.query)
+			results, err := searchFn(context.Background(), query)
 			return resultsMsg{id: searchID, results: results, err: err}
 		}
 
@@ -214,12 +291,42 @@ func (m LiveSearchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		default:
 			m.status = lsStatusStyle.Render(fmt.Sprintf("%d results", len(msg.results)))
 		}
+		return m, nil
 	}
 
 	// Default: pass through to textinput (e.g. cursor blink).
-	var tiCmd tea.Cmd
-	m.input, tiCmd = m.input.Update(msg)
-	return m, tiCmd
+	if m.focus == focusInput {
+		var tiCmd tea.Cmd
+		m.input, tiCmd = m.input.Update(msg)
+		return m, tiCmd
+	}
+	return m, nil
+}
+
+// recalcLayout recomputes input width and list height based on current terminal size.
+func (m LiveSearchModel) recalcLayout() LiveSearchModel {
+	if m.width == 0 {
+		return m
+	}
+	// Input width: terminal width minus border (2) minus padding (2 each side = 4)
+	inputWidth := m.width - 6
+	if inputWidth < 10 {
+		inputWidth = 10
+	}
+	m.input.SetWidth(inputWidth)
+
+	const (
+		inputH  = 3 // rounded border = 2 lines + 1 content = 3
+		statusH = 1
+		helpH   = 1
+		padding = 1
+	)
+	listH := m.height - inputH - statusH - helpH - padding
+	if listH < 3 {
+		listH = 3
+	}
+	m.list.SetSize(m.width, listH)
+	return m
 }
 
 // triggerSearch returns a Cmd that waits debounce duration then sends a searchMsg.
@@ -237,18 +344,72 @@ func (m LiveSearchModel) View() tea.View {
 		return tea.NewView("")
 	}
 
-	inputRendered := lsInputBorderStyle.Render(m.input.View())
+	// Input box — border colour changes based on focus
+	borderStyle := lsInputBorderFocused
+	if m.focus == focusList {
+		borderStyle = lsInputBorderBlurred
+	}
+	inputRendered := borderStyle.Render(m.input.View())
 
+	// Status / loading line
 	var statusLine string
 	if m.loading {
-		statusLine = lsLoadingStyle.Render("  searching…")
+		statusLine = lsLoadingStyle.Render("  ◌ searching…")
 	} else {
 		statusLine = "  " + m.status
 	}
 
-	help := lsHelpStyle.Render("  ↑/↓ navigate · enter open in Obsidian · esc quit")
+	// Focus hint tabs
+	searchTab := lsTabInactiveStyle.Render("[ search ]")
+	listTab := lsTabInactiveStyle.Render("[ results ]")
+	if m.focus == focusInput {
+		searchTab = lsTabActiveStyle.Render("[ search ]")
+	} else {
+		listTab = lsTabActiveStyle.Render("[ results ]")
+	}
+	tabs := "  " + searchTab + "  " + listTab
 
-	v := tea.NewView(inputRendered + "\n" + statusLine + "\n" + m.list.View() + "\n" + help)
+	// Help bar
+	var help string
+	if m.focus == focusInput {
+		help = lsHelpStyle.Render("  tab/↓ → results · esc quit")
+	} else {
+		help = lsHelpStyle.Render("  ↑/↓ navigate · enter open · ↑ top → search · esc quit")
+	}
+
+	content := inputRendered + "\n" + statusLine + "\n" + tabs + "\n" + m.list.View() + "\n" + help
+	v := tea.NewView(content)
 	v.AltScreen = true
 	return v
 }
+
+// ─── Helpers ──────────────────────────────────────────────────────
+
+// SuppressStderr redirects stderr to /dev/null for the duration of fn,
+// then restores it. Used to silence ChromaDB/hnswlib integrity-check noise
+// that would otherwise bleed into the TUI.
+func SuppressStderr(fn func()) {
+	devNull, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
+	if err != nil {
+		fn()
+		return
+	}
+	defer func() { _ = devNull.Close() }()
+
+	orig := os.Stderr
+	os.Stderr = devNull
+	// Also silence the C-library side via a dup2 if needed — redirect fd 2
+	savedFd2, err2 := dupFd(2)
+	if err2 == nil {
+		_ = dup2(int(devNull.Fd()), 2)
+		defer func() {
+			_ = dup2(savedFd2, 2)
+			_ = closeFd(savedFd2)
+		}()
+	}
+	defer func() { os.Stderr = orig }()
+	fn()
+}
+
+// NullWriter returns an io.Writer that discards everything.
+func NullWriter() io.Writer { return io.Discard }

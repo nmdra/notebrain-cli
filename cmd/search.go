@@ -92,10 +92,12 @@ func (c *SearchCmd) Run(globals *Globals) error {
 
 		model := tui.NewLiveSearch(searchFn, globals.Vault, limit, c.Query)
 		p := tea.NewProgram(model)
-		if _, err := p.Run(); err != nil {
-			return err
-		}
-		return nil
+		var runErr error
+		// Suppress ChromaDB/hnswlib integrity-check noise from polluting the TUI.
+		tui.SuppressStderr(func() {
+			_, runErr = p.Run()
+		})
+		return runErr
 	}
 
 	// ── Static one-shot search ─────────────────────────────────────────────
