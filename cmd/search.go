@@ -22,6 +22,7 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"context"
 	"fmt"
 
 	tea "charm.land/bubbletea/v2"
@@ -32,18 +33,19 @@ import (
 )
 
 type SearchCmd struct {
-	Query       string `arg:"" help:"Search query"`
+	Query       string `arg:"" optional:"" help:"Search query (omit when using --interactive)"`
 	Limit       int    `help:"maximum number of results to return" default:"10"`
 	Section     string `help:"filter by heading path"`
 	HasTasks    bool   `help:"only return chunks that contain task lists"`
 	HasCode     bool   `help:"only return chunks that contain code blocks"`
-	Interactive bool   `help:"open interactive browser"`
+	Interactive bool   `help:"launch live interactive search TUI"`
 }
 
 func (c *SearchCmd) Run(globals *Globals) error {
 
-	query := c.Query
-	limit := c.Limit
+	if !c.Interactive && c.Query == "" {
+		return fmt.Errorf("query is required (or use --interactive for live search)")
+	}
 
 	chromaPath := globals.ChromaPath
 	ctx := globals.Ctx
@@ -59,7 +61,45 @@ func (c *SearchCmd) Run(globals *Globals) error {
 	}
 	defer func() { _ = emb.Close() }()
 
-	qVec, err := emb.Embed(ctx, query)
+	// ── Interactive live-search TUI ────────────────────────────────────────
+	if c.Interactive {
+		// Build the chroma where-filter once (same logic as static path).
+		var filters []chroma.WhereClause
+		if c.Section != "" {
+			filters = append(filters, chroma.EqString("heading_path", c.Section))
+		}
+		if c.HasTasks {
+			filters = append(filters, chroma.EqBool("has_task", true))
+		}
+		if c.HasCode {
+			filters = append(filters, chroma.EqBool("has_code", true))
+		}
+		var whereFilter chroma.WhereFilter
+		if len(filters) == 1 {
+			whereFilter = filters[0]
+		} else if len(filters) > 1 {
+			whereFilter = chroma.And(filters...)
+		}
+
+		limit := c.Limit
+		searchFn := func(ctx context.Context, query string) ([]store.Result, error) {
+			qVec, err := emb.Embed(ctx, query)
+			if err != nil {
+				return nil, fmt.Errorf("embed query: %w", err)
+			}
+			return st.SemanticSearch(ctx, qVec, limit, whereFilter)
+		}
+
+		model := tui.NewLiveSearch(searchFn, globals.Vault, limit, c.Query)
+		p := tea.NewProgram(model)
+		if _, err := p.Run(); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	// ── Static one-shot search ─────────────────────────────────────────────
+	qVec, err := emb.Embed(ctx, c.Query)
 	if err != nil {
 		return err
 	}
@@ -84,20 +124,11 @@ func (c *SearchCmd) Run(globals *Globals) error {
 		whereFilter = chroma.And(filters...)
 	}
 
-	results, err := st.SemanticSearch(ctx, qVec, limit, whereFilter)
+	results, err := st.SemanticSearch(ctx, qVec, c.Limit, whereFilter)
 	if err != nil {
 		return err
 	}
 
-	if c.Interactive {
-		header := fmt.Sprintf("Semantic Search: %q", query)
-		p := tea.NewProgram(tui.NewResultBrowser(header, globals.Vault, results))
-		if _, err := p.Run(); err != nil {
-			return err
-		}
-		return nil
-	}
-
-	printResults(fmt.Sprintf("Semantic Search: %q", query), results, globals.VaultName, hyperlinkSupported(globals))
+	printResults(fmt.Sprintf("Semantic Search: %q", c.Query), results, globals.VaultName, hyperlinkSupported(globals))
 	return nil
 }
