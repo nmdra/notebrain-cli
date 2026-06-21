@@ -246,13 +246,9 @@ func (p *Pipeline) ingestFile(ctx context.Context, vaultPath string, filePath st
 		}
 	}
 
-	if err := p.store.DeleteNoteChunks(ctx, slug); err != nil {
-		return err
-	}
-	if err := p.store.UpsertChunks(ctx, chunkRecords); err != nil {
-		return err
-	}
-	if err := p.store.UpsertLinks(ctx, slug, astRes.Links); err != nil {
+	// Atomically replace chunks + links under a single lock to prevent
+	// concurrent hnswlib modifications that corrupt the HNSW graph.
+	if err := p.store.IngestNote(ctx, slug, chunkRecords, astRes.Links); err != nil {
 		return err
 	}
 

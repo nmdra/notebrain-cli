@@ -31,12 +31,33 @@ type ChunkRecord struct {
 	Embedding    []float32
 }
 
+// IngestNote atomically replaces all chunks and links for a single note.
+// It holds the store mutex for the entire Delete→UpsertChunks→UpsertLinks
+// sequence to prevent concurrent hnswlib modifications that corrupt the
+// HNSW graph (assertion: inbound_connections_num[i] > 0).
+func (s *Store) IngestNote(ctx context.Context, noteSlug string, chunks []ChunkRecord, links []string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if err := s.deleteNoteChunks(ctx, noteSlug); err != nil {
+		return err
+	}
+	if err := s.upsertChunks(ctx, chunks); err != nil {
+		return err
+	}
+	return s.upsertLinks(ctx, noteSlug, links)
+}
+
 // UpsertChunks stores a batch of chunks (upsert = insert or replace by ID).
 // Call DeleteNoteChunks first to cleanly re-ingest a note.
 func (s *Store) UpsertChunks(ctx context.Context, chunks []ChunkRecord) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.upsertChunks(ctx, chunks)
+}
 
+// upsertChunks is the unlocked implementation. Caller must hold s.mu.
+func (s *Store) upsertChunks(ctx context.Context, chunks []ChunkRecord) error {
 	if len(chunks) == 0 {
 		return nil
 	}
@@ -66,7 +87,11 @@ func (s *Store) UpsertChunks(ctx context.Context, chunks []ChunkRecord) error {
 func (s *Store) DeleteNoteChunks(ctx context.Context, noteSlug string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.deleteNoteChunks(ctx, noteSlug)
+}
 
+// deleteNoteChunks is the unlocked implementation. Caller must hold s.mu.
+func (s *Store) deleteNoteChunks(ctx context.Context, noteSlug string) error {
 	return s.chunks.Delete(ctx,
 		chroma.WithWhere(chroma.EqString("note_slug", noteSlug)),
 	)
@@ -76,7 +101,11 @@ func (s *Store) DeleteNoteChunks(ctx context.Context, noteSlug string) error {
 func (s *Store) UpsertLinks(ctx context.Context, noteSlug string, links []string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.upsertLinks(ctx, noteSlug, links)
+}
 
+// upsertLinks is the unlocked implementation. Caller must hold s.mu.
+func (s *Store) upsertLinks(ctx context.Context, noteSlug string, links []string) error {
 	// Delete old outgoing links for this note
 	if err := s.links.Delete(ctx,
 		chroma.WithWhere(chroma.EqString("source_slug", noteSlug)),
