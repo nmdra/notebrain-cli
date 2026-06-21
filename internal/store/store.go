@@ -34,13 +34,19 @@ func Open(ctx context.Context, path string) (*Store, error) {
 		return nil, fmt.Errorf("chroma open %s: %w", path, err)
 	}
 
-	chunks, err := client.GetOrCreateCollection(ctx, CollectionChunks)
+	// Tune HNSW index for faster querying and proper metric
+	meta := map[string]interface{}{
+		"hnsw:space":     "cosine", // MiniLM embeddings are cosine-optimized
+		"hnsw:search_ef": 50,       // Lower value improves query speed (default is 100)
+	}
+
+	chunks, err := client.GetOrCreateCollection(ctx, CollectionChunks, chroma.WithCollectionMetadataMapCreateStrict(meta))
 	if err != nil {
 		_ = client.Close()
 		return nil, fmt.Errorf("get/create chunks collection: %w", err)
 	}
 
-	links, err := client.GetOrCreateCollection(ctx, CollectionLinks)
+	links, err := client.GetOrCreateCollection(ctx, CollectionLinks, chroma.WithCollectionMetadataMapCreateStrict(meta))
 	if err != nil {
 		_ = client.Close()
 		return nil, fmt.Errorf("get/create links collection: %w", err)
