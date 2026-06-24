@@ -97,7 +97,7 @@ func (c *SearchCmd) Run(globals *Globals) error {
 			return results, err
 		}
 
-		model := tui.NewLiveSearch(searchFn, globals.Vault, limit, c.Query)
+		model := tui.NewLiveSearch(searchFn, globals.VaultPath, limit, c.Query)
 		p := tea.NewProgram(model)
 		var runErr error
 		// Suppress ChromaDB/hnswlib integrity-check noise from polluting the TUI.

@@ -16,7 +16,7 @@ type Globals struct {
 	ChromaPath   string  `help:"path to ChromaDB persistent storage" default:"~/.notebrain/chroma"`
 	ChromaMode   string  `help:"ChromaDB client mode ('persistent' or 'http')" default:"persistent"`
 	ChromaURL    string  `help:"ChromaDB server URL (used when --chroma-mode=http)" default:"http://localhost:8000"`
-	Vault        string  `help:"Obsidian vault name"`
+	VaultPath    string  `help:"Obsidian vault path (also used as vault name fallback)"`
 	Verbose      bool    `help:"enable verbose output"`
 	NoHyperlinks bool    `help:"Disable OSC 8 terminal hyperlinks in output"`
 	Format       string  `help:"output format" enum:"text,json,tsv,ndjson" default:"text"`
@@ -72,8 +72,8 @@ func ParseAndRun(ctx context.Context) error {
 	)
 
 	// Resolve vault display name for Obsidian URI generation.
-	// Priority: --vault flag > OBSIDIAN_VAULT_NAME > OBSIDIAN_VAULT > basename(OBSIDIAN_VAULT_PATH)
-	vault := cli.Vault
+	// Priority: --vault-path flag > OBSIDIAN_VAULT_NAME > OBSIDIAN_VAULT > basename(OBSIDIAN_VAULT_PATH)
+	vault := cli.VaultPath
 	if vault == "" {
 		vault = os.Getenv("OBSIDIAN_VAULT_NAME")
 		if vault == "" {
