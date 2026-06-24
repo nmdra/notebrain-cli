@@ -21,13 +21,13 @@ type Config struct {
 	// VaultName for Obsidian CLI targeting.
 	VaultName string
 	// Embedder type: "minilm" or "ollama"
-	Embedder    string
-	OllamaURL   string
-	OllamaModel string
-	ChunkSize   int
+	Embedder     string
+	OllamaURL    string
+	OllamaModel  string
+	ChunkSize    int
 	ChunkOverlap int
-	Limit       int
-	Verbose     bool
+	Limit        int
+	Verbose      bool
 }
 
 // Default returns a Config with sensible defaults.

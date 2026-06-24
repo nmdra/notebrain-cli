@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/alecthomas/kong"
+	"github.com/nmdra/notebrain-cli/internal/configfile"
 )
 
 // Globals holds shared configuration available to all subcommands.
@@ -25,6 +26,8 @@ type Globals struct {
 	// Internal fields, not exposed as flags
 	Ctx       context.Context `kong:"-"`
 	VaultName string          `kong:"-"` // resolved display name for Obsidian URIs
+
+	Config kong.ConfigFlag `help:"Path to config file" default:"~/.notebrain/config/config.toml"`
 }
 
 // CLI is the top-level Kong command tree.
@@ -65,6 +68,7 @@ func ParseAndRun(ctx context.Context) error {
 			Compact: true,
 			Summary: true,
 		}),
+		kong.Configuration(configfile.IgnoreMissingFileLoader(configfile.TOMLResolver)),
 	)
 
 	// Resolve vault display name for Obsidian URI generation.
