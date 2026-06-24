@@ -26,9 +26,10 @@ type Embedder interface {
 
 // Pipeline orchestrates the ingestion of markdown files into the ChromaDB store.
 type Pipeline struct {
-	store    *store.Store
-	embedder Embedder
-	workers  int
+	store         *store.Store
+	embedder      Embedder
+	workers       int
+	MinChunkWords int
 }
 
 // NewPipeline creates an ingestion pipeline with the given number of concurrent workers.
@@ -255,8 +256,16 @@ func (p *Pipeline) processFile(ctx context.Context, vaultPath string, filePath s
 		modTime = info.ModTime()
 	}
 
-	chunkRecords := make([]store.ChunkRecord, len(astRes.Chunks))
-	for i, c := range astRes.Chunks {
+	// Filter chunks by minimum word count
+	var validChunks []parser.ASTChunk
+	for _, c := range astRes.Chunks {
+		if c.WordCount >= p.MinChunkWords {
+			validChunks = append(validChunks, c)
+		}
+	}
+
+	chunkRecords := make([]store.ChunkRecord, len(validChunks))
+	for i, c := range validChunks {
 		emb, err := p.embedder.Embed(ctx, c.Text)
 		if err != nil {
 			return nil, err
@@ -267,7 +276,7 @@ func (p *Pipeline) processFile(ctx context.Context, vaultPath string, filePath s
 			NoteSlug:     slug,
 			Title:        title,
 			FilePath:     relPath,
-			ChunkIndex:   c.Index,
+			ChunkIndex:   i,
 			Text:         c.Text,
 			Tags:         astRes.Tags,
 			HasLinks:     len(astRes.Links) > 0,

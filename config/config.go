@@ -21,27 +21,29 @@ type Config struct {
 	// VaultName for Obsidian CLI targeting.
 	VaultName string
 	// Embedder type: "minilm" or "ollama"
-	Embedder     string
-	OllamaURL    string
-	OllamaModel  string
-	ChunkSize    int
-	ChunkOverlap int
-	Limit        int
-	Verbose      bool
+	Embedder      string
+	OllamaURL     string
+	OllamaModel   string
+	ChunkSize     int
+	ChunkOverlap  int
+	Limit         int
+	MinChunkWords int
+	Verbose       bool
 }
 
 // Default returns a Config with sensible defaults.
 func Default() *Config {
 	home, _ := os.UserHomeDir()
 	return &Config{
-		ChromaPath:   filepath.Join(home, ".notebrain", "chroma"),
-		ChromaMode:   "persistent",
-		ChromaURL:    "http://localhost:8000",
-		Embedder:     "minilm",
-		OllamaURL:    "http://localhost:11434",
-		OllamaModel:  "nomic-embed-text",
-		ChunkSize:    512,
-		ChunkOverlap: 64,
-		Limit:        10,
+		ChromaPath:    filepath.Join(home, ".notebrain", "chroma"),
+		ChromaMode:    "persistent",
+		ChromaURL:     "http://localhost:8000",
+		Embedder:      "minilm",
+		OllamaURL:     "http://localhost:11434",
+		OllamaModel:   "nomic-embed-text",
+		ChunkSize:     512,
+		ChunkOverlap:  64,
+		Limit:         10,
+		MinChunkWords: 0,
 	}
 }

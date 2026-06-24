@@ -74,6 +74,11 @@ func TestDefault_Fields(t *testing.T) {
 			got:  func(c *Config) any { return c.Verbose },
 			want: false,
 		},
+		{
+			name: "MinChunkWords is 0",
+			got:  func(c *Config) any { return c.MinChunkWords },
+			want: 0,
+		},
 	}
 
 	cfg := Default()

@@ -31,8 +31,9 @@ import (
 )
 
 type IngestCmd struct {
-	Glob    string `arg:"" optional:"" help:"glob pattern to ingest"`
-	Workers int    `help:"number of concurrent ingestion workers" default:"4"`
+	Glob          string `arg:"" optional:"" help:"glob pattern to ingest"`
+	Workers       int    `help:"number of concurrent ingestion workers" default:"4"`
+	MinChunkWords int    `name:"min-chunk-words" help:"skip chunks containing fewer than this many words" default:"0"`
 }
 
 func (c *IngestCmd) Run(globals *Globals) error {
@@ -66,5 +67,6 @@ func (c *IngestCmd) Run(globals *Globals) error {
 
 	fmt.Printf("Starting ingestion pipeline with %d workers...\n", workers)
 	pipeline := ingest.NewPipeline(st, emb, workers)
+	pipeline.MinChunkWords = c.MinChunkWords
 	return pipeline.Run(ctx, vaultPath, glob, os.Stdin, os.Stdout)
 }

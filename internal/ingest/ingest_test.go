@@ -128,3 +128,35 @@ func TestPipelineSyncDeleted(t *testing.T) {
 		t.Errorf("Expected 1 link remaining after sync, got %d", stats["links"])
 	}
 }
+
+func TestPipelineMinChunkWords(t *testing.T) {
+	ctx := context.Background()
+	dbDir := t.TempDir()
+	st, err := store.Open(ctx, dbDir)
+	if err != nil {
+		t.Fatalf("Failed to open store: %v", err)
+	}
+	defer func() { _ = st.Close() }()
+
+	vaultDir := t.TempDir()
+
+	// note1 has 2 words (should be skipped if MinChunkWords = 5)
+	// note2 has 8 words (should be kept if MinChunkWords = 5)
+	_ = os.WriteFile(filepath.Join(vaultDir, "note1.md"), []byte("short note"), 0644)
+	_ = os.WriteFile(filepath.Join(vaultDir, "note2.md"), []byte("this is a longer note containing several words"), 0644)
+
+	p := NewPipeline(st, &mockEmbedder{}, 1)
+	p.MinChunkWords = 5
+
+	pr, pw := io.Pipe()
+	go func() { _ = pw.Close() }()
+	var stdout bytes.Buffer
+	if err := p.Run(ctx, vaultDir, "", pr, &stdout); err != nil {
+		t.Fatalf("Pipeline.Run failed: %v", err)
+	}
+
+	stats, _ := st.Stats(ctx)
+	if stats["chunks"] != 1 {
+		t.Errorf("Expected 1 chunk (only note2), got %d", stats["chunks"])
+	}
+}
