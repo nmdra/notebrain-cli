@@ -1,5 +1,5 @@
 # NoteBrain CLI Configuration Template
-# 
+#
 # Copy this file to:
 #   - ~/.notebrain/config/config.toml (Default global config location)
 #   - Or any path and reference it using: notebrain --config /path/to/config.toml
