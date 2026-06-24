@@ -1,0 +1,101 @@
+# NoteBrain CLI Configuration Template
+# 
+# Copy this file to:
+#   - ~/.notebrain/config/config.toml (Default global config location)
+#   - Or any path and reference it using: notebrain --config /path/to/config.toml
+#
+# Note: Command line flags always override values specified in this file.
+
+# ------------------------------------------------------------------------------
+# Global Settings
+# ------------------------------------------------------------------------------
+
+# Path to the local directory where ChromaDB stores its data.
+# Defaults to "~/.notebrain/chroma"
+chroma-path = "~/.notebrain/chroma"
+
+# ChromaDB client connection mode.
+#   - "persistent": Runs ChromaDB embedded in the local Go process (uses persistent SQLite/HNSW).
+#   - "http": Connects to a standalone ChromaDB server via HTTP REST APIs.
+# Defaults to "persistent"
+chroma-mode = "persistent"
+
+# ChromaDB server URL (only used when chroma-mode = "http")
+# Defaults to "http://localhost:8000"
+chroma-url = "http://localhost:8000"
+
+# Absolute path to your Obsidian vault on disk.
+# If set here, you don't need to specify --vault-path on every 'ingest' execution.
+# vault-path = "/home/user/Documents/Obsidian Vault"
+
+# Enable verbose debug logs to stderr.
+# Defaults to false
+verbose = false
+
+# Disable OSC 8 terminal hyperlinks in output.
+# Useful if your terminal emulator does not support clickable link rendering.
+# Defaults to false
+no-hyperlinks = false
+
+# Default CLI output formatting option.
+# Options: "text" (human-readable), "json" (structured API), "tsv" (tabular), "ndjson" (newline-delimited JSON)
+# Defaults to "text"
+format = "text"
+
+# Include full matched note chunk text in structured JSON, TSV, or NDJSON outputs.
+# Defaults to false
+include-text = false
+
+# Suppress similarity search results below this similarity threshold.
+# Must be a floating-point value between 0.0 and 1.0.
+# Defaults to 0.0
+min-score = 0.0
+
+# ------------------------------------------------------------------------------
+# Ingestion Pipeline Settings
+# ------------------------------------------------------------------------------
+
+# Number of concurrent workers to use when reading and parsing markdown files.
+# Defaults to 4
+workers = 4
+
+# Skip text chunks containing fewer than this many words during ingestion.
+# Highly recommended to set between 3 and 10 to filter out short headings, empty lines,
+# or list bullets that do not represent coherent semantic ideas. This reduces
+# database size and speeds up vector embedding generation.
+# Defaults to 0 (all chunks are indexed)
+min-chunk-words = 5
+
+# ------------------------------------------------------------------------------
+# Search and Traversal Settings
+# ------------------------------------------------------------------------------
+
+# Default maximum number of results to return for search, boosted, and hidden commands.
+# Defaults to 10
+limit = 10
+
+# ------------------------------------------------------------------------------
+# Future / Extension Settings (Defined in config schema, not currently exposed via flags)
+# ------------------------------------------------------------------------------
+
+# Embedding backend to use.
+#   - "minilm": Embedded local ONNX vector model (MiniLM-L6-v2)
+#   - "ollama": Remote Ollama service
+# Defaults to "minilm"
+# embedder = "minilm"
+
+# Ollama server endpoint (only used when embedder = "ollama")
+# Defaults to "http://localhost:11434"
+# ollama-url = "http://localhost:11434"
+
+# Model name for generating Ollama embeddings
+# Defaults to "nomic-embed-text"
+# ollama-model = "nomic-embed-text"
+
+# Maximum chunk size in tokens/runes.
+# Defaults to 512
+# chunk-size = 512
+
+# Overlap size between adjacent chunks.
+# Defaults to 64
+# chunk-overlap = 64
