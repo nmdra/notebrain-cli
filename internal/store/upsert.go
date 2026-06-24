@@ -39,12 +39,15 @@ func (s *Store) IngestNote(ctx context.Context, noteSlug string, chunks []ChunkR
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if err := s.deleteNoteChunks(ctx, noteSlug); err != nil {
-		return err
-	}
+	// 1. Upsert chunks (replaces existing by ID, adds new)
 	if err := s.upsertChunks(ctx, chunks); err != nil {
 		return err
 	}
+	// 2. Clean up any stale chunks (if new version has fewer chunks)
+	if err := s.cleanupNoteChunks(ctx, noteSlug, len(chunks)); err != nil {
+		return err
+	}
+	// 3. Sync links (upserts new/existing, deletes stale)
 	return s.upsertLinks(ctx, noteSlug, links)
 }
 
@@ -87,13 +90,20 @@ func (s *Store) upsertChunks(ctx context.Context, chunks []ChunkRecord) error {
 func (s *Store) DeleteNoteChunks(ctx context.Context, noteSlug string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.deleteNoteChunks(ctx, noteSlug)
-}
-
-// deleteNoteChunks is the unlocked implementation. Caller must hold s.mu.
-func (s *Store) deleteNoteChunks(ctx context.Context, noteSlug string) error {
 	return s.chunks.Delete(ctx,
 		chroma.WithWhere(chroma.EqString("note_slug", noteSlug)),
+	)
+}
+
+// cleanupNoteChunks deletes chunks for a note with an index >= validCount.
+// This removes stale chunks when a note shrinks, without dropping and recreating
+// the valid ones (which triggers an hnswlib race condition/bug).
+func (s *Store) cleanupNoteChunks(ctx context.Context, noteSlug string, validCount int) error {
+	return s.chunks.Delete(ctx,
+		chroma.WithWhere(chroma.And(
+			chroma.EqString("note_slug", noteSlug),
+			chroma.GteInt("chunk_index", validCount),
+		)),
 	)
 }
 
@@ -106,15 +116,11 @@ func (s *Store) UpsertLinks(ctx context.Context, noteSlug string, links []string
 
 // upsertLinks is the unlocked implementation. Caller must hold s.mu.
 func (s *Store) upsertLinks(ctx context.Context, noteSlug string, links []string) error {
-	// Delete old outgoing links for this note
-	if err := s.links.Delete(ctx,
-		chroma.WithWhere(chroma.EqString("source_slug", noteSlug)),
-	); err != nil {
-		return fmt.Errorf("delete old links for %s: %w", noteSlug, err)
-	}
-
+	// Deduplicate links
 	var uniqueLinks []string
 	seenSlugs := make(map[string]bool)
+	targetSlugMap := make(map[string]string) // original -> slug
+
 	for _, l := range links {
 		targetSlug := parser.Slugify(l)
 		if targetSlug == "" || seenSlugs[targetSlug] {
@@ -122,6 +128,35 @@ func (s *Store) upsertLinks(ctx context.Context, noteSlug string, links []string
 		}
 		seenSlugs[targetSlug] = true
 		uniqueLinks = append(uniqueLinks, l)
+		targetSlugMap[l] = targetSlug
+	}
+
+	// 1. Fetch existing links for this source_slug
+	existing, err := s.links.Get(ctx,
+		chroma.WithWhere(chroma.EqString("source_slug", noteSlug)),
+		chroma.WithInclude(chroma.IncludeMetadatas), // minimal fetch
+	)
+	if err != nil {
+		return fmt.Errorf("fetch existing links for %s: %w", noteSlug, err)
+	}
+
+	// 2. Identify stale links to delete
+	var staleIDs []chroma.DocumentID
+	for _, docID := range existing.GetIDs() {
+		// docID format: source_slug + "→" + target_slug
+		parts := strings.Split(string(docID), "→")
+		if len(parts) == 2 {
+			tgtSlug := parts[1]
+			if !seenSlugs[tgtSlug] {
+				staleIDs = append(staleIDs, docID)
+			}
+		}
+	}
+
+	if len(staleIDs) > 0 {
+		if err := s.links.Delete(ctx, chroma.WithIDs(staleIDs...)); err != nil {
+			return fmt.Errorf("delete stale links for %s: %w", noteSlug, err)
+		}
 	}
 
 	if len(uniqueLinks) == 0 {
@@ -133,7 +168,7 @@ func (s *Store) upsertLinks(ctx context.Context, noteSlug string, links []string
 	metas := make([]chroma.DocumentMetadata, len(uniqueLinks))
 
 	for i, l := range uniqueLinks {
-		targetSlug := parser.Slugify(l) // derive slug from resolved path
+		targetSlug := targetSlugMap[l]
 		ids[i] = chroma.DocumentID(noteSlug + "→" + targetSlug)
 		texts[i] = l
 		if texts[i] == "" {

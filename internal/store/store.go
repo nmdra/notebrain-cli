@@ -36,8 +36,9 @@ func Open(ctx context.Context, path string) (*Store, error) {
 
 	// Tune HNSW index for faster querying and proper metric
 	meta := map[string]interface{}{
-		"hnsw:space":     "cosine", // MiniLM embeddings are cosine-optimized
-		"hnsw:search_ef": 50,       // Lower value improves query speed (default is 100)
+		"hnsw:space":       "cosine", // MiniLM embeddings are cosine-optimized
+		"hnsw:search_ef":   50,       // Lower value improves query speed (default is 100)
+		"hnsw:num_threads": 1,        // Prevent hnswlib background thread crash under load
 	}
 
 	chunks, err := client.GetOrCreateCollection(ctx, CollectionChunks, chroma.WithCollectionMetadataMapCreateStrict(meta))
