@@ -230,7 +230,7 @@ func (p *Pipeline) ingestFile(ctx context.Context, vaultPath string, filePath st
 	}
 
 	title := parser.TitleFromPath(relPath)
-	astRes := parser.ParseAST(string(content), slug, 300)
+	astRes := parser.ParseAST(string(content), slug, 1000)
 
 	if ft, ok := astRes.Frontmatter["title"].(string); ok && ft != "" {
 		title = ft

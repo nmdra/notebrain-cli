@@ -83,6 +83,11 @@ func ParseAST(body, noteSlug string, maxChunkRunes int) ASTResult {
 		return ast.WalkContinue, nil
 	})
 
+	fmTags := extractFrontmatterTags(frontmatter)
+	for _, t := range fmTags {
+		tagsSet[t] = struct{}{}
+	}
+
 	var tags []string
 	for t := range tagsSet {
 		tags = append(tags, t)
@@ -179,6 +184,9 @@ func extractSections(doc ast.Node, src []byte) []section {
 
 		case *ast.Paragraph:
 			ensureCurrent()
+			if isOnlyHashtags(node, src) {
+				return ast.WalkSkipChildren, nil
+			}
 			t := extractText(node, src)
 			if t == "" {
 				return ast.WalkSkipChildren, nil
@@ -329,7 +337,16 @@ func extractText(n ast.Node, src []byte) string {
 			return ast.WalkContinue, nil
 		}
 		if t, ok := node.(*ast.Text); ok {
-			buf.Write(t.Segment.Value(src))
+			val := t.Segment.Value(src)
+			if node.Parent() != nil {
+				if _, isHashtag := node.Parent().(*hashtag.Node); isHashtag {
+					// Strip the leading '#' from the hashtag text in prose
+					if len(val) > 0 && val[0] == '#' {
+						val = val[1:]
+					}
+				}
+			}
+			buf.Write(val)
 			if t.SoftLineBreak() || t.HardLineBreak() {
 				buf.WriteByte(' ')
 			}
@@ -354,4 +371,92 @@ func containsTaskList(n ast.Node) bool {
 		return false
 	}
 	return found
+}
+
+func isOnlyHashtags(n ast.Node, src []byte) bool {
+	onlyHashtags := true
+	hasHashtags := false
+
+	_ = ast.Walk(n, func(node ast.Node, entering bool) (ast.WalkStatus, error) {
+		if !entering {
+			return ast.WalkContinue, nil
+		}
+		// Skip block level containers, walk into their children
+		if node.Type() == ast.TypeBlock || node.Type() == ast.TypeDocument {
+			return ast.WalkContinue, nil
+		}
+
+		switch n := node.(type) {
+		case *hashtag.Node:
+			hasHashtags = true
+			return ast.WalkSkipChildren, nil
+		case *ast.Text:
+			txt := string(n.Segment.Value(src))
+			if strings.TrimSpace(txt) != "" {
+				onlyHashtags = false
+				return ast.WalkStop, nil
+			}
+		default:
+			onlyHashtags = false
+			return ast.WalkStop, nil
+		}
+		return ast.WalkContinue, nil
+	})
+
+	return hasHashtags && onlyHashtags
+}
+
+func extractFrontmatterTags(fm map[string]interface{}) []string {
+	if fm == nil {
+		return nil
+	}
+
+	var rawTags interface{}
+	if val, ok := fm["tags"]; ok {
+		rawTags = val
+	} else if val, ok := fm["tag"]; ok {
+		rawTags = val
+	}
+
+	if rawTags == nil {
+		return nil
+	}
+
+	var tags []string
+	switch val := rawTags.(type) {
+	case string:
+		// e.g. "tag1, tag2" or "tag1 tag2"
+		var parts []string
+		if strings.Contains(val, ",") {
+			parts = strings.Split(val, ",")
+		} else {
+			parts = strings.Fields(val)
+		}
+		for _, p := range parts {
+			t := strings.TrimSpace(p)
+			t = strings.TrimPrefix(t, "#")
+			if t != "" {
+				tags = append(tags, t)
+			}
+		}
+	case []interface{}:
+		for _, item := range val {
+			if s, ok := item.(string); ok {
+				t := strings.TrimSpace(s)
+				t = strings.TrimPrefix(t, "#")
+				if t != "" {
+					tags = append(tags, t)
+				}
+			}
+		}
+	case []string:
+		for _, s := range val {
+			t := strings.TrimSpace(s)
+			t = strings.TrimPrefix(t, "#")
+			if t != "" {
+				tags = append(tags, t)
+			}
+		}
+	}
+	return tags
 }

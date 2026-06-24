@@ -65,6 +65,7 @@ func TestParseAST(t *testing.T) {
 		wantTags   []string
 		wantLinks  []string
 		wantTitle  string
+		checkText  func(*testing.T, []ASTChunk)
 	}{
 		{
 			name:     "basic parsing with frontmatter and wikilinks",
@@ -82,9 +83,18 @@ Some prose here with a [[WikiLink]] and a #hashtag.
 More content.
 `,
 			wantChunks: 2,
-			wantTags:   []string{"hashtag"},
+			wantTags:   []string{"a", "b", "hashtag"},
 			wantLinks:  []string{"WikiLink"},
 			wantTitle:  "Test Note",
+			checkText: func(t *testing.T, chunks []ASTChunk) {
+				if len(chunks) > 0 {
+					// The '#' should be stripped from the inline tag in prose
+					expected := "Some prose here with a WikiLink and a hashtag."
+					if chunks[0].Text != expected {
+						t.Errorf("expected chunk text %q, got %q", expected, chunks[0].Text)
+					}
+				}
+			},
 		},
 		{
 			name:       "code block",
@@ -106,6 +116,36 @@ More content.
 			wantLinks:  []string{},
 			wantTitle:  "",
 		},
+		{
+			name:     "tag-only blocks skipped, inline hashtags cleaned",
+			slug:     "tags-note",
+			maxRunes: 500,
+			body: `# Section 1
+This is some prose with #golang inline.
+
+#tag1 #tag2 #tag3
+
+# Section 2
+Some other text.
+`,
+			wantChunks: 2, // The tag-only middle paragraph is skipped!
+			wantTags:   []string{"golang", "tag1", "tag2", "tag3"},
+			wantLinks:  []string{},
+			wantTitle:  "",
+			checkText: func(t *testing.T, chunks []ASTChunk) {
+				if len(chunks) != 2 {
+					t.Fatalf("expected 2 chunks, got %d", len(chunks))
+				}
+				expected1 := "This is some prose with golang inline."
+				expected2 := "Some other text."
+				if chunks[0].Text != expected1 {
+					t.Errorf("chunk 0: expected %q, got %q", expected1, chunks[0].Text)
+				}
+				if chunks[1].Text != expected2 {
+					t.Errorf("chunk 1: expected %q, got %q", expected2, chunks[1].Text)
+				}
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -117,7 +157,7 @@ More content.
 
 			// Simple check for tags (order doesn't matter, but let's just do a basic presence check)
 			if len(res.Tags) != len(tt.wantTags) {
-				t.Errorf("got %d tags, want %d", len(res.Tags), len(tt.wantTags))
+				t.Errorf("got %d tags (%v), want %d (%v)", len(res.Tags), res.Tags, len(tt.wantTags), tt.wantTags)
 			}
 			if len(res.Links) != len(tt.wantLinks) {
 				t.Errorf("got %d links, want %d", len(res.Links), len(tt.wantLinks))
@@ -127,6 +167,10 @@ More content.
 				if title, ok := res.Frontmatter["title"].(string); !ok || title != tt.wantTitle {
 					t.Errorf("got title %v, want %s", res.Frontmatter["title"], tt.wantTitle)
 				}
+			}
+
+			if tt.checkText != nil {
+				tt.checkText(t, res.Chunks)
 			}
 		})
 	}
