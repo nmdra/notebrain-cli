@@ -51,6 +51,115 @@ func (s *Store) IngestNote(ctx context.Context, noteSlug string, chunks []ChunkR
 	return s.upsertLinks(ctx, noteSlug, links)
 }
 
+type BatchIngestData struct {
+	NoteSlug     string
+	ChunkRecords []ChunkRecord
+	Links        []string
+}
+
+// BatchIngest atomically replaces all chunks and links for a batch of notes, and deletes stale notes.
+// It uses a single mutex lock to serialize operations on the store.
+func (s *Store) BatchIngest(ctx context.Context, data []BatchIngestData, staleSlugs []string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// 1. Gather all slugs we need to delete from the index
+	var slugsToClean []string
+	slugsToClean = append(slugsToClean, staleSlugs...)
+	for _, d := range data {
+		slugsToClean = append(slugsToClean, d.NoteSlug)
+	}
+
+	if len(slugsToClean) > 0 {
+		// 2. Fetch and delete existing chunks and links for these slugs in batches of 100
+		const batchSize = 100
+		for i := 0; i < len(slugsToClean); i += batchSize {
+			end := i + batchSize
+			if end > len(slugsToClean) {
+				end = len(slugsToClean)
+			}
+			batchSlugs := slugsToClean[i:end]
+
+			var filters []chroma.WhereClause
+			for _, slug := range batchSlugs {
+				filters = append(filters, chroma.EqString("note_slug", slug))
+			}
+
+			var whereFilter chroma.WhereFilter
+			if len(filters) == 1 {
+				whereFilter = filters[0]
+			} else {
+				whereFilter = chroma.Or(filters...)
+			}
+
+			// Fetch existing chunk IDs
+			resChunks, err := s.chunks.Get(ctx,
+				chroma.WithWhere(whereFilter),
+				chroma.WithInclude(chroma.IncludeMetadatas),
+			)
+			if err != nil {
+				return fmt.Errorf("fetch chunk IDs for cleanup: %w", err)
+			}
+
+			// Delete existing chunks
+			if len(resChunks.GetIDs()) > 0 {
+				if err := s.chunks.Delete(ctx, chroma.WithIDs(resChunks.GetIDs()...)); err != nil {
+					return fmt.Errorf("delete chunks batch: %w", err)
+				}
+			}
+
+			// Fetch existing links IDs (links metadata uses source_slug instead of note_slug)
+			var linksFilters []chroma.WhereClause
+			for _, slug := range batchSlugs {
+				linksFilters = append(linksFilters, chroma.EqString("source_slug", slug))
+			}
+			var linksWhereFilter chroma.WhereFilter
+			if len(linksFilters) == 1 {
+				linksWhereFilter = linksFilters[0]
+			} else {
+				linksWhereFilter = chroma.Or(linksFilters...)
+			}
+
+			resLinks, err := s.links.Get(ctx,
+				chroma.WithWhere(linksWhereFilter),
+				chroma.WithInclude(chroma.IncludeMetadatas),
+			)
+			if err != nil {
+				return fmt.Errorf("fetch links IDs for cleanup: %w", err)
+			}
+
+			// Delete existing links
+			if len(resLinks.GetIDs()) > 0 {
+				if err := s.links.Delete(ctx, chroma.WithIDs(resLinks.GetIDs()...)); err != nil {
+					return fmt.Errorf("delete links batch: %w", err)
+				}
+			}
+		}
+	}
+
+	// 3. Batch upsert new chunks
+	var allChunks []ChunkRecord
+	for _, d := range data {
+		allChunks = append(allChunks, d.ChunkRecords...)
+	}
+	if len(allChunks) > 0 {
+		if err := s.upsertChunks(ctx, allChunks); err != nil {
+			return fmt.Errorf("batch upsert chunks: %w", err)
+		}
+	}
+
+	// 4. Batch upsert new links
+	for _, d := range data {
+		if len(d.Links) > 0 {
+			if err := s.upsertLinks(ctx, d.NoteSlug, d.Links); err != nil {
+				return fmt.Errorf("batch upsert links for %s: %w", d.NoteSlug, err)
+			}
+		}
+	}
+
+	return nil
+}
+
 // UpsertChunks stores a batch of chunks (upsert = insert or replace by ID).
 // Call DeleteNoteChunks first to cleanly re-ingest a note.
 func (s *Store) UpsertChunks(ctx context.Context, chunks []ChunkRecord) error {
@@ -65,25 +174,39 @@ func (s *Store) upsertChunks(ctx context.Context, chunks []ChunkRecord) error {
 		return nil
 	}
 
-	ids := make([]chroma.DocumentID, len(chunks))
-	texts := make([]string, len(chunks))
-	embs := make([]embeddings.Embedding, len(chunks))
-	metas := make([]chroma.DocumentMetadata, len(chunks))
+	const batchSize = 2000
+	for i := 0; i < len(chunks); i += batchSize {
+		end := i + batchSize
+		if end > len(chunks) {
+			end = len(chunks)
+		}
+		batch := chunks[i:end]
 
-	for i, c := range chunks {
-		ids[i] = chroma.DocumentID(c.ID)
-		texts[i] = c.Text
-		embs[i] = embeddings.NewEmbeddingFromFloat32(c.Embedding)
-		metaMap := buildChunkMeta(c)
-		metas[i], _ = chroma.NewDocumentMetadataFromMap(metaMap)
+		ids := make([]chroma.DocumentID, len(batch))
+		texts := make([]string, len(batch))
+		embs := make([]embeddings.Embedding, len(batch))
+		metas := make([]chroma.DocumentMetadata, len(batch))
+
+		for j, c := range batch {
+			ids[j] = chroma.DocumentID(c.ID)
+			texts[j] = c.Text
+			embs[j] = embeddings.NewEmbeddingFromFloat32(c.Embedding)
+			metaMap := buildChunkMeta(c)
+			metas[j], _ = chroma.NewDocumentMetadataFromMap(metaMap)
+		}
+
+		err := s.chunks.Upsert(ctx,
+			chroma.WithIDs(ids...),
+			chroma.WithTexts(texts...),
+			chroma.WithEmbeddings(embs...),
+			chroma.WithMetadatas(metas...),
+		)
+		if err != nil {
+			return fmt.Errorf("upsert chunk batch [%d:%d]: %w", i, end, err)
+		}
 	}
 
-	return s.chunks.Upsert(ctx,
-		chroma.WithIDs(ids...),
-		chroma.WithTexts(texts...),
-		chroma.WithEmbeddings(embs...),
-		chroma.WithMetadatas(metas...),
-	)
+	return nil
 }
 
 // DeleteNoteChunks removes all chunks belonging to a note (before re-ingest).

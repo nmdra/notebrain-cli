@@ -23,25 +23,39 @@ type Store struct {
 
 // Open creates or opens the persistent ChromaDB store at path.
 func Open(ctx context.Context, path string) (*Store, error) {
-	client, err := chroma.NewPersistentClient(
-		chroma.WithPersistentPath(path),
-		chroma.WithPersistentAllowReset(true),
-		chroma.WithPersistentClientOption(
-			chroma.WithDatabaseAndTenant("default_database", "default_tenant"),
-		),
-	)
+	var client chroma.Client
+	var chunks chroma.Collection
+	var links chroma.Collection
+	var err error
+
+	suppressOutputs(func() {
+		client, err = chroma.NewPersistentClient(
+			chroma.WithPersistentPath(path),
+			chroma.WithPersistentAllowReset(true),
+			chroma.WithPersistentClientOption(
+				chroma.WithDatabaseAndTenant("default_database", "default_tenant"),
+			),
+		)
+	})
 	if err != nil {
 		return nil, fmt.Errorf("chroma open %s: %w", path, err)
 	}
 
 	// Tune HNSW index for chunks (MiniLM embeddings are cosine-optimized)
 	chunksMeta := map[string]interface{}{
-		"hnsw:space":       "cosine",
-		"hnsw:search_ef":   50, // Lower value improves query speed
-		"hnsw:num_threads": 1,  // Prevent hnswlib background thread crash
+		"hnsw:space":           "cosine",
+		"hnsw:search_ef":       50, // Lower value improves query speed
+		"hnsw:num_threads":     1,  // Prevent hnswlib background thread crash
+		"hnsw:M":               32, // Prevent isolated nodes and HNSW integrity check assertion crashes
+		"hnsw:construction_ef": 200,
 	}
 
-	chunks, err := client.GetOrCreateCollection(ctx, CollectionChunks, chroma.WithCollectionMetadataMapCreateStrict(chunksMeta))
+	suppressOutputs(func() {
+		chunks, err = client.GetOrCreateCollection(ctx, CollectionChunks, chroma.WithCollectionMetadataMapCreateStrict(chunksMeta))
+		if err == nil {
+			_, _ = chunks.Count(ctx) // Force lazy-loading of HNSW index under suppressor
+		}
+	})
 	if err != nil {
 		_ = client.Close()
 		return nil, fmt.Errorf("get/create chunks collection: %w", err)
@@ -53,7 +67,12 @@ func Open(ctx context.Context, path string) (*Store, error) {
 		"hnsw:num_threads": 1,
 	}
 
-	links, err := client.GetOrCreateCollection(ctx, CollectionLinks, chroma.WithCollectionMetadataMapCreateStrict(linksMeta))
+	suppressOutputs(func() {
+		links, err = client.GetOrCreateCollection(ctx, CollectionLinks, chroma.WithCollectionMetadataMapCreateStrict(linksMeta))
+		if err == nil {
+			_, _ = links.Count(ctx) // Force lazy-loading of HNSW index under suppressor
+		}
+	})
 	if err != nil {
 		_ = client.Close()
 		return nil, fmt.Errorf("get/create links collection: %w", err)
@@ -76,9 +95,11 @@ func (s *Store) Reset(ctx context.Context) error {
 	}
 
 	chunksMeta := map[string]interface{}{
-		"hnsw:space":       "cosine",
-		"hnsw:search_ef":   50,
-		"hnsw:num_threads": 1,
+		"hnsw:space":           "cosine",
+		"hnsw:search_ef":       50,
+		"hnsw:num_threads":     1,
+		"hnsw:M":               32, // Prevent isolated nodes and HNSW integrity check assertion crashes
+		"hnsw:construction_ef": 200,
 	}
 	var err error
 	s.chunks, err = s.client.GetOrCreateCollection(ctx, CollectionChunks, chroma.WithCollectionMetadataMapCreateStrict(chunksMeta))

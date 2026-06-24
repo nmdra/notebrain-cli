@@ -79,21 +79,9 @@ func (p *Pipeline) Run(ctx context.Context, vaultPath string, glob string, stdin
 		}
 	}
 
-	if len(staleSlugs) > 0 {
-		_, _ = fmt.Fprintf(stdout, "Syncing database: removing %d deleted notes...\n", len(staleSlugs))
-		for _, slug := range staleSlugs {
-			if err := p.store.DeleteNoteChunks(ctx, slug); err != nil {
-				_, _ = fmt.Fprintf(stdout, "Warning: failed to delete chunks for %s: %v\n", slug, err)
-			}
-			if err := p.store.DeleteNoteLinks(ctx, slug); err != nil {
-				_, _ = fmt.Fprintf(stdout, "Warning: failed to delete links for %s: %v\n", slug, err)
-			}
-		}
-	}
-
 	// +1 for the TUI goroutine's potential error
 	progressCh := make(chan tui.ProgressUpdate, p.workers*2)
-	errCh := make(chan error, totalFiles+1)
+	errCh := make(chan error, totalFiles+2) // +2 for TUI and batch ingest error
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -125,6 +113,9 @@ func (p *Pipeline) Run(ctx context.Context, vaultPath string, glob string, stdin
 	var workerWg sync.WaitGroup
 	sem := make(chan struct{}, p.workers)
 
+	var mu sync.Mutex
+	var ingestResults []store.BatchIngestData
+
 fileLoop:
 	for _, file := range files {
 		// Check for context cancellation before spawning new work
@@ -146,8 +137,16 @@ fileLoop:
 				workerWg.Done()
 			}()
 
-			if err := p.ingestFile(ctx, vaultPath, f, hashes); err != nil {
+			res, err := p.processFile(ctx, vaultPath, f, hashes)
+			if err != nil {
 				errCh <- fmt.Errorf("file %s: %w", f, err)
+				return
+			}
+
+			if res != nil {
+				mu.Lock()
+				ingestResults = append(ingestResults, *res)
+				mu.Unlock()
 			}
 
 			n := atomic.AddInt64(&completed, 1)
@@ -164,6 +163,15 @@ fileLoop:
 	atomic.StoreInt32(&done, 1)
 	close(progressCh)
 	uiWg.Wait()
+
+	// Perform batch database updates
+	if len(ingestResults) > 0 || len(staleSlugs) > 0 {
+		_, _ = fmt.Fprintln(stdout, "\nSyncing database: applying batch updates...")
+		if err := p.store.BatchIngest(ctx, ingestResults, staleSlugs); err != nil {
+			errCh <- fmt.Errorf("batch ingest: %w", err)
+		}
+	}
+
 	close(errCh)
 
 	var firstErr error
@@ -211,22 +219,22 @@ func (p *Pipeline) collectFiles(vaultPath, glob string) ([]string, error) {
 	return files, nil
 }
 
-func (p *Pipeline) ingestFile(ctx context.Context, vaultPath string, filePath string, knownHashes map[string]string) error {
+func (p *Pipeline) processFile(ctx context.Context, vaultPath string, filePath string, knownHashes map[string]string) (*store.BatchIngestData, error) {
 	relPath, err := filepath.Rel(vaultPath, filePath)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	content, err := os.ReadFile(filePath)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	slug := parser.Slugify(relPath)
 
 	hash := fmt.Sprintf("%x", sha256.Sum256(content))
 	if knownHashes[slug] == hash {
-		return nil
+		return nil, nil
 	}
 
 	title := parser.TitleFromPath(relPath)
@@ -251,7 +259,7 @@ func (p *Pipeline) ingestFile(ctx context.Context, vaultPath string, filePath st
 	for i, c := range astRes.Chunks {
 		emb, err := p.embedder.Embed(ctx, c.Text)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		chunkRecords[i] = store.ChunkRecord{
@@ -274,11 +282,9 @@ func (p *Pipeline) ingestFile(ctx context.Context, vaultPath string, filePath st
 		}
 	}
 
-	// Atomically replace chunks + links under a single lock to prevent
-	// concurrent hnswlib modifications that corrupt the HNSW graph.
-	if err := p.store.IngestNote(ctx, slug, chunkRecords, astRes.Links); err != nil {
-		return err
-	}
-
-	return nil
+	return &store.BatchIngestData{
+		NoteSlug:     slug,
+		ChunkRecords: chunkRecords,
+		Links:        astRes.Links,
+	}, nil
 }

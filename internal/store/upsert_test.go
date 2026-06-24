@@ -148,3 +148,74 @@ func TestIngestNote(t *testing.T) {
 		t.Errorf("Expected 1 chunk, 1 link after shrinking, got %v", stats)
 	}
 }
+
+func TestBatchIngest(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatalf("Open failed: %v", err)
+	}
+	defer func() { _ = st.Close() }()
+
+	// 1. Initial Batch Ingest: Ingest Note A and Note B
+	data := []store.BatchIngestData{
+		{
+			NoteSlug: "note-a",
+			ChunkRecords: []store.ChunkRecord{
+				{ID: "note-a:0", NoteSlug: "note-a", ChunkIndex: 0, Text: "chunk A0", Embedding: []float32{0.1}},
+				{ID: "note-a:1", NoteSlug: "note-a", ChunkIndex: 1, Text: "chunk A1", Embedding: []float32{0.2}},
+			},
+			Links: []string{"note-b"},
+		},
+		{
+			NoteSlug: "note-b",
+			ChunkRecords: []store.ChunkRecord{
+				{ID: "note-b:0", NoteSlug: "note-b", ChunkIndex: 0, Text: "chunk B0", Embedding: []float32{0.3}},
+			},
+			Links: []string{"note-c"},
+		},
+	}
+
+	err = st.BatchIngest(ctx, data, nil)
+	if err != nil {
+		t.Fatalf("Initial BatchIngest failed: %v", err)
+	}
+
+	stats, _ := st.Stats(ctx)
+	if stats["chunks"] != 3 || stats["links"] != 2 {
+		t.Errorf("Expected 3 chunks, 2 links after initial batch, got %v", stats)
+	}
+
+	// 2. Modify Note A (shrink to 1 chunk, update links), Delete Note B (as stale slug), and Add Note C
+	data2 := []store.BatchIngestData{
+		{
+			NoteSlug: "note-a",
+			ChunkRecords: []store.ChunkRecord{
+				{ID: "note-a:0", NoteSlug: "note-a", ChunkIndex: 0, Text: "chunk A0 updated", Embedding: []float32{0.15}},
+			},
+			Links: []string{"note-c"},
+		},
+		{
+			NoteSlug: "note-c",
+			ChunkRecords: []store.ChunkRecord{
+				{ID: "note-c:0", NoteSlug: "note-c", ChunkIndex: 0, Text: "chunk C0", Embedding: []float32{0.4}},
+			},
+			Links: []string{},
+		},
+	}
+
+	err = st.BatchIngest(ctx, data2, []string{"note-b"})
+	if err != nil {
+		t.Fatalf("Second BatchIngest failed: %v", err)
+	}
+
+	stats, _ = st.Stats(ctx)
+	// Expected:
+	// - note-a: 1 chunk, 1 link (links: "note-c")
+	// - note-b: deleted (0 chunks, 0 links)
+	// - note-c: 1 chunk, 0 links
+	// Total: chunks = 2 (note-a:0, note-c:0), links = 1 (note-a -> note-c)
+	if stats["chunks"] != 2 || stats["links"] != 1 {
+		t.Errorf("Expected 2 chunks, 1 link after updates/delete, got %v", stats)
+	}
+}
