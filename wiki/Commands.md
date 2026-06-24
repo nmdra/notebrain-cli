@@ -15,9 +15,14 @@ Flags:
                          ChromaDB client mode ('persistent' or 'http')
       --chroma-url="http://localhost:8000"
                          ChromaDB server URL (used when --chroma-mode=http)
-      --vault=STRING     Obsidian vault name
-      --verbose          enable verbose output
-      --no-hyperlinks    Disable OSC 8 terminal hyperlinks in output
+      --vault-path=STRING    Obsidian vault path (also used as vault name fallback)
+      --verbose              enable verbose output
+      --no-hyperlinks        Disable OSC 8 terminal hyperlinks in output
+      --format="text"        output format (text, json, tsv, ndjson)
+      --include-text         include matched chunk text in structured output
+      --min-score=0          suppress results below this similarity score (0–1)
+      --config="~/.notebrain/config/config.toml"
+                             Path to config file
 
 Commands:
   ingest         Ingest markdown files from a vault
@@ -41,7 +46,7 @@ For all query commands (`search`, `backlinks`, `connections`, `hidden`, `boosted
 ## `ingest`
 Indexes your Obsidian vault into the local ChromaDB database.
 ```bash
-notebrain ingest --vault "/path/to/vault" [--workers 4]
+notebrain ingest --vault-path "/path/to/vault" [--workers 4]
 ```
 - Parses Markdown files.
 - Extracts Wikilinks (`[[target]]`) and Tags (`#tag`).
@@ -97,4 +102,25 @@ notebrain stats
 Drops all collections and starts fresh. This operation is irreversible.
 ```bash
 notebrain reset
+```
+
+## Configuration File
+
+You can set any global flag persistently by creating a `config.toml` file at `~/.notebrain/config/config.toml`. 
+
+Flags are mapped implicitly to TOML keys (without the `--` prefix).
+
+```toml
+vault-path = "/path/to/my/Second Brain"
+format = "json"
+chroma-path = "/custom/path/to/chroma"
+verbose = true
+```
+
+## Machine-Readable Output
+
+NoteBrain supports JSON, TSV, and NDJSON outputs for use in automation scripts or AI agents. The TUI is automatically suppressed when formatting is not `text`.
+
+```bash
+notebrain search "golang concurrency" --format json --include-text
 ```

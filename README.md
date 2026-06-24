@@ -12,14 +12,26 @@ NoteBrain is a high-performance Go CLI tool designed to index an Obsidian vault 
 - **Beautiful TUI Integration**: Enjoy an interactive terminal UI for navigating search results with fuzzy-finding and live ingestion progress bars powered by `charm.land/bubbles`.
 - **Goldmark AST-Aware Chunking**: Intelligently chunks markdown sections according to header hierarchies instead of arbitrary character splits, preserving code blocks and structural metadata.
 - **Advanced Filtering**: Use `--section`, `--has-code`, and `--has-tasks` to filter searches precisely by document structures.
+- **Machine-Readable Outputs**: Supports JSON, TSV, and NDJSON with `--format` flags for seamless integration into AI agent workflows (Claude, Gemini, etc.).
 - **OSC 8 Terminal Hyperlinks**: Automatically renders clickable `obsidian://open` links right in your CLI for seamlessly opening matched chunks inside Obsidian (supported terminals only).
 - **Graph Traversal**: Explores your Obsidian wikilinks graph (`[[Note]]`).
 - **Hidden Connections**: Discovers notes that are semantically identical but not explicitly linked.
 - **Graph-Boosted Search**: Combines semantic search scores with structural graph proximities.
 
-## Configuration (.env)
+## Configuration
 
-You can manage global variables to streamline NoteBrain usage via a `.env` file. Copy `.env.example` to `.env` in the project root:
+NoteBrain supports both `.env` files and a dedicated `config.toml` file for persisting CLI arguments.
+
+### TOML Configuration (`~/.notebrain/config/config.toml`)
+You can persistently set any global CLI flag using a TOML file. For example, to avoid typing `--vault-path` and `--format` every time:
+```toml
+vault-path = "/path/to/Second Brain 2.0"
+format = "text"
+verbose = false
+```
+
+### Environment Variables (`.env`)
+You can also manage configuration via environment variables. Copy `.env.example` to `.env` in the project root:
 
 ```env
 # The absolute path to your Obsidian vault on disk (used by 'ingest')
@@ -37,7 +49,7 @@ OBSIDIAN_VAULT_NAME="Second Brain 2.0"
 1. **Install** NoteBrain (see [Installation](wiki/Installation.md)).
 2. **Ingest** your vault:
    ```bash
-   notebrain ingest --vault "/path/to/your/Obsidian Vault"
+   notebrain ingest --vault-path "/path/to/your/Obsidian Vault"
    ```
 3. **Search** your thoughts:
    ```bash
