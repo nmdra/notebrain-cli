@@ -58,11 +58,11 @@ func (c *HiddenCmd) Run(globals *Globals) error {
 		return err
 	}
 
-	results, err := st.HiddenConnections(ctx, qVec, targetSlug, limit)
+	results, err := st.HiddenConnections(ctx, qVec, targetSlug, limit, globals.IncludeText)
 	if err != nil {
 		return err
 	}
 
-	printResults(fmt.Sprintf("Hidden connections for: %q (slug: %s)", targetNote, targetSlug), results, globals.VaultName, hyperlinkSupported(globals))
+	printResultsFormatted("hidden", fmt.Sprintf("Hidden connections for: %q (slug: %s)", targetNote, targetSlug), results, globals)
 	return nil
 }

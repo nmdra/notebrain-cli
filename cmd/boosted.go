@@ -62,11 +62,11 @@ func (c *BoostedCmd) Run(globals *Globals) error {
 		return err
 	}
 
-	results, err := st.GraphBoostedSearch(ctx, qVec, seedSlug, boost, limit)
+	results, err := st.GraphBoostedSearch(ctx, qVec, seedSlug, boost, limit, globals.IncludeText)
 	if err != nil {
 		return err
 	}
 
-	printResults(fmt.Sprintf("Graph-Boosted Search Results for: %q (seed: %s, boost: %.2f)", query, seedSlug, boost), results, globals.VaultName, hyperlinkSupported(globals))
+	printResultsFormatted("boosted", fmt.Sprintf("Graph-Boosted Search Results for: %q (seed: %s, boost: %.2f)", query, seedSlug, boost), results, globals)
 	return nil
 }

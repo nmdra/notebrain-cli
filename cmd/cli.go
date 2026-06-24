@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,12 +12,15 @@ import (
 
 // Globals holds shared configuration available to all subcommands.
 type Globals struct {
-	ChromaPath   string `help:"path to ChromaDB persistent storage" default:"~/.notebrain/chroma"`
-	ChromaMode   string `help:"ChromaDB client mode ('persistent' or 'http')" default:"persistent"`
-	ChromaURL    string `help:"ChromaDB server URL (used when --chroma-mode=http)" default:"http://localhost:8000"`
-	Vault        string `help:"Obsidian vault name"`
-	Verbose      bool   `help:"enable verbose output"`
-	NoHyperlinks bool   `help:"Disable OSC 8 terminal hyperlinks in output"`
+	ChromaPath   string  `help:"path to ChromaDB persistent storage" default:"~/.notebrain/chroma"`
+	ChromaMode   string  `help:"ChromaDB client mode ('persistent' or 'http')" default:"persistent"`
+	ChromaURL    string  `help:"ChromaDB server URL (used when --chroma-mode=http)" default:"http://localhost:8000"`
+	Vault        string  `help:"Obsidian vault name"`
+	Verbose      bool    `help:"enable verbose output"`
+	NoHyperlinks bool    `help:"Disable OSC 8 terminal hyperlinks in output"`
+	Format       string  `help:"output format" enum:"text,json,tsv,ndjson" default:"text"`
+	IncludeText  bool    `help:"include matched chunk text in structured output"`
+	MinScore     float64 `help:"suppress results below this similarity score (0–1)" default:"0"`
 
 	// Internal fields, not exposed as flags
 	Ctx       context.Context `kong:"-"`
@@ -91,7 +95,16 @@ func ParseAndRun(ctx context.Context) error {
 		}
 	}
 
-	return ctxParser.Run(&cli.Globals)
+	err = ctxParser.Run(&cli.Globals)
+	if err != nil {
+		if cli.Format == "json" || cli.Format == "ndjson" {
+			// Print error as JSON to stdout for agents
+			_, _ = fmt.Fprintf(os.Stdout, "{\"error\": %q}\n", err.Error())
+			os.Exit(1)
+		}
+		return err
+	}
+	return nil
 }
 
 // hyperlinkSupported returns true if the terminal supports OSC 8 hyperlinks

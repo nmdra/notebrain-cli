@@ -92,7 +92,7 @@ func (c *SearchCmd) Run(globals *Globals) error {
 					err = fmt.Errorf("embed query: %w", err)
 					return
 				}
-				results, err = st.SemanticSearch(ctx, qVec, limit, whereFilter)
+				results, err = st.SemanticSearch(ctx, qVec, limit, whereFilter, false)
 			})
 			return results, err
 		}
@@ -133,11 +133,11 @@ func (c *SearchCmd) Run(globals *Globals) error {
 		whereFilter = chroma.And(filters...)
 	}
 
-	results, err := st.SemanticSearch(ctx, qVec, c.Limit, whereFilter)
+	results, err := st.SemanticSearch(ctx, qVec, c.Limit, whereFilter, globals.IncludeText)
 	if err != nil {
 		return err
 	}
 
-	printResults(fmt.Sprintf("Semantic Search: %q", c.Query), results, globals.VaultName, hyperlinkSupported(globals))
+	printResultsFormatted("search", fmt.Sprintf("Semantic Search: %q", c.Query), results, globals)
 	return nil
 }

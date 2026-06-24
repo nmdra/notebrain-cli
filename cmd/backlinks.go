@@ -49,6 +49,6 @@ func (c *BacklinksCmd) Run(globals *Globals) error {
 		return err
 	}
 
-	printResults(fmt.Sprintf("Backlinks for: %q (slug: %s)", targetNote, targetSlug), links, globals.VaultName, hyperlinkSupported(globals))
+	printResultsFormatted("backlinks", fmt.Sprintf("Backlinks for: %q (slug: %s)", targetNote, targetSlug), links, globals)
 	return nil
 }

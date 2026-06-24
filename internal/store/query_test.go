@@ -56,8 +56,10 @@ func TestQueries(t *testing.T) {
 
 	setupTestData(t, ctx, st)
 
+	qVec := []float32{1.0, 0.0, 0.0}
+
 	t.Run("SemanticSearch", func(t *testing.T) {
-		res, err := st.SemanticSearch(ctx, []float32{1.0, 0.0, 0.0}, 10, nil)
+		res, err := st.SemanticSearch(ctx, qVec, 10, nil, false)
 		if err != nil {
 			t.Fatalf("SemanticSearch failed: %v", err)
 		}
@@ -104,12 +106,12 @@ func TestQueries(t *testing.T) {
 		}
 		_ = st.UpsertChunks(ctx, chunks)
 
-		res, err := st.HiddenConnections(ctx, []float32{1.0, 0.0, 0.0}, "note-a", 10)
+		hidden, err := st.HiddenConnections(ctx, qVec, "note-a", 10, false)
 		if err != nil {
 			t.Fatalf("HiddenConnections failed: %v", err)
 		}
-		if len(res) == 0 || res[0].NoteSlug != "note-c" {
-			t.Errorf("Expected note-c to be hidden connection to note-a, got %v", res)
+		if len(hidden) == 0 || hidden[0].NoteSlug != "note-c" {
+			t.Errorf("Expected note-c to be hidden connection to note-a, got %v", hidden)
 		}
 	})
 
@@ -133,18 +135,17 @@ func TestQueries(t *testing.T) {
 	})
 
 	t.Run("GraphBoostedSearch", func(t *testing.T) {
-		qVec := []float32{1.0, 0.0, 0.0}
 		// Querying near note-a, with seed note-b and boost
-		res, err := st.GraphBoostedSearch(ctx, qVec, "note-b", 0.5, 10)
+		boosted, err := st.GraphBoostedSearch(ctx, qVec, "note-b", 0.5, 10, false)
 		if err != nil {
 			t.Fatalf("GraphBoostedSearch failed: %v", err)
 		}
-		if len(res) == 0 {
+		if len(boosted) == 0 {
 			t.Fatalf("Expected results, got none")
 		}
 
 		found := false
-		for _, r := range res {
+		for _, r := range boosted {
 			if r.NoteSlug == "note-b" {
 				found = true
 			}
