@@ -62,11 +62,30 @@ func ParseAndRun(ctx context.Context) error {
 
 	ctxParser := kong.Parse(&cli,
 		kong.Name("notebrain"),
-		kong.Description("Index and search your Obsidian vault with semantic intelligence"),
+		kong.Description(`Index and search your Obsidian vault with semantic intelligence.
+
+NoteBrain uses local LLM embeddings to index your Markdown notes into ChromaDB, 
+enabling powerful semantic search, hidden graph connections, and AI-friendly automation workflows.
+
+Examples:
+  # Ingest your entire vault into ChromaDB
+  notebrain ingest --vault-path "/path/to/Obsidian"
+  
+  # Perform a semantic search across your notes
+  notebrain search "how to configure neovim" --limit 5
+  
+  # Graph-boosted search (combines semantic similarity + wikilink connections)
+  notebrain boosted "docker setup"
+
+  # Find hidden connections between notes that are not explicitly linked
+  notebrain hidden "project alpha"
+  
+  # Automate CLI output for AI agents (Claude, Gemini, etc.)
+  notebrain search "rust error handling" --format json --include-text`),
 		kong.UsageOnError(),
 		kong.ConfigureHelp(kong.HelpOptions{
 			Compact: true,
-			Summary: true,
+			Summary: false,
 		}),
 		kong.Configuration(configfile.IgnoreMissingFileLoader(configfile.TOMLResolver)),
 	)
