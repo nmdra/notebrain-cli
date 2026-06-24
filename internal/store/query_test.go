@@ -155,3 +155,34 @@ func TestQueries(t *testing.T) {
 		}
 	})
 }
+
+func TestGetNoteHashes(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatalf("Open failed: %v", err)
+	}
+	defer func() { _ = st.Close() }()
+
+	chunks := []store.ChunkRecord{
+		{
+			ID:          "note-hash-test:0",
+			NoteSlug:    "note-hash-test",
+			Title:       "Note Hash",
+			FilePath:    "Note Hash.md",
+			ChunkIndex:  0,
+			ContentHash: "abcdef123456",
+			Embedding:   []float32{1.0, 0.0, 0.0},
+		},
+	}
+	_ = st.UpsertChunks(ctx, chunks)
+
+	hashes, err := st.GetNoteHashes(ctx)
+	if err != nil {
+		t.Fatalf("GetNoteHashes failed: %v", err)
+	}
+
+	if val, ok := hashes["note-hash-test"]; !ok || val != "abcdef123456" {
+		t.Errorf("GetNoteHashes returned unexpected or missing hash: %v", hashes)
+	}
+}

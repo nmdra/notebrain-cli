@@ -19,6 +19,9 @@ var (
 
 // TitleFromPath derives a fallback title from the relative file path.
 func TitleFromPath(path string) string {
+	if path == "" {
+		return ""
+	}
 	base := filepath.Base(path)
 	return strings.TrimSuffix(base, ".md")
 }

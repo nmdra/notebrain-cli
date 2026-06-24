@@ -35,6 +35,26 @@ func TestSlugify(t *testing.T) {
 	}
 }
 
+func TestTitleFromPath(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{name: "simple", input: "My Note.md", want: "My Note"},
+		{name: "with directory", input: "Folder/My Note.md", want: "My Note"},
+		{name: "no extension", input: "My Note", want: "My Note"},
+		{name: "empty", input: "", want: ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := TitleFromPath(tt.input); got != tt.want {
+				t.Errorf("TitleFromPath(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestParseAST(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -72,6 +92,16 @@ More content.
 			maxRunes:   500,
 			body:       "```go\nfmt.Println(\"hi\")\n```\n",
 			wantChunks: 1,
+			wantTags:   []string{},
+			wantLinks:  []string{},
+			wantTitle:  "",
+		},
+		{
+			name:       "chunk splitting boundary",
+			slug:       "long-note",
+			maxRunes:   50, // very small to force split
+			body:       "# Intro\n\nFirst paragraph that is somewhat long and should definitely trigger a split.\n\nSecond paragraph here also fairly long.\n\nThird paragraph.\n",
+			wantChunks: 3, // "Intro" + P1, P2, P3
 			wantTags:   []string{},
 			wantLinks:  []string{},
 			wantTitle:  "",
