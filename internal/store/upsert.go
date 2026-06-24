@@ -95,6 +95,15 @@ func (s *Store) DeleteNoteChunks(ctx context.Context, noteSlug string) error {
 	)
 }
 
+// DeleteNoteLinks removes all outgoing links for a note.
+func (s *Store) DeleteNoteLinks(ctx context.Context, noteSlug string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.links.Delete(ctx,
+		chroma.WithWhere(chroma.EqString("source_slug", noteSlug)),
+	)
+}
+
 // cleanupNoteChunks deletes chunks for a note with an index >= validCount.
 // This removes stale chunks when a note shrinks, without dropping and recreating
 // the valid ones (which triggers an hnswlib race condition/bug).
@@ -183,14 +192,19 @@ func (s *Store) upsertLinks(ctx context.Context, noteSlug string, links []string
 		metas[i], _ = chroma.NewDocumentMetadataFromMap(metaMap)
 	}
 
-	// sb_links has no embedding function — pass zero-length embeddings or
+	// nb_links has no embedding function — pass zero-length embeddings or
 	// create the collection with no embedding function.
-	// Simplest: store links with a dummy 1-dim embedding.
+	// Simplest: store links with a dummy 16-dim embedding.
 	embs := make([]embeddings.Embedding, len(uniqueLinks))
-	// Add dummy 1-dimensional embeddings to bypass Chroma dimension checks (required)
-	// We use random values to prevent HNSW pathologically failing on identical vectors
+	// Add dummy 16-dimensional embeddings to bypass Chroma dimension checks (required).
+	// Using 16 distinct dimensions in L2 space avoids HNSW pathologically failing or corrupting
+	// on identical/degenerate vector spaces.
 	for i := range uniqueLinks {
-		embs[i] = embeddings.NewEmbeddingFromFloat32([]float32{rand.Float32()})
+		vec := make([]float32, 16)
+		for j := 0; j < 16; j++ {
+			vec[j] = rand.Float32()
+		}
+		embs[i] = embeddings.NewEmbeddingFromFloat32(vec)
 	}
 
 	return s.links.Upsert(ctx,

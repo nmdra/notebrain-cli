@@ -63,6 +63,34 @@ func (p *Pipeline) Run(ctx context.Context, vaultPath string, glob string, stdin
 		hashes = make(map[string]string)
 	}
 
+	// Identify notes that are in the database but no longer exist on disk
+	validSlugs := make(map[string]bool)
+	for _, file := range files {
+		rel, err := filepath.Rel(vaultPath, file)
+		if err == nil {
+			validSlugs[parser.Slugify(rel)] = true
+		}
+	}
+
+	var staleSlugs []string
+	for slug := range hashes {
+		if !validSlugs[slug] {
+			staleSlugs = append(staleSlugs, slug)
+		}
+	}
+
+	if len(staleSlugs) > 0 {
+		_, _ = fmt.Fprintf(stdout, "Syncing database: removing %d deleted notes...\n", len(staleSlugs))
+		for _, slug := range staleSlugs {
+			if err := p.store.DeleteNoteChunks(ctx, slug); err != nil {
+				_, _ = fmt.Fprintf(stdout, "Warning: failed to delete chunks for %s: %v\n", slug, err)
+			}
+			if err := p.store.DeleteNoteLinks(ctx, slug); err != nil {
+				_, _ = fmt.Fprintf(stdout, "Warning: failed to delete links for %s: %v\n", slug, err)
+			}
+		}
+	}
+
 	// +1 for the TUI goroutine's potential error
 	progressCh := make(chan tui.ProgressUpdate, p.workers*2)
 	errCh := make(chan error, totalFiles+1)

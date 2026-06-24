@@ -73,3 +73,58 @@ func TestPipelineRun(t *testing.T) {
 		t.Errorf("Expected 2 links, got %d", stats["links"])
 	}
 }
+
+func TestPipelineSyncDeleted(t *testing.T) {
+	ctx := context.Background()
+	dbDir := t.TempDir()
+	st, err := store.Open(ctx, dbDir)
+	if err != nil {
+		t.Fatalf("Failed to open store: %v", err)
+	}
+	defer func() { _ = st.Close() }()
+
+	vaultDir := t.TempDir()
+
+	// 1. Write note1.md and note2.md
+	n1Path := filepath.Join(vaultDir, "note1.md")
+	n2Path := filepath.Join(vaultDir, "note2.md")
+	_ = os.WriteFile(n1Path, []byte("Note one [[note2]]"), 0644)
+	_ = os.WriteFile(n2Path, []byte("Note two [[note1]]"), 0644)
+
+	p := NewPipeline(st, &mockEmbedder{}, 1)
+
+	// Ingest initially
+	pr1, pw1 := io.Pipe()
+	go func() { _ = pw1.Close() }()
+	var stdout1 bytes.Buffer
+	if err := p.Run(ctx, vaultDir, "", pr1, &stdout1); err != nil {
+		t.Fatalf("First run failed: %v", err)
+	}
+
+	stats, _ := st.Stats(ctx)
+	if stats["chunks"] != 2 || stats["links"] != 2 {
+		t.Fatalf("Expected 2 chunks, 2 links initially, got %v", stats)
+	}
+
+	// 2. Delete note2.md on disk
+	if err := os.Remove(n2Path); err != nil {
+		t.Fatalf("Failed to delete file: %v", err)
+	}
+
+	// Ingest again
+	pr2, pw2 := io.Pipe()
+	go func() { _ = pw2.Close() }()
+	var stdout2 bytes.Buffer
+	if err := p.Run(ctx, vaultDir, "", pr2, &stdout2); err != nil {
+		t.Fatalf("Second run failed: %v", err)
+	}
+
+	// 3. Verify that note2 has been cleaned up (only 1 chunk and 1 link for note1 remain)
+	stats, _ = st.Stats(ctx)
+	if stats["chunks"] != 1 {
+		t.Errorf("Expected 1 chunk remaining after sync, got %d", stats["chunks"])
+	}
+	if stats["links"] != 1 {
+		t.Errorf("Expected 1 link remaining after sync, got %d", stats["links"])
+	}
+}

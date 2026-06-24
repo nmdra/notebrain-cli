@@ -34,20 +34,26 @@ func Open(ctx context.Context, path string) (*Store, error) {
 		return nil, fmt.Errorf("chroma open %s: %w", path, err)
 	}
 
-	// Tune HNSW index for faster querying and proper metric
-	meta := map[string]interface{}{
-		"hnsw:space":       "cosine", // MiniLM embeddings are cosine-optimized
-		"hnsw:search_ef":   50,       // Lower value improves query speed (default is 100)
-		"hnsw:num_threads": 1,        // Prevent hnswlib background thread crash under load
+	// Tune HNSW index for chunks (MiniLM embeddings are cosine-optimized)
+	chunksMeta := map[string]interface{}{
+		"hnsw:space":       "cosine",
+		"hnsw:search_ef":   50, // Lower value improves query speed
+		"hnsw:num_threads": 1,  // Prevent hnswlib background thread crash
 	}
 
-	chunks, err := client.GetOrCreateCollection(ctx, CollectionChunks, chroma.WithCollectionMetadataMapCreateStrict(meta))
+	chunks, err := client.GetOrCreateCollection(ctx, CollectionChunks, chroma.WithCollectionMetadataMapCreateStrict(chunksMeta))
 	if err != nil {
 		_ = client.Close()
 		return nil, fmt.Errorf("get/create chunks collection: %w", err)
 	}
 
-	links, err := client.GetOrCreateCollection(ctx, CollectionLinks, chroma.WithCollectionMetadataMapCreateStrict(meta))
+	// Tune HNSW index for links (uses dummy embeddings, L2 distance avoids cosine degeneracy)
+	linksMeta := map[string]interface{}{
+		"hnsw:space":       "l2",
+		"hnsw:num_threads": 1,
+	}
+
+	links, err := client.GetOrCreateCollection(ctx, CollectionLinks, chroma.WithCollectionMetadataMapCreateStrict(linksMeta))
 	if err != nil {
 		_ = client.Close()
 		return nil, fmt.Errorf("get/create links collection: %w", err)

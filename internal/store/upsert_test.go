@@ -94,6 +94,16 @@ func TestUpsertLinks(t *testing.T) {
 	if stats["links"] != 1 {
 		t.Errorf("Expected 1 link after replacement, got %d", stats["links"])
 	}
+
+	// Delete links
+	err = st.DeleteNoteLinks(ctx, "test-note")
+	if err != nil {
+		t.Fatalf("DeleteNoteLinks failed: %v", err)
+	}
+	stats, _ = st.Stats(ctx)
+	if stats["links"] != 0 {
+		t.Errorf("Expected 0 links after delete, got %d", stats["links"])
+	}
 }
 
 func TestIngestNote(t *testing.T) {
