@@ -74,12 +74,23 @@ func (s *Store) Reset(ctx context.Context) error {
 			return fmt.Errorf("delete collection %s: %w", name, err)
 		}
 	}
+
+	chunksMeta := map[string]interface{}{
+		"hnsw:space":       "cosine",
+		"hnsw:search_ef":   50,
+		"hnsw:num_threads": 1,
+	}
 	var err error
-	s.chunks, err = s.client.GetOrCreateCollection(ctx, CollectionChunks)
+	s.chunks, err = s.client.GetOrCreateCollection(ctx, CollectionChunks, chroma.WithCollectionMetadataMapCreateStrict(chunksMeta))
 	if err != nil {
 		return err
 	}
-	s.links, err = s.client.GetOrCreateCollection(ctx, CollectionLinks)
+
+	linksMeta := map[string]interface{}{
+		"hnsw:space":       "l2",
+		"hnsw:num_threads": 1,
+	}
+	s.links, err = s.client.GetOrCreateCollection(ctx, CollectionLinks, chroma.WithCollectionMetadataMapCreateStrict(linksMeta))
 	return err
 }
 
