@@ -53,7 +53,9 @@ var mdParser = goldmark.New(
 )
 
 // ParseAST parses body text into ASTChunks, extracting wikilinks, tags, and frontmatter.
-func ParseAST(body, noteSlug string, maxChunkRunes int) ASTResult {
+// maxChunkRunes controls the maximum rune length per chunk. overlapRunes controls how many
+// runes are repeated at the start of the next sub-chunk when a section is split (overlap).
+func ParseAST(body, noteSlug string, maxChunkRunes, overlapRunes int) ASTResult {
 	src := []byte(body)
 	reader := text.NewReader(src)
 	doc := mdParser.Parser().Parse(reader)
@@ -99,7 +101,7 @@ func ParseAST(body, noteSlug string, maxChunkRunes int) ASTResult {
 
 	// Extract chunks using section logic
 	sections := extractSections(doc, src)
-	chunks := buildChunks(sections, noteSlug, maxChunkRunes)
+	chunks := buildChunks(sections, noteSlug, maxChunkRunes, overlapRunes)
 
 	return ASTResult{
 		Chunks:      chunks,
@@ -231,7 +233,7 @@ func extractSections(doc ast.Node, src []byte) []section {
 	return sections
 }
 
-func buildChunks(sections []section, noteSlug string, maxRunes int) []ASTChunk {
+func buildChunks(sections []section, noteSlug string, maxRunes, overlapRunes int) []ASTChunk {
 	var chunks []ASTChunk
 	idx := 0
 
@@ -284,7 +286,7 @@ func buildChunks(sections []section, noteSlug string, maxRunes int) []ASTChunk {
 			continue
 		}
 
-		subTexts := splitAtBoundary(runes, maxRunes)
+		subTexts := splitAtBoundary(runes, maxRunes, overlapRunes)
 		for _, sub := range subTexts {
 			chunks = append(chunks, ASTChunk{
 				NoteSlug:    noteSlug,
@@ -303,7 +305,11 @@ func buildChunks(sections []section, noteSlug string, maxRunes int) []ASTChunk {
 	return chunks
 }
 
-func splitAtBoundary(runes []rune, maxRunes int) []string {
+// splitAtBoundary splits a rune slice into parts of at most maxRunes runes each,
+// preferring sentence boundaries (./!/?) or newlines as break points.
+// overlapRunes runes from the previous part are repeated at the start of each new part
+// to preserve sentence-level continuity across sub-chunk boundaries.
+func splitAtBoundary(runes []rune, maxRunes, overlapRunes int) []string {
 	var parts []string
 	start := 0
 	for start < len(runes) {
@@ -325,7 +331,14 @@ func splitAtBoundary(runes []rune, maxRunes int) []string {
 			}
 		}
 		parts = append(parts, strings.TrimSpace(string(runes[start:breakAt])))
-		start = breakAt
+
+		// Apply overlap: back up by overlapRunes so the next chunk shares context.
+		// Safety floor: nextStart must advance beyond start to prevent infinite loops.
+		nextStart := breakAt - overlapRunes
+		if nextStart <= start {
+			nextStart = breakAt
+		}
+		start = nextStart
 	}
 	return parts
 }

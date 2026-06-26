@@ -150,7 +150,7 @@ Some other text.
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			res := ParseAST(tt.body, tt.slug, tt.maxRunes)
+			res := ParseAST(tt.body, tt.slug, tt.maxRunes, 0)
 			if len(res.Chunks) != tt.wantChunks {
 				t.Errorf("got %d chunks, want %d", len(res.Chunks), tt.wantChunks)
 			}

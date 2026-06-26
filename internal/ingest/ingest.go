@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -29,10 +30,13 @@ type Pipeline struct {
 	store         *store.Store
 	embedder      Embedder
 	workers       int
-	MinChunkWords int
+	MinChunkWords int // minimum word count to keep a chunk (filters junk)
+	ChunkSize     int // maximum runes per chunk fed to ParseAST
+	ChunkOverlap  int // overlap runes between sub-chunks when a section is split
 }
 
 // NewPipeline creates an ingestion pipeline with the given number of concurrent workers.
+// Set ChunkSize, ChunkOverlap, and MinChunkWords on the returned Pipeline before calling Run.
 func NewPipeline(s *store.Store, e Embedder, workers int) *Pipeline {
 	if workers <= 0 {
 		workers = 1
@@ -41,6 +45,9 @@ func NewPipeline(s *store.Store, e Embedder, workers int) *Pipeline {
 		store:    s,
 		embedder: e,
 		workers:  workers,
+		// Defaults matching config.Default() — callers should override from config.
+		ChunkSize:    800,
+		ChunkOverlap: 100,
 	}
 }
 
@@ -239,7 +246,7 @@ func (p *Pipeline) processFile(ctx context.Context, vaultPath string, filePath s
 	}
 
 	title := parser.TitleFromPath(relPath)
-	astRes := parser.ParseAST(string(content), slug, 1000)
+	astRes := parser.ParseAST(string(content), slug, p.ChunkSize, p.ChunkOverlap)
 
 	if ft, ok := astRes.Frontmatter["title"].(string); ok && ft != "" {
 		title = ft
@@ -256,17 +263,34 @@ func (p *Pipeline) processFile(ctx context.Context, vaultPath string, filePath s
 		modTime = info.ModTime()
 	}
 
-	// Filter chunks by minimum word count
+	// Filter chunks: discard those below the minimum word threshold and
+	// sections whose entire text is only [code:X] placeholder tokens (no prose).
 	var validChunks []parser.ASTChunk
 	for _, c := range astRes.Chunks {
-		if c.WordCount >= p.MinChunkWords {
-			validChunks = append(validChunks, c)
+		if c.WordCount < p.MinChunkWords {
+			continue
 		}
+		if isCodeOnlyChunk(c.Text) {
+			continue
+		}
+		validChunks = append(validChunks, c)
 	}
 
 	chunkRecords := make([]store.ChunkRecord, len(validChunks))
 	for i, c := range validChunks {
-		emb, err := p.embedder.Embed(ctx, c.Text)
+		// Preamble fix: the top-of-note section before the first heading has no
+		// HeadingPath. Use the note title so preamble chunks are semantically grounded.
+		headingPath := c.HeadingPath
+		if headingPath == "" {
+			headingPath = title
+		}
+
+		// Contextual augmentation: prepend title + heading path + tags before
+		// embedding. The raw c.Text is still stored in ChromaDB for display.
+		// This "contextual chunking" technique improves retrieval relevance by
+		// grounding the vector in the document's semantic position.
+		embedText := buildEmbedText(title, headingPath, astRes.Tags, c.Text)
+		emb, err := p.embedder.Embed(ctx, embedText)
 		if err != nil {
 			return nil, err
 		}
@@ -296,4 +320,59 @@ func (p *Pipeline) processFile(ctx context.Context, vaultPath string, filePath s
 		ChunkRecords: chunkRecords,
 		Links:        astRes.Links,
 	}, nil
+}
+
+// buildEmbedText constructs the text fed to the embedding model for a chunk.
+// It prepends the note title, heading path, and tags so the vector captures the
+// document's semantic position — a technique known as contextual chunking that
+// significantly improves retrieval relevance for AI agents.
+//
+// The augmented text is used ONLY for embedding; the raw chunk text (c.Text) is
+// what gets stored in ChromaDB for display and retrieval.
+//
+// Example output:
+//
+//	Architecture Notes > Data Flow > Ingest Pipeline
+//	[tags: golang, rag, chromadb]
+//
+//	The pipeline reads markdown files from the vault directory...
+func buildEmbedText(title, headingPath string, tags []string, chunkText string) string {
+	var sb strings.Builder
+
+	// Write breadcrumb header: "Title > HeadingPath" (or just "Title" for top-level)
+	if title != "" {
+		sb.WriteString(title)
+		if headingPath != "" && headingPath != title {
+			sb.WriteString(" > ")
+			sb.WriteString(headingPath)
+		}
+		sb.WriteByte('\n')
+	} else if headingPath != "" {
+		sb.WriteString(headingPath)
+		sb.WriteByte('\n')
+	}
+
+	// Append lightweight tag hint if tags are present (~5-10 extra tokens)
+	if len(tags) > 0 {
+		sb.WriteString("[tags: ")
+		sb.WriteString(strings.Join(tags, ", "))
+		sb.WriteString("]\n")
+	}
+
+	if sb.Len() > 0 {
+		sb.WriteByte('\n')
+	}
+	sb.WriteString(chunkText)
+	return sb.String()
+}
+
+// codeOnlyPattern matches chunk text that consists entirely of [code:X] or [code]
+// placeholder tokens emitted by the parser for fenced code blocks.
+// Such chunks carry no prose signal and produce noisy embeddings.
+var codeOnlyPattern = regexp.MustCompile(`^(\[code(:[^\]]+)?\]\s*)+$`)
+
+// isCodeOnlyChunk returns true when the entire chunk text is one or more
+// [code:X] placeholder tokens with no prose content.
+func isCodeOnlyChunk(text string) bool {
+	return codeOnlyPattern.MatchString(strings.TrimSpace(text))
 }

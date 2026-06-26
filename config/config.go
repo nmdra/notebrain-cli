@@ -21,12 +21,18 @@ type Config struct {
 	// VaultName for Obsidian CLI targeting.
 	VaultName string
 	// Embedder type: "minilm" or "ollama"
-	Embedder      string
-	OllamaURL     string
-	OllamaModel   string
-	ChunkSize     int
-	ChunkOverlap  int
-	Limit         int
+	Embedder    string
+	OllamaURL   string
+	OllamaModel string
+	// ChunkSize is the maximum number of runes per chunk passed to the parser.
+	// MiniLM-L6-v2 is optimal at 128-256 tokens (~600-800 runes for English prose).
+	ChunkSize int
+	// ChunkOverlap is the number of runes repeated at the start of each sub-chunk
+	// when a section is split. Provides sentence-level continuity across boundaries.
+	ChunkOverlap int
+	Limit        int
+	// MinChunkWords filters out chunks with fewer words than this threshold before
+	// embedding. Eliminates heading-only, code-placeholder, and link-only fragments.
 	MinChunkWords int
 	Verbose       bool
 }
@@ -41,9 +47,9 @@ func Default() *Config {
 		Embedder:      "minilm",
 		OllamaURL:     "http://localhost:11434",
 		OllamaModel:   "nomic-embed-text",
-		ChunkSize:     512,
-		ChunkOverlap:  64,
+		ChunkSize:     800, // runes; ~178 tokens — leaves ~78-token headroom for title/heading prefix
+		ChunkOverlap:  100, // runes; ~1-2 sentences of overlap for sub-chunk splits
 		Limit:         10,
-		MinChunkWords: 0,
+		MinChunkWords: 10, // rejects heading-only and code-placeholder fragments
 	}
 }

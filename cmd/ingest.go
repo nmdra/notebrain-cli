@@ -33,7 +33,9 @@ import (
 type IngestCmd struct {
 	Glob          string `arg:"" optional:"" help:"glob pattern to ingest"`
 	Workers       int    `help:"number of concurrent ingestion workers" default:"4"`
-	MinChunkWords int    `name:"min-chunk-words" help:"skip chunks containing fewer than this many words" default:"0"`
+	MinChunkWords int    `name:"min-chunk-words" help:"skip chunks with fewer words than this (0 = use default of 10)" default:"0"`
+	ChunkSize     int    `name:"chunk-size" help:"maximum runes per chunk for the parser (0 = use default of 800)" default:"0"`
+	ChunkOverlap  int    `name:"chunk-overlap" help:"overlap runes between sub-chunks when a section is split (0 = use default of 100)" default:"0"`
 }
 
 func (c *IngestCmd) Run(globals *Globals) error {
@@ -67,6 +69,15 @@ func (c *IngestCmd) Run(globals *Globals) error {
 
 	fmt.Printf("Starting ingestion pipeline with %d workers...\n", workers)
 	pipeline := ingest.NewPipeline(st, emb, workers)
-	pipeline.MinChunkWords = c.MinChunkWords
+	// Allow flag/config overrides; 0 means "use the pipeline's built-in default".
+	if c.MinChunkWords > 0 {
+		pipeline.MinChunkWords = c.MinChunkWords
+	}
+	if c.ChunkSize > 0 {
+		pipeline.ChunkSize = c.ChunkSize
+	}
+	if c.ChunkOverlap > 0 {
+		pipeline.ChunkOverlap = c.ChunkOverlap
+	}
 	return pipeline.Run(ctx, vaultPath, glob, os.Stdin, os.Stdout)
 }

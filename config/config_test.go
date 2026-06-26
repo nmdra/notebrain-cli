@@ -55,14 +55,14 @@ func TestDefault_Fields(t *testing.T) {
 			want: "nomic-embed-text",
 		},
 		{
-			name: "ChunkSize is 512",
+			name: "ChunkSize is 800",
 			got:  func(c *Config) any { return c.ChunkSize },
-			want: 512,
+			want: 800,
 		},
 		{
-			name: "ChunkOverlap is 64",
+			name: "ChunkOverlap is 100",
 			got:  func(c *Config) any { return c.ChunkOverlap },
-			want: 64,
+			want: 100,
 		},
 		{
 			name: "Limit is 10",
@@ -75,9 +75,9 @@ func TestDefault_Fields(t *testing.T) {
 			want: false,
 		},
 		{
-			name: "MinChunkWords is 0",
+			name: "MinChunkWords is 10",
 			got:  func(c *Config) any { return c.MinChunkWords },
-			want: 0,
+			want: 10,
 		},
 	}
 
