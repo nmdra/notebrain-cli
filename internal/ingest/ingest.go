@@ -27,12 +27,13 @@ type Embedder interface {
 
 // Pipeline orchestrates the ingestion of markdown files into the ChromaDB store.
 type Pipeline struct {
-	store         *store.Store
-	embedder      Embedder
-	workers       int
-	MinChunkWords int // minimum word count to keep a chunk (filters junk)
-	ChunkSize     int // maximum runes per chunk fed to ParseAST
-	ChunkOverlap  int // overlap runes between sub-chunks when a section is split
+	store          *store.Store
+	embedder       Embedder
+	workers        int
+	MinChunkWords  int // minimum word count to keep a chunk (filters junk)
+	ChunkSize      int // maximum runes per chunk fed to ParseAST
+	ChunkOverlap   int // overlap runes between sub-chunks when a section is split
+	RespectExclude bool
 }
 
 // NewPipeline creates an ingestion pipeline with the given number of concurrent workers.
@@ -46,8 +47,9 @@ func NewPipeline(s *store.Store, e Embedder, workers int) *Pipeline {
 		embedder: e,
 		workers:  workers,
 		// Defaults matching config.Default() — callers should override from config.
-		ChunkSize:    800,
-		ChunkOverlap: 100,
+		ChunkSize:      800,
+		ChunkOverlap:   100,
+		RespectExclude: true,
 	}
 }
 
@@ -198,11 +200,30 @@ fileLoop:
 
 // collectFiles walks the vault directory and returns all .md files matching glob.
 func (p *Pipeline) collectFiles(vaultPath, glob string) ([]string, error) {
+	var excluded []string
+	if p.RespectExclude {
+		excluded = LoadExcludedPaths(vaultPath)
+	}
 	var files []string
 	err := filepath.WalkDir(vaultPath, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
+
+		rel, err := filepath.Rel(vaultPath, path)
+		if err != nil {
+			return err
+		}
+
+		if rel != "." {
+			if IsExcluded(rel, excluded) {
+				if d.IsDir() {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+		}
+
 		if d.IsDir() {
 			if strings.HasPrefix(d.Name(), ".") {
 				return filepath.SkipDir
@@ -211,7 +232,6 @@ func (p *Pipeline) collectFiles(vaultPath, glob string) ([]string, error) {
 		}
 		if filepath.Ext(path) == ".md" {
 			if glob != "" {
-				rel, _ := filepath.Rel(vaultPath, path)
 				matched, _ := filepath.Match(glob, rel)
 				if !matched {
 					return nil

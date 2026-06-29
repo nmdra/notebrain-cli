@@ -13,15 +13,16 @@ import (
 
 // Globals holds shared configuration available to all subcommands.
 type Globals struct {
-	ChromaPath   string  `help:"path to ChromaDB persistent storage" default:"~/.notebrain/chroma"`
-	ChromaMode   string  `help:"ChromaDB client mode ('persistent' or 'http')" default:"persistent"`
-	ChromaURL    string  `help:"ChromaDB server URL (used when --chroma-mode=http)" default:"http://localhost:8000"`
-	VaultPath    string  `help:"Obsidian vault path (also used as vault name fallback)"`
-	Verbose      bool    `help:"enable verbose output"`
-	NoHyperlinks bool    `help:"Disable OSC 8 terminal hyperlinks in output"`
-	Format       string  `help:"output format" enum:"text,json,tsv,ndjson" default:"text"`
-	IncludeText  bool    `help:"include matched chunk text in structured output"`
-	MinScore     float64 `help:"suppress results below this similarity score (0–1)" default:"0"`
+	ChromaPath     string  `help:"path to ChromaDB persistent storage" default:"~/.notebrain/chroma"`
+	ChromaMode     string  `help:"ChromaDB client mode ('persistent' or 'http')" default:"persistent"`
+	ChromaURL      string  `help:"ChromaDB server URL (used when --chroma-mode=http)" default:"http://localhost:8000"`
+	VaultPath      string  `help:"Obsidian vault path (also used as vault name fallback)"`
+	Verbose        bool    `help:"enable verbose output"`
+	NoHyperlinks   bool    `help:"Disable OSC 8 terminal hyperlinks in output"`
+	Format         string  `help:"output format" enum:"text,json,tsv,ndjson" default:"text"`
+	IncludeText    bool    `help:"include matched chunk text in structured output"`
+	MinScore       float64 `help:"suppress results below this similarity score (0–1)" default:"0"`
+	RespectExclude bool    `help:"respect Obsidian userIgnoreFilters and attachmentFolderPath settings during ingest" default:"true"`
 
 	// Internal fields, not exposed as flags
 	Ctx       context.Context `kong:"-"`

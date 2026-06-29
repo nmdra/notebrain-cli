@@ -69,6 +69,7 @@ func (c *IngestCmd) Run(globals *Globals) error {
 
 	fmt.Printf("Starting ingestion pipeline with %d workers...\n", workers)
 	pipeline := ingest.NewPipeline(st, emb, workers)
+	pipeline.RespectExclude = globals.RespectExclude
 	// Allow flag/config overrides; 0 means "use the pipeline's built-in default".
 	if c.MinChunkWords > 0 {
 		pipeline.MinChunkWords = c.MinChunkWords

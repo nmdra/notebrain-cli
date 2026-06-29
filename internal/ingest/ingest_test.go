@@ -160,3 +160,40 @@ func TestPipelineMinChunkWords(t *testing.T) {
 		t.Errorf("Expected 1 chunk (only note2), got %d", stats["chunks"])
 	}
 }
+
+func TestPipelineRespectExclude(t *testing.T) {
+	ctx := context.Background()
+	dbDir := t.TempDir()
+	st, err := store.Open(ctx, dbDir)
+	if err != nil {
+		t.Fatalf("Failed to open store: %v", err)
+	}
+	defer func() { _ = st.Close() }()
+
+	vaultDir := t.TempDir()
+	obsidianDir := filepath.Join(vaultDir, ".obsidian")
+	_ = os.MkdirAll(obsidianDir, 0755)
+	appJSON := []byte(`{"userIgnoreFilters": ["Archive"], "attachmentFolderPath": "99.Storage-Shed/Attachments"}`)
+	_ = os.WriteFile(filepath.Join(obsidianDir, "app.json"), appJSON, 0644)
+
+	_ = os.WriteFile(filepath.Join(vaultDir, "active.md"), []byte("Active note content"), 0644)
+	_ = os.MkdirAll(filepath.Join(vaultDir, "Archive"), 0755)
+	_ = os.WriteFile(filepath.Join(vaultDir, "Archive", "old.md"), []byte("Old note content"), 0644)
+	_ = os.MkdirAll(filepath.Join(vaultDir, "99.Storage-Shed", "Attachments"), 0755)
+	_ = os.WriteFile(filepath.Join(vaultDir, "99.Storage-Shed", "Attachments", "attachment.md"), []byte("Attachment note"), 0644)
+
+	p := NewPipeline(st, &mockEmbedder{}, 1)
+	p.RespectExclude = true
+
+	pr, pw := io.Pipe()
+	go func() { _ = pw.Close() }()
+	var stdout bytes.Buffer
+	if err := p.Run(ctx, vaultDir, "", pr, &stdout); err != nil {
+		t.Fatalf("Pipeline.Run failed: %v", err)
+	}
+
+	stats, _ := st.Stats(ctx)
+	if stats["chunks"] != 1 {
+		t.Errorf("Expected 1 chunk (only active.md), got %d", stats["chunks"])
+	}
+}
