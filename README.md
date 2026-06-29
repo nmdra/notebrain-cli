@@ -3,6 +3,11 @@
 NoteBrain is a high-performance Go CLI tool designed to index an Obsidian vault into a local **ChromaDB** vector database. It enables powerful semantic search, backlink traversal, graph connections, hidden connections, shared tags discovery, and graph-boosted semantic queries across your personal knowledge base.
 
 [![Release](https://github.com/nmdra/notebrain-cli/actions/workflows/release.yml/badge.svg)](https://github.com/nmdra/notebrain-cli/actions/workflows/release.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/nmdra/notebrain-cli)](https://goreportcard.com/report/github.com/nmdra/notebrain-cli)
+[![Go Reference](https://pkg.go.dev/badge/github.com/nmdra/notebrain-cli.svg)](https://pkg.go.dev/github.com/nmdra/notebrain-cli)
+[![License: MIT](https://img.shields.io/github/license/nmdra/notebrain-cli)](https://github.com/nmdra/notebrain-cli/blob/main/LICENSE)
+[![GitHub release](https://img.shields.io/github/v/release/nmdra/notebrain-cli)](https://github.com/nmdra/notebrain-cli/releases)
+[![GitHub stars](https://img.shields.io/github/stars/nmdra/notebrain-cli?style=social)](https://github.com/nmdra/notebrain-cli/stargazers)
 
 ## Features
 
@@ -25,7 +30,9 @@ NoteBrain is a high-performance Go CLI tool designed to index an Obsidian vault 
 NoteBrain supports both `.env` files and a dedicated `config.toml` file for persisting CLI arguments.
 
 ### TOML Configuration (`~/.notebrain/config/config.toml`)
+
 You can persistently set any global CLI flag using a TOML file. For example, to avoid typing `--vault-path` and `--format` every time:
+
 ```toml
 vault-path = "/path/to/Second Brain 2.0"
 format = "text"
@@ -39,6 +46,7 @@ use-editor = false
 ```
 
 ### Environment Variables (`.env`)
+
 You can also manage configuration via environment variables. Copy `.env.example` to `.env` in the project root:
 
 ```env
@@ -71,10 +79,10 @@ flowchart TD
     A[Obsidian Vault] -->|Markdown Files| B(Parser Engine)
     B -->|Chunks & Frontmatter| C{Ingestion Pipeline}
     B -->|Wikilinks| C
-    
+
     C -->|SHA-256 Hash Check| D[ChromaDB Local Vector Store]
     C -->|ONNX Embeddings| D
-    
+
     E[CLI Commands] -->|Query| D
     D -->|Semantic Search| E
     D -->|BFS Graph Traversal| E
@@ -83,12 +91,16 @@ flowchart TD
 ## Documentation
 
 Comprehensive documentation is available in the `wiki/` directory:
+
 - [Installation Guide](wiki/Installation.md)
 - [Architecture Details](wiki/Architecture.md)
 
 ### CLI Command Reference
+
 Full documentation for all NoteBrain commands:
+
 - [Commands Reference](wiki/Commands.md)
 
 ## License
+
 MIT License
