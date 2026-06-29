@@ -1,5 +1,5 @@
 # Binaries
-notebrain
+/notebrain
 *.exe
 *.dll
 *.so
