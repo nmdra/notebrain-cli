@@ -9,10 +9,12 @@ require (
 	github.com/alecthomas/kong v1.15.0
 	github.com/amikos-tech/chroma-go v0.4.1
 	github.com/joho/godotenv v1.5.1
+	github.com/pelletier/go-toml/v2 v2.4.2
 	github.com/yuin/goldmark v1.8.2
 	github.com/yuin/goldmark-meta v1.1.0
 	go.abhg.dev/goldmark/hashtag v0.4.0
 	go.abhg.dev/goldmark/wikilink v0.6.0
+	golang.org/x/sys v0.45.0
 )
 
 require (
@@ -44,7 +46,6 @@ require (
 	github.com/mattn/go-runewidth v0.0.23 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
-	github.com/pelletier/go-toml/v2 v2.4.2 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/sahilm/fuzzy v0.1.1 // indirect
@@ -53,7 +54,6 @@ require (
 	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/crypto v0.46.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/sys v0.45.0 // indirect
 	golang.org/x/text v0.32.0 // indirect
 	gopkg.in/yaml.v2 v2.3.0 // indirect
 )
