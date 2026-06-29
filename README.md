@@ -14,6 +14,8 @@ NoteBrain is a high-performance Go CLI tool designed to index an Obsidian vault 
 - **Advanced Filtering**: Use `--section`, `--has-code`, and `--has-tasks` to filter searches precisely by document structures.
 - **Machine-Readable Outputs**: Supports JSON, TSV, and NDJSON with `--format` flags for seamless integration into AI agent workflows (Claude, Gemini, etc.).
 - **OSC 8 Terminal Hyperlinks**: Automatically renders clickable `obsidian://open` links right in your CLI for seamlessly opening matched chunks inside Obsidian (supported terminals only).
+- **External Editor Integration**: Launch your preferred terminal/GUI editor (`$EDITOR` environment variable) directly from the TUI results view.
+- **Obsidian Excluded Files & Attachments**: Automatically honors your Obsidian configuration (`userIgnoreFilters` and `attachmentFolderPath`) during ingestion to keep databases clean.
 - **Graph Traversal**: Explores your Obsidian wikilinks graph (`[[Note]]`).
 - **Hidden Connections**: Discovers notes that are semantically identical but not explicitly linked.
 - **Graph-Boosted Search**: Combines semantic search scores with structural graph proximities.
@@ -28,6 +30,12 @@ You can persistently set any global CLI flag using a TOML file. For example, to 
 vault-path = "/path/to/Second Brain 2.0"
 format = "text"
 verbose = false
+
+# Respect Obsidian settings (default: true)
+respect-exclude = true
+
+# Use $EDITOR as default opener instead of Obsidian (default: false)
+use-editor = false
 ```
 
 ### Environment Variables (`.env`)

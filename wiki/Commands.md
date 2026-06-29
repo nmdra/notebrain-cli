@@ -21,6 +21,8 @@ Flags:
       --format="text"        output format (text, json, tsv, ndjson)
       --include-text         include matched chunk text in structured output
       --min-score=0          suppress results below this similarity score (0–1)
+      --respect-exclude      respect Obsidian userIgnoreFilters and attachmentFolderPath settings during ingest (default: true)
+      --use-editor           enable external editor ($EDITOR) integration as default open type (default: false)
       --config="~/.notebrain/config/config.toml"
                              Path to config file
 
@@ -40,7 +42,9 @@ Commands:
 For all query commands (`search`, `backlinks`, `connections`, `hidden`, `boosted`, `tags`), NoteBrain will launch a **beautiful interactive terminal UI**! 
 - Use the **Up/Down** arrow keys to navigate the results.
 - Press **/** to live-filter the results.
-- Press **Enter** to instantly open the selected note inside Obsidian!
+- Press **Enter** to open the selected note using your default method (Obsidian, or your editor if `--use-editor` is enabled).
+- Press **o** to open the note explicitly in Obsidian.
+- Press **e** to open the note explicitly in your terminal or GUI editor (defined by the `$EDITOR` environment variable).
 - Press **q** or **Esc** to exit.
 
 ## `ingest`

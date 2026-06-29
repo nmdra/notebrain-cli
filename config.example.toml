@@ -51,6 +51,16 @@ include-text = false
 # Defaults to 0.0
 min-score = 0.0
 
+# Respect Obsidian's userIgnoreFilters and attachmentFolderPath configuration.
+# If true, files matching these rules or located in the attachment directory are skipped during ingest.
+# Defaults to true
+respect-exclude = true
+
+# Use your preferred terminal/GUI editor ($EDITOR environment variable) as the default opener.
+# If true, pressing Enter in the interactive search UI opens notes in the editor instead of Obsidian.
+# Defaults to false
+use-editor = false
+
 # ------------------------------------------------------------------------------
 # Ingestion Pipeline Settings
 # ------------------------------------------------------------------------------
