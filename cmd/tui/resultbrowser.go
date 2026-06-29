@@ -2,8 +2,6 @@ package tui
 
 import (
 	"fmt"
-	"os/exec"
-	"runtime"
 
 	"charm.land/bubbles/v2/list"
 	tea "charm.land/bubbletea/v2"
@@ -30,11 +28,12 @@ func (i resultItem) FilterValue() string { return i.Result.Title }
 type Model struct {
 	list      list.Model
 	vaultName string
+	useEditor bool
 	quitting  bool
 }
 
 // NewResultBrowser creates a new interactive search results browser.
-func NewResultBrowser(header, vaultName string, results []store.Result) Model {
+func NewResultBrowser(header, vaultName string, results []store.Result, useEditor bool) Model {
 	items := make([]list.Item, len(results))
 	for i, r := range results {
 		items[i] = resultItem{r}
@@ -45,7 +44,7 @@ func NewResultBrowser(header, vaultName string, results []store.Result) Model {
 	l.SetShowStatusBar(true)
 	l.SetFilteringEnabled(true) // "/" to fuzzy-filter results live
 
-	return Model{list: l, vaultName: vaultName}
+	return Model{list: l, vaultName: vaultName, useEditor: useEditor}
 }
 
 func (m Model) Init() tea.Cmd { return nil }
@@ -56,16 +55,30 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.list.SetSize(msg.Width, msg.Height-2)
 
+	case editorFinishedMsg:
+		return m, nil
+
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "q", "ctrl+c":
 			m.quitting = true
 			return m, tea.Quit
 
-		case "enter", "o":
-			// Open the selected note in Obsidian
+		case "enter":
 			if item, ok := m.list.SelectedItem().(resultItem); ok {
-				_ = openInObsidian(m.vaultName, item.FilePath)
+				return m, openNote(m.vaultName, item.FilePath, m.useEditor)
+			}
+			return m, nil
+
+		case "o":
+			if item, ok := m.list.SelectedItem().(resultItem); ok {
+				return m, openNote(m.vaultName, item.FilePath, false)
+			}
+			return m, nil
+
+		case "e":
+			if item, ok := m.list.SelectedItem().(resultItem); ok {
+				return m, openNote(m.vaultName, item.FilePath, true)
 			}
 			return m, nil
 		}
@@ -82,34 +95,8 @@ func (m Model) View() tea.View {
 	}
 	help := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#888780")).
-		Render("\n  ↑/↓ navigate · / filter · enter open in Obsidian · q quit")
+		Render("\n  ↑/↓ navigate · / filter · enter open · o obsidian · e editor · q quit")
 	v := tea.NewView(m.list.View() + help)
 	v.AltScreen = true
 	return v
-}
-
-// openInObsidian shells out to the OS opener with an obsidian:// URI.
-func openInObsidian(vaultName, filePath string) error {
-	if filePath == "" {
-		return nil
-	}
-	uri := store.ObsidianURI(vaultName, filePath)
-	cmd := exec.Command(openCommand(), uri)
-	if err := cmd.Start(); err != nil {
-		return err
-	}
-	// Reap the child process in background to avoid zombies
-	go func() { _ = cmd.Wait() }()
-	return nil
-}
-
-func openCommand() string {
-	switch runtime.GOOS {
-	case "darwin":
-		return "open"
-	case "windows":
-		return "start"
-	default:
-		return "xdg-open"
-	}
 }

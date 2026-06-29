@@ -58,6 +58,7 @@ type LiveSearchModel struct {
 	list      list.Model
 	searchFn  SearchFunc
 	vaultName string
+	useEditor bool
 	focus     focusState
 
 	// inflight is a pointer to an int64 counter used for debounce ID tracking.
@@ -109,7 +110,7 @@ var (
 // NewLiveSearch creates a LiveSearchModel.
 // searchFn wraps embed+query so the TUI has no direct dependency on the
 // store/embedder packages.
-func NewLiveSearch(searchFn SearchFunc, vaultName string, limit int, initialQuery string) LiveSearchModel {
+func NewLiveSearch(searchFn SearchFunc, vaultName string, limit int, initialQuery string, useEditor bool) LiveSearchModel {
 	ti := textinput.New()
 	ti.Placeholder = "type to search your vault…"
 	ti.Prompt = "  "
@@ -130,6 +131,7 @@ func NewLiveSearch(searchFn SearchFunc, vaultName string, limit int, initialQuer
 		list:      l,
 		searchFn:  searchFn,
 		vaultName: vaultName,
+		useEditor: useEditor,
 		focus:     focusInput,
 		inflight:  &inflightCounter,
 		debounce:  300 * time.Millisecond,
@@ -157,6 +159,9 @@ func (m LiveSearchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m = m.recalcLayout()
+
+	case editorFinishedMsg:
+		return m, nil
 
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -208,24 +213,29 @@ func (m LiveSearchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "enter":
-			// Enter only opens a note when the list has focus
 			if m.focus == focusList {
 				if item, ok := m.list.SelectedItem().(resultItem); ok {
-					_ = openInObsidian(m.vaultName, item.FilePath)
+					return m, openNote(m.vaultName, item.FilePath, m.useEditor)
 				}
 				return m, nil
 			}
-			// In input focus, enter does nothing (search is debounced on keypress)
 
 		case "o":
-			// 'o' opens the selected note only when list has focus
 			if m.focus == focusList {
 				if item, ok := m.list.SelectedItem().(resultItem); ok {
-					_ = openInObsidian(m.vaultName, item.FilePath)
+					return m, openNote(m.vaultName, item.FilePath, false)
 				}
 				return m, nil
 			}
-			// In input focus, 'o' is just a character — fall through to textinput
+			fallthrough
+
+		case "e":
+			if m.focus == focusList {
+				if item, ok := m.list.SelectedItem().(resultItem); ok {
+					return m, openNote(m.vaultName, item.FilePath, true)
+				}
+				return m, nil
+			}
 			fallthrough
 
 		default:
@@ -379,7 +389,7 @@ func (m LiveSearchModel) View() tea.View {
 	if m.focus == focusInput {
 		help = lsHelpStyle.Render("  ↓ → results · esc quit")
 	} else {
-		help = lsHelpStyle.Render("  ↑/↓ navigate · enter open · tab/↑ top → search · esc quit")
+		help = lsHelpStyle.Render("  ↑/↓ navigate · enter open · o obsidian · e editor · tab/↑ top → search · esc quit")
 	}
 
 	content := inputRendered + "\n" + statusLine + "\n" + tabs + "\n" + m.list.View() + "\n" + help

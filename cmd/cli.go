@@ -23,6 +23,7 @@ type Globals struct {
 	IncludeText    bool    `help:"include matched chunk text in structured output"`
 	MinScore       float64 `help:"suppress results below this similarity score (0–1)" default:"0"`
 	RespectExclude bool    `help:"respect Obsidian userIgnoreFilters and attachmentFolderPath settings during ingest" default:"true"`
+	UseEditor      bool    `help:"enable external editor ($EDITOR) integration as default open type" default:"false"`
 
 	// Internal fields, not exposed as flags
 	Ctx       context.Context `kong:"-"`
