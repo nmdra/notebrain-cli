@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.0.0] - 2026-06-30
+
+### Breaking Changes
+- **Modernized JSON Schema (`snake_case`)**: All machine-readable structured outputs (`--format json`, `tsv`, `ndjson`) have been modernized from PascalCase (`Title`, `Score`, `FilePath`) to clean `snake_case` keys (`title`, `score`, `file_path`, `note_slug`, `tags`, `text`). Consumer automation scripts and AI agents must be updated to reference `snake_case` keys.
+
+### Added
+- **AI Agent Command Chaining (`--jsonpath`)**: Integrated `jsonpath` expression evaluation across all query and stats commands (`--jsonpath="$.results[0].note_slug"`). Scalar outputs format as unquoted raw strings and arrays print newline-separated elements, allowing direct shell pipeline integration without external JSON parsers like `jq`.
+- **Complete Note Retrieval (`notebrain get`)**: Added a dedicated `get <slug-or-path>` command to retrieve and stitch together all indexed document chunks into the full reconstructed markdown note content.
+- **Tag Search & Filtering (`--tag`)**: Added direct tag filtering (`--tag="TagName"`) to `notebrain search` and expanded tag extraction across note metadata.
+- **AI Agent Skill Instructions**: Added and documented the built-in `notebrain-assistant` skill (`.agents/skills/notebrain/SKILL.md`) optimized for agentic coding tools.
+- **TOML Configuration File Support**: Added support for persisting CLI flags via `~/.notebrain/config/config.toml` along with flags `--respect-exclude` and `--use-editor`.
+- **External Editor Integration (`--use-editor`)**: Added ability to open matching notes directly in terminal/GUI editors defined by `$EDITOR` from the interactive TUI.
+- **Obsidian Ignore & Attachment Filtering**: Automatically honors Obsidian's `userIgnoreFilters` and `attachmentFolderPath` settings during ingestion when `--respect-exclude` is enabled.
+
+### Fixed
+- **HNSW Concurrency & Integrity Bugs**: Implemented batch database writes and serialized chunk deletion/insertion operations to eliminate embedded `hnswlib` assertion failures during high concurrency ingestion and collection reset.
+
 ## [v1.1.0] - 2026-06-19
 
 ### Added
