@@ -2,6 +2,7 @@ package store_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -203,5 +204,27 @@ func TestTagSearch(t *testing.T) {
 	}
 	if len(res) == 0 || res[0].NoteSlug != "note-a" {
 		t.Errorf("Expected note-a for tag 'vector', got %v", res)
+	}
+}
+
+func TestGetNote(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatalf("Open failed: %v", err)
+	}
+	defer func() { _ = st.Close() }()
+
+	setupTestData(t, ctx, st)
+
+	note, err := st.GetNote(ctx, "note-a")
+	if err != nil {
+		t.Fatalf("GetNote failed: %v", err)
+	}
+	if note.NoteSlug != "note-a" {
+		t.Errorf("Expected NoteSlug note-a, got %s", note.NoteSlug)
+	}
+	if !strings.Contains(note.Text, "golang and chroma") {
+		t.Errorf("Expected full text to contain golang and chroma, got %s", note.Text)
 	}
 }

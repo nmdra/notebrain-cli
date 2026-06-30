@@ -22,7 +22,9 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
 
 	"charm.land/lipgloss/v2"
 	"github.com/nmdra/notebrain-cli/internal/store"
@@ -44,6 +46,16 @@ func (c *StatsCmd) Run(globals *Globals) error {
 	stats, err := st.Stats(ctx)
 	if err != nil {
 		return err
+	}
+
+	if globals.JSONPath != "" {
+		return printJSONPathResult(stats, globals.JSONPath)
+	}
+
+	if globals.Format == "json" || globals.Format == "ndjson" {
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		return enc.Encode(stats)
 	}
 
 	rows := fmt.Sprintf(

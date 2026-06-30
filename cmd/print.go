@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
+	"github.com/PaesslerAG/jsonpath"
 	"github.com/nmdra/notebrain-cli/internal/store"
 )
 
@@ -37,6 +38,19 @@ func printResultsFormatted(commandName string, query string, results []store.Res
 	}
 	if filtered == nil {
 		filtered = []store.Result{} // avoid null in JSON
+	}
+
+	if globals.JSONPath != "" {
+		env := jsonEnvelope{
+			Command: commandName,
+			Query:   query,
+			Total:   len(filtered),
+			Results: filtered,
+		}
+		if err := printJSONPathResult(env, globals.JSONPath); err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		}
+		return
 	}
 
 	// 2. Route by format
@@ -107,5 +121,64 @@ func printResultsFormatted(commandName string, query string, results []store.Res
 			fmt.Println("\n  " + extraStyle.Render("(Ctrl+click or Cmd+click a title to open in Obsidian)"))
 		}
 		fmt.Println()
+	}
+}
+
+func normalizeJSONPath(jp string) string {
+	jp = strings.TrimSpace(jp)
+	// If kubectl style {.items[0]} or {$.items[0]}
+	if strings.HasPrefix(jp, "{") && strings.HasSuffix(jp, "}") {
+		jp = strings.TrimPrefix(jp, "{")
+		jp = strings.TrimSuffix(jp, "}")
+		jp = strings.TrimSpace(jp)
+	}
+	if strings.HasPrefix(jp, ".") && !strings.HasPrefix(jp, "..") {
+		jp = "$" + jp
+	} else if !strings.HasPrefix(jp, "$") && !strings.HasPrefix(jp, "@") {
+		jp = "$." + jp
+	}
+	return jp
+}
+
+func printJSONPathResult(obj interface{}, jp string) error {
+	data, err := json.Marshal(obj)
+	if err != nil {
+		return fmt.Errorf("jsonpath marshal: %w", err)
+	}
+	var raw interface{}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return fmt.Errorf("jsonpath unmarshal: %w", err)
+	}
+
+	normPath := normalizeJSONPath(jp)
+	res, err := jsonpath.Get(normPath, raw)
+	if err != nil {
+		return fmt.Errorf("evaluate jsonpath %q: %w", jp, err)
+	}
+
+	if res == nil {
+		return nil
+	}
+
+	switch val := res.(type) {
+	case []interface{}:
+		for _, item := range val {
+			printSingleJSONPathValue(item)
+		}
+	default:
+		printSingleJSONPathValue(val)
+	}
+	return nil
+}
+
+func printSingleJSONPathValue(val interface{}) {
+	switch v := val.(type) {
+	case string:
+		fmt.Println(v)
+	case float64, float32, int, int64, bool:
+		fmt.Printf("%v\n", v)
+	default:
+		enc := json.NewEncoder(os.Stdout)
+		_ = enc.Encode(v)
 	}
 }

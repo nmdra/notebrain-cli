@@ -20,6 +20,7 @@ type Globals struct {
 	Verbose        bool    `help:"enable verbose output"`
 	NoHyperlinks   bool    `help:"Disable OSC 8 terminal hyperlinks in output"`
 	Format         string  `help:"output format" enum:"text,json,tsv,ndjson" default:"text"`
+	JSONPath       string  `name:"jsonpath" help:"extract specific fields from JSON output using a JSONPath expression (e.g. '$.results[0].note_slug')"`
 	IncludeText    bool    `help:"include matched chunk text in structured output"`
 	MinScore       float64 `help:"suppress results below this similarity score (0–1)" default:"0"`
 	RespectExclude bool    `help:"respect Obsidian userIgnoreFilters and attachmentFolderPath settings during ingest" default:"true"`
@@ -44,6 +45,7 @@ type CLI struct {
 	Tags        TagsCmd        `cmd:"" help:"Find notes sharing common tags"`
 	Boosted     BoostedCmd     `cmd:"" help:"Graph-boosted semantic search"`
 	Stats       StatsCmd       `cmd:"" help:"Show collection statistics"`
+	Get         GetCmd         `cmd:"" help:"Fetch complete note content by slug or path"`
 	Reset       ResetCmd       `cmd:"" help:"Reset the ChromaDB collections"`
 }
 

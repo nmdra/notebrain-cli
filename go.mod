@@ -6,6 +6,7 @@ require (
 	charm.land/bubbles/v2 v2.1.0
 	charm.land/bubbletea/v2 v2.0.7
 	charm.land/lipgloss/v2 v2.0.4
+	github.com/PaesslerAG/jsonpath v0.1.1
 	github.com/alecthomas/kong v1.15.0
 	github.com/amikos-tech/chroma-go v0.4.1
 	github.com/joho/godotenv v1.5.1
@@ -19,6 +20,7 @@ require (
 
 require (
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
+	github.com/PaesslerAG/gval v1.0.0 // indirect
 	github.com/amikos-tech/chroma-go-local v0.3.4 // indirect
 	github.com/amikos-tech/pure-onnx v0.0.1 // indirect
 	github.com/amikos-tech/pure-tokenizers v0.1.5 // indirect

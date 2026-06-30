@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 
 	chroma "github.com/amikos-tech/chroma-go/pkg/api/v2"
 	"github.com/amikos-tech/chroma-go/pkg/embeddings"
@@ -19,6 +20,16 @@ type Result struct {
 	Extra       string   `json:"extra,omitempty"` // e.g. shared tags, hop count
 	HeadingPath string   `json:"heading_path,omitempty"`
 	Text        string   `json:"text,omitempty"` // populated only when include-text is requested
+}
+
+// NoteContent represents the complete reconstructed text and metadata of a note.
+type NoteContent struct {
+	NoteSlug string   `json:"note_slug"`
+	Title    string   `json:"title"`
+	FilePath string   `json:"file_path"`
+	Tags     []string `json:"tags,omitempty"`
+	Text     string   `json:"text"`
+	Chunks   int      `json:"chunks"`
 }
 
 // ─── Semantic Search ─────────────────────────────────────────────
@@ -556,4 +567,69 @@ func decodeTags(m chroma.DocumentMetadata) []string {
 		tags = append(tags, metaString(m, key))
 	}
 	return tags
+}
+
+// GetNote retrieves all chunks of a note and reconstructs its complete content.
+func (s *Store) GetNote(ctx context.Context, slugOrPath string) (*NoteContent, error) {
+	res, err := s.chunks.Get(ctx,
+		chroma.WithWhere(chroma.Or(
+			chroma.EqString("note_slug", slugOrPath),
+			chroma.EqString("file_path", slugOrPath),
+		)),
+		chroma.WithInclude(chroma.IncludeMetadatas, chroma.IncludeDocuments),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("get note: %w", err)
+	}
+
+	metas := res.GetMetadatas()
+	texts := res.GetDocuments()
+	if len(metas) == 0 {
+		return nil, fmt.Errorf("note not found: %s", slugOrPath)
+	}
+
+	type chunkInfo struct {
+		index int
+		text  string
+		meta  chroma.DocumentMetadata
+	}
+	var chunks []chunkInfo
+	for i, m := range metas {
+		idx := 0
+		if c, ok := m.GetInt("chunk_index"); ok {
+			idx = int(c)
+		} else if c, ok := m.GetFloat("chunk_index"); ok {
+			idx = int(c)
+		}
+		txt := ""
+		if len(texts) > i && texts[i] != nil {
+			txt = texts[i].ContentString()
+		}
+		chunks = append(chunks, chunkInfo{index: idx, text: txt, meta: m})
+	}
+
+	sort.Slice(chunks, func(i, j int) bool { return chunks[i].index < chunks[j].index })
+
+	firstMeta := chunks[0].meta
+	slug := metaString(firstMeta, "note_slug")
+	title := metaString(firstMeta, "title")
+	filePath := metaString(firstMeta, "file_path")
+	tags := decodeTags(firstMeta)
+
+	var textParts []string
+	for _, c := range chunks {
+		if c.text != "" {
+			textParts = append(textParts, c.text)
+		}
+	}
+	fullText := strings.Join(textParts, "\n\n")
+
+	return &NoteContent{
+		NoteSlug: slug,
+		Title:    title,
+		FilePath: filePath,
+		Tags:     tags,
+		Text:     fullText,
+		Chunks:   len(chunks),
+	}, nil
 }
