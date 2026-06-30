@@ -17,7 +17,9 @@ NoteBrain is a high-performance Go CLI tool designed to index an Obsidian vault 
 - **Beautiful TUI Integration**: Enjoy an interactive terminal UI for navigating search results with fuzzy-finding and live ingestion progress bars powered by `charm.land/bubbles`.
 - **Goldmark AST-Aware Chunking**: Intelligently chunks markdown sections according to header hierarchies instead of arbitrary character splits, preserving code blocks and structural metadata.
 - **Advanced Filtering**: Use `--section`, `--has-code`, and `--has-tasks` to filter searches precisely by document structures.
-- **Machine-Readable Outputs**: Supports JSON, TSV, and NDJSON with `--format` flags for seamless integration into AI agent workflows (Claude, Gemini, etc.).
+- **Machine-Readable Outputs & AI Agent Chaining**: Supports structured `snake_case` JSON, TSV, and NDJSON with `--format` flags. Integrated `--jsonpath` filtering allows direct scalar extraction without external dependencies like `jq` for effortless command pipelines.
+- **Complete Note Retrieval**: Reconstruct full note content on the fly from indexed document chunks (`notebrain get`).
+- **Tag Search & Filtering**: Filter vector similarity searches by tag (`--tag`) or inspect structured tag arrays across your notes.
 - **OSC 8 Terminal Hyperlinks**: Automatically renders clickable `obsidian://open` links right in your CLI for seamlessly opening matched chunks inside Obsidian (supported terminals only).
 - **External Editor Integration**: Launch your preferred terminal/GUI editor (`$EDITOR` environment variable) directly from the TUI results view.
 - **Obsidian Excluded Files & Attachments**: Automatically honors your Obsidian configuration (`userIgnoreFilters` and `attachmentFolderPath`) during ingestion to keep databases clean.
@@ -70,6 +72,14 @@ OBSIDIAN_VAULT_NAME="Second Brain 2.0"
 3. **Search** your thoughts:
    ```bash
    notebrain search "how do message brokers work?" --limit 5
+   ```
+4. **Retrieve** full note content or chain commands for AI agents:
+   ```bash
+   # Extract top matching note slug directly into a shell variable
+   SLUG=$(notebrain search "message broker" --limit 1 --jsonpath="$.results[0].note_slug")
+
+   # Retrieve complete reconstructed note text
+   notebrain get "$SLUG" --jsonpath="$.text"
    ```
 
 ## Architecture

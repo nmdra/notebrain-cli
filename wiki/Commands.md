@@ -19,6 +19,7 @@ Flags:
       --verbose              enable verbose output
       --no-hyperlinks        Disable OSC 8 terminal hyperlinks in output
       --format="text"        output format (text, json, tsv, ndjson)
+      --jsonpath=STRING      JSONPath expression for filtering output (e.g., $.results[0].note_slug)
       --include-text         include matched chunk text in structured output
       --min-score=0          suppress results below this similarity score (0–1)
       --respect-exclude      respect Obsidian userIgnoreFilters and attachmentFolderPath settings during ingest (default: true)
@@ -29,6 +30,7 @@ Flags:
 Commands:
   ingest         Ingest markdown files from a vault
   search         Semantic search across indexed notes
+  get            Retrieve the full reconstructed markdown text of a note
   backlinks      Find incoming links to a note
   connections    Traverse graph connections
   hidden         Discover hidden semantic links between unlinked notes
@@ -58,9 +60,16 @@ notebrain ingest --vault-path "/path/to/vault" [--workers 4]
 - *Note: Run this command whenever your vault has significantly changed.*
 
 ## `search`
-Performs a semantic search against your vault chunks.
+Performs a semantic search against your vault chunks. Supports optional tag filtering via `--tag`.
 ```bash
 notebrain search "how do message brokers work?" --limit 5
+notebrain search "kubernetes reconciliation" --tag="Kubernetes" --limit 5
+```
+
+## `get`
+Retrieves and reconstructs the full markdown content of a note by combining all indexed chunks matching the given note slug or file path.
+```bash
+notebrain get "02areaskubernetesckadkubernetes-native-applications"
 ```
 
 ## `backlinks`
@@ -121,10 +130,21 @@ chroma-path = "/custom/path/to/chroma"
 verbose = true
 ```
 
-## Machine-Readable Output
+## Machine-Readable Output & AI Agent Chaining
 
-NoteBrain supports JSON, TSV, and NDJSON outputs for use in automation scripts or AI agents. The TUI is automatically suppressed when formatting is not `text`.
+NoteBrain supports structured `snake_case` JSON, TSV, and NDJSON outputs (`note_slug`, `title`, `file_path`, `score`, `tags`, `text`) for clean automation and AI agent workflows. The TUI is automatically suppressed when formatting is not `text`.
 
 ```bash
 notebrain search "golang concurrency" --format json --include-text
+```
+
+For direct shell pipeline extraction without external JSON tools like `jq`, use `--jsonpath`:
+
+```bash
+# 1. Extract note slug directly
+SLUG=$(notebrain search "message broker backpressure" --limit 1 --jsonpath="$.results[0].note_slug")
+
+# 2. Fetch full note text or related backlinks
+notebrain get "$SLUG" --jsonpath="$.text"
+notebrain backlinks "$SLUG" --jsonpath="$.results[*].note_slug"
 ```
