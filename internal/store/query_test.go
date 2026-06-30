@@ -186,3 +186,22 @@ func TestGetNoteHashes(t *testing.T) {
 		t.Errorf("GetNoteHashes returned unexpected or missing hash: %v", hashes)
 	}
 }
+
+func TestTagSearch(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatalf("Open failed: %v", err)
+	}
+	defer func() { _ = st.Close() }()
+
+	setupTestData(t, ctx, st)
+
+	res, err := st.TagSearch(ctx, "vector", 10, nil, false)
+	if err != nil {
+		t.Fatalf("TagSearch failed: %v", err)
+	}
+	if len(res) == 0 || res[0].NoteSlug != "note-a" {
+		t.Errorf("Expected note-a for tag 'vector', got %v", res)
+	}
+}

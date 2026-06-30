@@ -33,9 +33,10 @@ import (
 )
 
 type SearchCmd struct {
-	Query       string `arg:"" optional:"" help:"Search query (omit when using --interactive)"`
+	Query       string `arg:"" optional:"" help:"Search query (omit when using --interactive or --tag)"`
 	Limit       int    `help:"maximum number of results to return" default:"10"`
 	Section     string `help:"filter by heading path"`
+	Tag         string `help:"filter or search by tag name"`
 	HasTasks    bool   `help:"only return chunks that contain task lists"`
 	HasCode     bool   `help:"only return chunks that contain code blocks"`
 	Interactive bool   `help:"launch live interactive search TUI"`
@@ -43,8 +44,8 @@ type SearchCmd struct {
 
 func (c *SearchCmd) Run(globals *Globals) error {
 
-	if !c.Interactive && c.Query == "" {
-		return fmt.Errorf("query is required (or use --interactive for live search)")
+	if !c.Interactive && c.Query == "" && c.Tag == "" {
+		return fmt.Errorf("query or --tag is required (or use --interactive for live search)")
 	}
 
 	chromaPath := globals.ChromaPath
@@ -73,6 +74,9 @@ func (c *SearchCmd) Run(globals *Globals) error {
 		}
 		if c.HasCode {
 			filters = append(filters, chroma.EqBool("has_code", true))
+		}
+		if c.Tag != "" {
+			filters = append(filters, store.TagWhereClause(c.Tag))
 		}
 		var whereFilter chroma.WhereFilter
 		if len(filters) == 1 {
@@ -108,11 +112,6 @@ func (c *SearchCmd) Run(globals *Globals) error {
 	}
 
 	// ── Static one-shot search ─────────────────────────────────────────────
-	qVec, err := emb.Embed(ctx, c.Query)
-	if err != nil {
-		return err
-	}
-
 	// Build filters based on flags
 	var filters []chroma.WhereClause
 
@@ -125,12 +124,29 @@ func (c *SearchCmd) Run(globals *Globals) error {
 	if hasCode := c.HasCode; hasCode {
 		filters = append(filters, chroma.EqBool("has_code", true))
 	}
+	if c.Tag != "" {
+		filters = append(filters, store.TagWhereClause(c.Tag))
+	}
 
 	var whereFilter chroma.WhereFilter
 	if len(filters) == 1 {
 		whereFilter = filters[0]
 	} else if len(filters) > 1 {
 		whereFilter = chroma.And(filters...)
+	}
+
+	if c.Query == "" {
+		results, err := st.TagSearch(ctx, c.Tag, c.Limit, whereFilter, globals.IncludeText)
+		if err != nil {
+			return err
+		}
+		printResultsFormatted("search", fmt.Sprintf("Tag Search: %q", c.Tag), results, globals)
+		return nil
+	}
+
+	qVec, err := emb.Embed(ctx, c.Query)
+	if err != nil {
+		return err
 	}
 
 	results, err := st.SemanticSearch(ctx, qVec, c.Limit, whereFilter, globals.IncludeText)

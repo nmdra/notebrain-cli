@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"strings"
 
 	chroma "github.com/amikos-tech/chroma-go/pkg/api/v2"
 	"github.com/amikos-tech/chroma-go/pkg/embeddings"
@@ -12,13 +11,14 @@ import (
 
 // Result is one row returned by any query.
 type Result struct {
-	NoteSlug    string
-	Title       string
-	FilePath    string
-	Score       float64
-	Extra       string // e.g. shared tags, hop count
-	HeadingPath string
-	Text        string // populated only when include-text is requested
+	NoteSlug    string   `json:"note_slug"`
+	Title       string   `json:"title"`
+	FilePath    string   `json:"file_path"`
+	Score       float64  `json:"score"`
+	Tags        []string `json:"tags,omitempty"`
+	Extra       string   `json:"extra,omitempty"` // e.g. shared tags, hop count
+	HeadingPath string   `json:"heading_path,omitempty"`
+	Text        string   `json:"text,omitempty"` // populated only when include-text is requested
 }
 
 // ─── Semantic Search ─────────────────────────────────────────────
@@ -235,11 +235,58 @@ func (s *Store) SharedTags(ctx context.Context, noteSlug string, minShared int) 
 			Title:    title,
 			FilePath: filePath,
 			Score:    float64(count),
-			Extra:    strings.Join(noteTagNames[slug], ", "),
+			Tags:     noteTagNames[slug],
 		})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Score > out[j].Score })
 	return out, nil
+}
+
+// ─── Direct Tag Search ────────────────────────────────────────────
+
+// CombineWhereFilters safely combines two optional WhereFilters using And.
+func CombineWhereFilters(f1, f2 chroma.WhereFilter) chroma.WhereFilter {
+	if f1 == nil {
+		return f2
+	}
+	if f2 == nil {
+		return f1
+	}
+	wc1, ok1 := f1.(chroma.WhereClause)
+	wc2, ok2 := f2.(chroma.WhereClause)
+	if ok1 && ok2 {
+		return chroma.And(wc1, wc2)
+	}
+	return f1
+}
+
+// TagWhereClause constructs a Chroma Or filter matching tag against tag_0 through tag_19.
+func TagWhereClause(tag string) chroma.WhereClause {
+	var clauses []chroma.WhereClause
+	for n := 0; n < 20; n++ {
+		clauses = append(clauses, chroma.EqString(fmt.Sprintf("tag_%d", n), tag))
+	}
+	return chroma.Or(clauses...)
+}
+
+// TagSearch finds notes that match a specific tag name.
+func (s *Store) TagSearch(ctx context.Context, tag string, limit int, whereFilter chroma.WhereFilter, includeText bool) ([]Result, error) {
+	filter := CombineWhereFilters(TagWhereClause(tag), whereFilter)
+
+	includes := []chroma.Include{chroma.IncludeMetadatas}
+	if includeText {
+		includes = append(includes, chroma.IncludeDocuments)
+	}
+
+	res, err := s.chunks.Get(ctx,
+		chroma.WithWhere(filter),
+		chroma.WithInclude(includes...),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("tag search: %w", err)
+	}
+
+	return getResultToResults(res, limit), nil
 }
 
 // ─── Graph-Boosted Search ─────────────────────────────────────────
@@ -284,6 +331,7 @@ func deduplicateByNote(res chroma.QueryResult, limit int) []Result {
 		distance    float32
 		headingPath string
 		text        string
+		tags        []string
 	}
 	seen := map[string]*best{}
 	metas := groups[0]
@@ -317,6 +365,7 @@ func deduplicateByNote(res chroma.QueryResult, limit int) []Result {
 				distance:    dist,
 				headingPath: metaString(meta, "heading_path"),
 				text:        txt,
+				tags:        decodeTags(meta),
 			}
 		}
 	}
@@ -329,9 +378,65 @@ func deduplicateByNote(res chroma.QueryResult, limit int) []Result {
 			Score:       float64(1 - b.distance), // convert distance → similarity
 			HeadingPath: b.headingPath,
 			Text:        b.text,
+			Tags:        b.tags,
 		})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Score > out[j].Score })
+	if len(out) > limit {
+		out = out[:limit]
+	}
+	return out
+}
+
+func getResultToResults(res chroma.GetResult, limit int) []Result {
+	metas := res.GetMetadatas()
+	if len(metas) == 0 {
+		return nil
+	}
+	texts := res.GetDocuments()
+
+	type best struct {
+		title       string
+		filePath    string
+		headingPath string
+		text        string
+		tags        []string
+	}
+	seen := map[string]*best{}
+
+	for i, meta := range metas {
+		slug := metaString(meta, "note_slug")
+		if slug == "" {
+			continue
+		}
+		if _, ok := seen[slug]; !ok {
+			txt := ""
+			if len(texts) > i && texts[i] != nil {
+				txt = texts[i].ContentString()
+			}
+			seen[slug] = &best{
+				title:       metaString(meta, "title"),
+				filePath:    metaString(meta, "file_path"),
+				headingPath: metaString(meta, "heading_path"),
+				text:        txt,
+				tags:        decodeTags(meta),
+			}
+		}
+	}
+
+	var out []Result
+	for slug, b := range seen {
+		out = append(out, Result{
+			NoteSlug:    slug,
+			Title:       b.title,
+			FilePath:    b.filePath,
+			Score:       1.0,
+			HeadingPath: b.headingPath,
+			Text:        b.text,
+			Tags:        b.tags,
+		})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Title < out[j].Title })
 	if len(out) > limit {
 		out = out[:limit]
 	}

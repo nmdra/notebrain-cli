@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	"charm.land/lipgloss/v2"
 	"github.com/nmdra/notebrain-cli/internal/store"
@@ -58,11 +59,11 @@ func printResultsFormatted(commandName string, query string, results []store.Res
 		}
 
 	case "tsv":
-		fmt.Println("slug\ttitle\tfile_path\tscore\textra\theading_path\ttext")
+		fmt.Println("slug\ttitle\tfile_path\tscore\ttags\textra\theading_path\ttext")
 		for _, r := range filtered {
-			// clean tabs and newlines from text/title just in case
-			fmt.Printf("%s\t%s\t%s\t%f\t%s\t%s\t%s\n",
-				r.NoteSlug, r.Title, r.FilePath, r.Score, r.Extra, r.HeadingPath, r.Text)
+			tagsStr := strings.Join(r.Tags, ",")
+			fmt.Printf("%s\t%s\t%s\t%f\t%s\t%s\t%s\t%s\n",
+				r.NoteSlug, r.Title, r.FilePath, r.Score, tagsStr, r.Extra, r.HeadingPath, r.Text)
 		}
 
 	default: // "text"
@@ -89,6 +90,13 @@ func printResultsFormatted(commandName string, query string, results []store.Res
 			score := scoreStyle.Render(fmt.Sprintf("score=%.4f", r.Score))
 			line := fmt.Sprintf("%s %s  %s", rank, title, score)
 
+			if len(r.Tags) > 0 {
+				var formattedTags []string
+				for _, t := range r.Tags {
+					formattedTags = append(formattedTags, "#"+t)
+				}
+				line += "  " + extraStyle.Render("["+strings.Join(formattedTags, " ")+"]")
+			}
 			if r.Extra != "" {
 				line += "  " + extraStyle.Render("["+r.Extra+"]")
 			}
