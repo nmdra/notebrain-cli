@@ -37,4 +37,6 @@ dist/
 
 # graphify
 graphify-out
+.graphifyignore
+
 .agents/skills/notebrain-workspace
