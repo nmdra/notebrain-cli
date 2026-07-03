@@ -33,6 +33,7 @@ type Pipeline struct {
 	MinChunkWords  int // minimum word count to keep a chunk (filters junk)
 	ChunkSize      int // maximum runes per chunk fed to ParseAST
 	ChunkOverlap   int // overlap runes between sub-chunks when a section is split
+	MaxEmbedTokens int // max tokens for embed text (model sequence length)
 	RespectExclude bool
 }
 
@@ -49,6 +50,7 @@ func NewPipeline(s *store.Store, e Embedder, workers int) *Pipeline {
 		// Defaults matching config.Default() — callers should override from config.
 		ChunkSize:      800,
 		ChunkOverlap:   100,
+		MaxEmbedTokens: 256,
 		RespectExclude: true,
 	}
 }
@@ -309,7 +311,7 @@ func (p *Pipeline) processFile(ctx context.Context, vaultPath string, filePath s
 		// embedding. The raw c.Text is still stored in ChromaDB for display.
 		// This "contextual chunking" technique improves retrieval relevance by
 		// grounding the vector in the document's semantic position.
-		embedText := buildEmbedText(title, headingPath, astRes.Tags, c.Text)
+		embedText := buildEmbedText(title, headingPath, astRes.Tags, c.Text, p.MaxEmbedTokens)
 		emb, err := p.embedder.Embed(ctx, embedText)
 		if err != nil {
 			return nil, err
@@ -342,41 +344,62 @@ func (p *Pipeline) processFile(ctx context.Context, vaultPath string, filePath s
 	}, nil
 }
 
-// buildEmbedText constructs the text fed to the embedding model for a chunk.
-// It prepends the note title, heading path, and tags so the vector captures the
-// document's semantic position — a technique known as contextual chunking that
-// significantly improves retrieval relevance for AI agents.
-//
-// The augmented text is used ONLY for embedding; the raw chunk text (c.Text) is
-// what gets stored in ChromaDB for display and retrieval.
-//
-// Example output:
-//
-//	Architecture Notes > Data Flow > Ingest Pipeline
-//	[tags: golang, rag, chromadb]
-//
-//	The pipeline reads markdown files from the vault directory...
-func buildEmbedText(title, headingPath string, tags []string, chunkText string) string {
-	var sb strings.Builder
+// estimateTokens returns a conservative rough token count for English/mixed text.
+// Based on empirical ratio: ~4 runes per token for MiniLM tokenizer.
+func estimateTokens(text string) int {
+	return (len([]rune(text)) + 3) / 4
+}
 
-	// Write breadcrumb header: "Title > HeadingPath" (or just "Title" for top-level)
-	if title != "" {
-		sb.WriteString(title)
-		if headingPath != "" && headingPath != title {
-			sb.WriteString(" > ")
-			sb.WriteString(headingPath)
-		}
-		sb.WriteByte('\n')
-	} else if headingPath != "" {
-		sb.WriteString(headingPath)
-		sb.WriteByte('\n')
+// buildEmbedText constructs contextual embedding text with a token budget guard.
+// Priority: chunk content > title > heading path > tags.
+// If the full text would exceed maxTokens, the prefix is progressively trimmed.
+func buildEmbedText(title, headingPath string, tags []string, chunkText string, maxTokens int) string {
+	if maxTokens <= 0 {
+		maxTokens = 256
 	}
 
-	// Append lightweight tag hint if tags are present (~5-10 extra tokens)
+	bodyTokens := estimateTokens(chunkText)
+
+	breadcrumb := ""
+	if title != "" && headingPath != "" && headingPath != title {
+		breadcrumb = title + " > " + headingPath
+	} else if title != "" {
+		breadcrumb = title
+	} else if headingPath != "" {
+		breadcrumb = headingPath
+	}
+
+	tagLine := ""
 	if len(tags) > 0 {
-		sb.WriteString("[tags: ")
-		sb.WriteString(strings.Join(tags, ", "))
-		sb.WriteString("]\n")
+		tagLine = "[tags: " + strings.Join(tags, ", ") + "]"
+	}
+
+	prefixBudget := maxTokens - bodyTokens - 2
+
+	var sb strings.Builder
+
+	if prefixBudget > 0 {
+		bcTokens := estimateTokens(breadcrumb)
+		tagTokens := estimateTokens(tagLine)
+
+		if bcTokens+tagTokens <= prefixBudget {
+			if breadcrumb != "" {
+				sb.WriteString(breadcrumb)
+				sb.WriteByte('\n')
+			}
+			if tagLine != "" {
+				sb.WriteString(tagLine)
+				sb.WriteByte('\n')
+			}
+		} else if bcTokens <= prefixBudget {
+			if breadcrumb != "" {
+				sb.WriteString(breadcrumb)
+				sb.WriteByte('\n')
+			}
+		} else if estimateTokens(title) <= prefixBudget && title != "" {
+			sb.WriteString(title)
+			sb.WriteByte('\n')
+		}
 	}
 
 	if sb.Len() > 0 {

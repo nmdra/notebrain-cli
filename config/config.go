@@ -34,22 +34,25 @@ type Config struct {
 	// MinChunkWords filters out chunks with fewer words than this threshold before
 	// embedding. Eliminates heading-only, code-placeholder, and link-only fragments.
 	MinChunkWords int
-	Verbose       bool
+	// MaxEmbedTokens is the maximum sequence length for embed text (model token budget).
+	MaxEmbedTokens int
+	Verbose        bool
 }
 
 // Default returns a Config with sensible defaults.
 func Default() *Config {
 	home, _ := os.UserHomeDir()
 	return &Config{
-		ChromaPath:    filepath.Join(home, ".notebrain", "chroma"),
-		ChromaMode:    "persistent",
-		ChromaURL:     "http://localhost:8000",
-		Embedder:      "minilm",
-		OllamaURL:     "http://localhost:11434",
-		OllamaModel:   "nomic-embed-text",
-		ChunkSize:     800, // runes; ~178 tokens — leaves ~78-token headroom for title/heading prefix
-		ChunkOverlap:  100, // runes; ~1-2 sentences of overlap for sub-chunk splits
-		Limit:         10,
-		MinChunkWords: 10, // rejects heading-only and code-placeholder fragments
+		ChromaPath:     filepath.Join(home, ".notebrain", "chroma"),
+		ChromaMode:     "persistent",
+		ChromaURL:      "http://localhost:8000",
+		Embedder:       "minilm",
+		OllamaURL:      "http://localhost:11434",
+		OllamaModel:    "nomic-embed-text",
+		ChunkSize:      800, // runes; ~178 tokens — leaves ~78-token headroom for title/heading prefix
+		ChunkOverlap:   100, // runes; ~1-2 sentences of overlap for sub-chunk splits
+		Limit:          10,
+		MinChunkWords:  10,  // rejects heading-only and code-placeholder fragments
+		MaxEmbedTokens: 256, // matches MiniLM sequence length
 	}
 }

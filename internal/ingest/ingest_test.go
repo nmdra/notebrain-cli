@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/nmdra/notebrain-cli/internal/store"
@@ -195,5 +196,64 @@ func TestPipelineRespectExclude(t *testing.T) {
 	stats, _ := st.Stats(ctx)
 	if stats["chunks"] != 1 {
 		t.Errorf("Expected 1 chunk (only active.md), got %d", stats["chunks"])
+	}
+}
+
+func TestEstimateTokens(t *testing.T) {
+	tests := []struct {
+		name string
+		text string
+	}{
+		{"empty", ""},
+		{"short", "hello world"},
+		{"medium", strings.Repeat("word ", 50)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := estimateTokens(tt.text)
+			if got < 0 {
+				t.Errorf("estimateTokens(%q) = %d, want >= 0", tt.text, got)
+			}
+			if tt.text != "" && got < 1 {
+				t.Errorf("estimateTokens(%q) = %d, want >= 1 for non-empty string", tt.text, got)
+			}
+		})
+	}
+}
+
+func TestBuildEmbedText_TruncationGuard(t *testing.T) {
+	longTitle := strings.Repeat("Architecture ", 20) // ~260 chars
+	longHeading := strings.Repeat("SubSection > ", 15)
+	tags := []string{"tag1", "tag2", "tag3", "tag4", "tag5"}
+	body := "This is the chunk body that must be preserved."
+
+	tests := []struct {
+		name      string
+		title     string
+		heading   string
+		tags      []string
+		body      string
+		maxTokens int
+		wantTitle bool
+		wantTags  bool
+	}{
+		{"normal fit", "My Note", "Section A", tags, body, 256, true, true},
+		{"long title drops tags", longTitle, "Sec", tags, body, 80, true, false},
+		{"very long prefix drops all", longTitle, longHeading, tags, body, 60, false, false},
+		{"empty prefix", "", "", nil, body, 256, false, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := buildEmbedText(tt.title, tt.heading, tt.tags, tt.body, tt.maxTokens)
+			if !strings.Contains(result, tt.body) {
+				t.Errorf("body text missing from embed text: got %q", result)
+			}
+			if tt.wantTags && !strings.Contains(result, "[tags:") {
+				t.Errorf("expected tags in embed text: got %q", result)
+			}
+			if !tt.wantTags && strings.Contains(result, "[tags:") {
+				t.Errorf("expected tags to be trimmed: got %q", result)
+			}
+		})
 	}
 }
