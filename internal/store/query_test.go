@@ -60,7 +60,7 @@ func TestQueries(t *testing.T) {
 	qVec := []float32{1.0, 0.0, 0.0}
 
 	t.Run("SemanticSearch", func(t *testing.T) {
-		res, err := st.SemanticSearch(ctx, qVec, 10, nil, false)
+		res, err := st.SemanticSearch(ctx, qVec, 10, 1, nil, false)
 		if err != nil {
 			t.Fatalf("SemanticSearch failed: %v", err)
 		}
@@ -226,5 +226,71 @@ func TestGetNote(t *testing.T) {
 	}
 	if !strings.Contains(note.Text, "golang and chroma") {
 		t.Errorf("Expected full text to contain golang and chroma, got %s", note.Text)
+	}
+}
+
+func TestSemanticSearch_TopKDeduplication(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatalf("Open failed: %v", err)
+	}
+	defer func() { _ = st.Close() }()
+
+	chunks := []store.ChunkRecord{
+		{
+			ID:         "multi:0",
+			NoteSlug:   "multi",
+			Title:      "Multi Note",
+			FilePath:   "multi.md",
+			ChunkIndex: 0,
+			Text:       "chunk zero",
+			Embedding:  []float32{1.0, 0.0, 0.0},
+		},
+		{
+			ID:         "multi:1",
+			NoteSlug:   "multi",
+			Title:      "Multi Note",
+			FilePath:   "multi.md",
+			ChunkIndex: 1,
+			Text:       "chunk one",
+			Embedding:  []float32{0.99, 0.0, 0.0},
+		},
+		{
+			ID:         "multi:2",
+			NoteSlug:   "multi",
+			Title:      "Multi Note",
+			FilePath:   "multi.md",
+			ChunkIndex: 2,
+			Text:       "chunk two",
+			Embedding:  []float32{0.98, 0.0, 0.0},
+		},
+		{
+			ID:         "multi:3",
+			NoteSlug:   "multi",
+			Title:      "Multi Note",
+			FilePath:   "multi.md",
+			ChunkIndex: 3,
+			Text:       "chunk three",
+			Embedding:  []float32{0.97, 0.0, 0.0},
+		},
+	}
+	if err := st.UpsertChunks(ctx, chunks); err != nil {
+		t.Fatalf("UpsertChunks failed: %v", err)
+	}
+
+	// With topK=2, we should get exactly 2 chunks for note "multi".
+	res, err := st.SemanticSearch(ctx, []float32{1.0, 0.0, 0.0}, 10, 2, nil, false)
+	if err != nil {
+		t.Fatalf("SemanticSearch failed: %v", err)
+	}
+	count := 0
+	for _, r := range res {
+		if r.NoteSlug == "multi" {
+			count++
+		}
+	}
+	if count != 2 {
+		t.Errorf("Expected exactly 2 chunks for note 'multi' with topK=2, got %d", count)
 	}
 }

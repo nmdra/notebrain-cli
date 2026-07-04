@@ -35,17 +35,22 @@ type NoteContent struct {
 // ─── Semantic Search ─────────────────────────────────────────────
 
 // SemanticSearch finds the most similar chunks to queryVec.
-// Returns deduplicated notes (best chunk per note).
-func (s *Store) SemanticSearch(ctx context.Context, queryVec []float32, limit int, whereFilter chroma.WhereFilter, includeText bool) ([]Result, error) {
-	// Fetch 3× limit to allow deduplication across chunks of same note
+// Returns deduplicated chunks retaining up to topKPerNote chunks per note.
+func (s *Store) SemanticSearch(ctx context.Context, queryVec []float32, limit int, topKPerNote int, whereFilter chroma.WhereFilter, includeText bool) ([]Result, error) {
+	// Fetch enough results to allow top-K deduplication across chunks
 	includes := []chroma.Include{chroma.IncludeMetadatas, chroma.IncludeDistances}
 	if includeText {
 		includes = append(includes, chroma.IncludeDocuments)
 	}
 
+	fetchCount := limit * 3
+	if fetchCount < limit*topKPerNote {
+		fetchCount = limit * topKPerNote
+	}
+
 	opts := []chroma.QueryOption{
 		chroma.WithQueryEmbeddings(embeddings.NewEmbeddingFromFloat32(queryVec)),
-		chroma.WithNResults(limit * 3),
+		chroma.WithNResults(fetchCount),
 		chroma.WithInclude(includes...),
 	}
 	if whereFilter != nil {
@@ -56,7 +61,7 @@ func (s *Store) SemanticSearch(ctx context.Context, queryVec []float32, limit in
 	if err != nil {
 		return nil, fmt.Errorf("semantic search: %w", err)
 	}
-	return deduplicateByNote(res, limit), nil
+	return deduplicateByNote(res, limit, topKPerNote), nil
 }
 
 // ─── Metadata Queries ────────────────────────────────────────────
@@ -190,7 +195,7 @@ func (s *Store) HiddenConnections(ctx context.Context, queryVec []float32, seedS
 	linked[seedSlug] = true
 
 	// 2. Wide semantic search
-	candidates, err := s.SemanticSearch(ctx, queryVec, limit*5, nil, includeText)
+	candidates, err := s.SemanticSearch(ctx, queryVec, limit*5, 1, nil, includeText)
 	if err != nil {
 		return nil, err
 	}
@@ -307,7 +312,7 @@ func (s *Store) TagSearch(ctx context.Context, tag string, limit int, whereFilte
 func (s *Store) GraphBoostedSearch(ctx context.Context, queryVec []float32, seedSlug string, boost float64, limit int, includeText bool) ([]Result, error) {
 	linked := s.linkedSlugs(ctx, seedSlug)
 
-	candidates, err := s.SemanticSearch(ctx, queryVec, limit*3, nil, includeText)
+	candidates, err := s.SemanticSearch(ctx, queryVec, limit*3, 1, nil, includeText)
 	if err != nil {
 		return nil, err
 	}
@@ -328,23 +333,17 @@ func (s *Store) GraphBoostedSearch(ctx context.Context, queryVec []float32, seed
 
 // ─── Internal helpers ─────────────────────────────────────────────
 
-// deduplicateByNote collapses multiple chunks from the same note,
-// keeping the best (lowest distance) chunk per note.
-func deduplicateByNote(res chroma.QueryResult, limit int) []Result {
+// deduplicateByNote retains up to topKPerNote chunks per note,
+// sorted overall by highest similarity score.
+func deduplicateByNote(res chroma.QueryResult, limit int, topKPerNote int) []Result {
+	if topKPerNote <= 0 {
+		topKPerNote = 3
+	}
 	groups := res.GetMetadatasGroups()
 	if len(groups) == 0 || len(groups[0]) == 0 {
 		return nil
 	}
 
-	type best struct {
-		title       string
-		filePath    string
-		distance    float32
-		headingPath string
-		text        string
-		tags        []string
-	}
-	seen := map[string]*best{}
 	metas := groups[0]
 
 	var dists []embeddings.Distance
@@ -359,39 +358,36 @@ func deduplicateByNote(res chroma.QueryResult, limit int) []Result {
 		texts = docsGroups[0]
 	}
 
+	noteCounts := make(map[string]int)
+	var out []Result
+
 	for i, meta := range metas {
 		slug := metaString(meta, "note_slug")
+		if noteCounts[slug] >= topKPerNote {
+			continue
+		}
+		noteCounts[slug]++
+
 		dist := float32(0)
 		if len(dists) > i {
 			dist = float32(dists[i])
 		}
-		if b, ok := seen[slug]; !ok || dist < b.distance {
-			txt := ""
-			if len(texts) > i && texts[i] != nil {
-				txt = texts[i].ContentString()
-			}
-			seen[slug] = &best{
-				title:       metaString(meta, "title"),
-				filePath:    metaString(meta, "file_path"),
-				distance:    dist,
-				headingPath: metaString(meta, "heading_path"),
-				text:        txt,
-				tags:        decodeTags(meta),
-			}
+		txt := ""
+		if len(texts) > i && texts[i] != nil {
+			txt = texts[i].ContentString()
 		}
-	}
-	var out []Result
-	for slug, b := range seen {
+
 		out = append(out, Result{
 			NoteSlug:    slug,
-			Title:       b.title,
-			FilePath:    b.filePath,
-			Score:       float64(1 - b.distance), // convert distance → similarity
-			HeadingPath: b.headingPath,
-			Text:        b.text,
-			Tags:        b.tags,
+			Title:       metaString(meta, "title"),
+			FilePath:    metaString(meta, "file_path"),
+			Score:       float64(1 - dist), // convert distance → similarity
+			HeadingPath: metaString(meta, "heading_path"),
+			Text:        txt,
+			Tags:        decodeTags(meta),
 		})
 	}
+
 	sort.Slice(out, func(i, j int) bool { return out[i].Score > out[j].Score })
 	if len(out) > limit {
 		out = out[:limit]

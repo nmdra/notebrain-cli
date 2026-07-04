@@ -36,7 +36,9 @@ type Config struct {
 	MinChunkWords int
 	// MaxEmbedTokens is the maximum sequence length for embed text (model token budget).
 	MaxEmbedTokens int
-	Verbose        bool
+	// TopKPerNote limits the number of chunks returned per note in semantic search.
+	TopKPerNote int
+	Verbose     bool
 }
 
 // Default returns a Config with sensible defaults.
@@ -54,5 +56,6 @@ func Default() *Config {
 		Limit:          10,
 		MinChunkWords:  10,  // rejects heading-only and code-placeholder fragments
 		MaxEmbedTokens: 256, // matches MiniLM sequence length
+		TopKPerNote:    3,   // top 3 most relevant chunks per note
 	}
 }

@@ -35,6 +35,7 @@ import (
 type SearchCmd struct {
 	Query       string `arg:"" optional:"" help:"Search query (omit when using --interactive or --tag)"`
 	Limit       int    `help:"maximum number of results to return" default:"10"`
+	TopKPerNote int    `name:"top-k" help:"maximum number of chunks to return per note" default:"3"`
 	Section     string `help:"filter by heading path"`
 	Tag         string `help:"filter or search by tag name"`
 	HasTasks    bool   `help:"only return chunks that contain task lists"`
@@ -86,6 +87,7 @@ func (c *SearchCmd) Run(globals *Globals) error {
 		}
 
 		limit := c.Limit
+		topK := c.TopKPerNote
 		searchFn := func(ctx context.Context, query string) ([]store.Result, error) {
 			var results []store.Result
 			var err error
@@ -96,7 +98,7 @@ func (c *SearchCmd) Run(globals *Globals) error {
 					err = fmt.Errorf("embed query: %w", err)
 					return
 				}
-				results, err = st.SemanticSearch(ctx, qVec, limit, whereFilter, false)
+				results, err = st.SemanticSearch(ctx, qVec, limit, topK, whereFilter, false)
 			})
 			return results, err
 		}
@@ -149,7 +151,7 @@ func (c *SearchCmd) Run(globals *Globals) error {
 		return err
 	}
 
-	results, err := st.SemanticSearch(ctx, qVec, c.Limit, whereFilter, globals.IncludeText)
+	results, err := st.SemanticSearch(ctx, qVec, c.Limit, c.TopKPerNote, whereFilter, globals.IncludeText)
 	if err != nil {
 		return err
 	}
