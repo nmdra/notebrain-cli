@@ -14,10 +14,6 @@ import (
 type Config struct {
 	// ChromaPath is the local directory where ChromaDB stores its data.
 	ChromaPath string
-	// ChromaMode selects persistent (embedded) or http (standalone server).
-	ChromaMode string // "persistent" | "http"
-	// ChromaURL is used when ChromaMode == "http".
-	ChromaURL string
 	// VaultName for Obsidian CLI targeting.
 	VaultName string
 	// Embedder type: "minilm" or "ollama"
@@ -46,8 +42,6 @@ func Default() *Config {
 	home, _ := os.UserHomeDir()
 	return &Config{
 		ChromaPath:     filepath.Join(home, ".notebrain", "chroma"),
-		ChromaMode:     "persistent",
-		ChromaURL:      "http://localhost:8000",
 		Embedder:       "minilm",
 		OllamaURL:      "http://localhost:11434",
 		OllamaModel:    "nomic-embed-text",

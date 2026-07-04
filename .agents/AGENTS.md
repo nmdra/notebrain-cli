@@ -9,7 +9,7 @@ NoteBrain is a Go CLI tool that indexes an Obsidian vault into ChromaDB for sema
 - **Language:** Go 1.26.3
 - **CLI Framework:** [kong](https://github.com/alecthomas/kong) v1.15.x (with custom TOML configuration resolver)
 - **Vector Store:** ChromaDB via [chroma-go](https://github.com/amikos-tech/chroma-go) v0.4.x (`pkg/api/v2`)
-- **Build:** `CGO_ENABLED=1` for persistent client; `CGO_ENABLED=0` for HTTP-only mode
+- **Build:** `CGO_ENABLED=1` (embedded persistent client via SQLite/HNSW bindings)
 
 ## Module Path
 

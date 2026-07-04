@@ -5,7 +5,7 @@ NoteBrain CLI processes your Obsidian markdown vault to create a fully searchabl
 ## Local Vector Database (ChromaDB)
 
 NoteBrain embeds [ChromaDB](https://www.trychroma.com/) directly into the Go binary using `chroma-go` v2.
-It operates in **Persistent Mode** (`CGO_ENABLED=1`), meaning there is no HTTP server running. SQLite and HNSW bindings are compiled directly into the tool, and the vector storage is flushed synchronously to your disk at `~/.notebrain/chroma`.
+NoteBrain runs embedded in your local process (`CGO_ENABLED=1`). SQLite and HNSW bindings are compiled directly into the tool, and the vector storage is flushed synchronously to your disk at `~/.notebrain/chroma`.
 
 ## Collections
 

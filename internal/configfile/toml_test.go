@@ -84,3 +84,48 @@ bool_field = false
 		t.Errorf("Expected bool-field false, got %v", cli.BoolField)
 	}
 }
+
+type CoreGlobals struct {
+	ChromaPath    string  `help:"path to ChromaDB persistent storage" default:"~/.notebrain/chroma"`
+	VaultPath     string  `name:"vault-path" help:"Obsidian vault path"`
+	ContextWindow int     `name:"context-window" default:"0"`
+	MinScore      float64 `default:"0"`
+}
+
+func TestTOMLResolver_StrictNoHTTP(t *testing.T) {
+	tomlData := []byte(`
+chroma-path = "/tmp/custom-chroma"
+vault_path = "/tmp/my-vault"
+context_window = 2
+min_score = 0.75
+`)
+
+	resolver, err := TOMLResolver(bytes.NewReader(tomlData))
+	if err != nil {
+		t.Fatalf("TOMLResolver failed: %v", err)
+	}
+
+	var cli CoreGlobals
+	parser, err := kong.New(&cli, kong.Resolvers(resolver))
+	if err != nil {
+		t.Fatalf("kong.New failed: %v", err)
+	}
+
+	_, err = parser.Parse([]string{})
+	if err != nil {
+		t.Fatalf("parser.Parse failed: %v", err)
+	}
+
+	if cli.ChromaPath != "/tmp/custom-chroma" {
+		t.Errorf("Expected ChromaPath '/tmp/custom-chroma', got %q", cli.ChromaPath)
+	}
+	if cli.VaultPath != "/tmp/my-vault" {
+		t.Errorf("Expected VaultPath '/tmp/my-vault', got %q", cli.VaultPath)
+	}
+	if cli.ContextWindow != 2 {
+		t.Errorf("Expected ContextWindow 2, got %d", cli.ContextWindow)
+	}
+	if cli.MinScore != 0.75 {
+		t.Errorf("Expected MinScore 0.75, got %f", cli.MinScore)
+	}
+}

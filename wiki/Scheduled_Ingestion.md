@@ -1,6 +1,6 @@
 # Scheduled Ingestion & Automation
 
-Rather than running a persistent background watch daemon that consumes idle CPU and memory, NoteBrain is designed to be executed periodically by native OS schedulers like **cron**, **systemd timers**, or **launchd**.
+Rather than running a persistent background watch daemon that consumes idle CPU and memory, NoteBrain is designed to be executed periodically by native OS schedulers like **cron**, **systemd service**.
 
 ## Why OS Schedulers?
 
@@ -12,8 +12,6 @@ Rather than running a persistent background watch daemon that consumes idle CPU 
 
 We recommend running automated ingestion **every 3 hours**. This provides an optimal balance between index freshness and background system impact.
 
-Template files are provided in the repository under [contrib/automation/](https://github.com/nmdra/notebrain-cli/contrib/automation/).
-
 ## Option 1: Linux & macOS (Cron)
 
 Cron is universally available on almost all Unix-like operating systems.
@@ -22,7 +20,7 @@ Cron is universally available on almost all Unix-like operating systems.
    ```bash
    crontab -e
    ```
-2. Append the schedule from `contrib/automation/crontab.example` (running every 3 hours):
+2. Append the schedule from [contrib/automation/crontab.example](contrib/automation/crontab.example) (running every 3 hours):
    ```cron
    0 */3 * * * /usr/local/bin/notebrain ingest >> ~/.notebrain/ingest.log 2>&1
    ```
@@ -31,6 +29,8 @@ Cron is universally available on almost all Unix-like operating systems.
 ## Option 2: Linux (Systemd User Timers)
 
 Systemd user timers offer precise execution tracking, automatic catch-up for missed runs (`Persistent=true`), and low priority execution (`Nice=19`).
+
+Template files are provided in the repository under [contrib/automation/systemd/](https://github.com/nmdra/notebrain-cli/tree/master/contrib/automation/systemd).
 
 1. Create the systemd user configuration directory:
    ```bash

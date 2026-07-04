@@ -14,8 +14,6 @@ import (
 // Globals holds shared configuration available to all subcommands.
 type Globals struct {
 	ChromaPath     string  `help:"path to ChromaDB persistent storage" default:"~/.notebrain/chroma"`
-	ChromaMode     string  `help:"ChromaDB client mode ('persistent' or 'http')" default:"persistent"`
-	ChromaURL      string  `help:"ChromaDB server URL (used when --chroma-mode=http)" default:"http://localhost:8000"`
 	VaultPath      string  `name:"vault-path" help:"Obsidian vault path (also used as vault name fallback)"`
 	VaultName      string  `name:"vault-name" help:"Obsidian vault name (for URI links, defaults to basename of vault-path)"`
 	Verbose        bool    `help:"enable verbose output"`

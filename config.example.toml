@@ -14,16 +14,6 @@
 # Defaults to "~/.notebrain/chroma"
 chroma-path = "~/.notebrain/chroma"
 
-# ChromaDB client connection mode.
-#   - "persistent": Runs ChromaDB embedded in the local Go process (uses persistent SQLite/HNSW).
-#   - "http": Connects to a standalone ChromaDB server via HTTP REST APIs.
-# Defaults to "persistent"
-chroma-mode = "persistent"
-
-# ChromaDB server URL (only used when chroma-mode = "http")
-# Defaults to "http://localhost:8000"
-chroma-url = "http://localhost:8000"
-
 # Absolute path to your Obsidian vault on disk.
 # If set here, you don't need to specify --vault-path on every 'ingest' execution.
 # vault-path = "/home/user/Documents/Obsidian Vault"
@@ -96,21 +86,3 @@ min-chunk-words = 10
 # Default maximum number of results to return for search, boosted, and hidden commands.
 # Defaults to 10
 limit = 10
-
-# ------------------------------------------------------------------------------
-# Future / Extension Settings (Defined in config schema, not currently exposed via flags)
-# ------------------------------------------------------------------------------
-
-# Embedding backend to use.
-#   - "minilm": Embedded local ONNX vector model (MiniLM-L6-v2)
-#   - "ollama": Remote Ollama service
-# Defaults to "minilm"
-# embedder = "minilm"
-
-# Ollama server endpoint (only used when embedder = "ollama")
-# Defaults to "http://localhost:11434"
-# ollama-url = "http://localhost:11434"
-
-# Model name for generating Ollama embeddings
-# Defaults to "nomic-embed-text"
-# ollama-model = "nomic-embed-text"

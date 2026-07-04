@@ -42,3 +42,36 @@ func TestStoreReset(t *testing.T) {
 		t.Fatalf("Reset failed: %v", err)
 	}
 }
+
+func TestStoreOpen_StrictPersistentOnly(t *testing.T) {
+	ctx := context.Background()
+	path := t.TempDir()
+
+	st, err := Open(ctx, path)
+	if err != nil {
+		t.Fatalf("Open failed: %v", err)
+	}
+
+	if st.client == nil {
+		t.Fatal("Expected persistent client to be non-nil")
+	}
+	if st.chunks == nil {
+		t.Fatal("Expected chunks collection to be initialized")
+	}
+	if st.links == nil {
+		t.Fatal("Expected links collection to be initialized")
+	}
+
+	// Verify stats work without network/HTTP server
+	stats, err := st.Stats(ctx)
+	if err != nil {
+		t.Fatalf("Stats failed: %v", err)
+	}
+	if stats["chunks"] != 0 || stats["links"] != 0 {
+		t.Errorf("Expected empty initial collections, got %v", stats)
+	}
+
+	if err := st.Close(); err != nil {
+		t.Errorf("Close failed: %v", err)
+	}
+}

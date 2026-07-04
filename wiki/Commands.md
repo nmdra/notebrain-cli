@@ -11,10 +11,6 @@ Flags:
   -h, --help             Show context-sensitive help.
       --chroma-path="~/.notebrain/chroma"
                          path to ChromaDB persistent storage
-      --chroma-mode="persistent"
-                         ChromaDB client mode ('persistent' or 'http')
-      --chroma-url="http://localhost:8000"
-                         ChromaDB server URL (used when --chroma-mode=http)
       --vault-path=STRING    Obsidian vault path (also used as vault name fallback)
       --verbose              enable verbose output
       --no-hyperlinks        Disable OSC 8 terminal hyperlinks in output

@@ -30,14 +30,14 @@ func TestDefault_Fields(t *testing.T) {
 			want: true,
 		},
 		{
-			name: "ChromaMode is persistent",
-			got:  func(c *Config) any { return c.ChromaMode },
-			want: "persistent",
+			name: "MaxEmbedTokens is 256",
+			got:  func(c *Config) any { return c.MaxEmbedTokens },
+			want: 256,
 		},
 		{
-			name: "ChromaURL",
-			got:  func(c *Config) any { return c.ChromaURL },
-			want: "http://localhost:8000",
+			name: "TopKPerNote is 3",
+			got:  func(c *Config) any { return c.TopKPerNote },
+			want: 3,
 		},
 		{
 			name: "Embedder is minilm",

@@ -1,12 +1,8 @@
-.PHONY: build build-http test test-cover lint clean chroma-server
+.PHONY: build test test-cover lint clean
 
-# Default: build with embedded persistent client (requires CGO)
+# Build with embedded persistent client (requires CGO)
 build:
 	CGO_ENABLED=1 go build -o notebrain .
-
-# Build for HTTP-only mode (no CGO needed)
-build-http:
-	CGO_ENABLED=0 go build -tags http_only -o notebrain .
 
 # Run all tests
 test:
@@ -30,13 +26,6 @@ lint:
 	else \
 		echo "No Go files changed."; \
 	fi
-
-# Start ChromaDB HTTP server (alternative mode)
-chroma-server:
-	docker run -d --name notebrain-chroma \
-		-p 8000:8000 \
-		-v $(HOME)/.notebrain/chroma:/chroma/chroma \
-		chromadb/chroma:1.5.9
 
 # Clean build artifacts
 clean:
