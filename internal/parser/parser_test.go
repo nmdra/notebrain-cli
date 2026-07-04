@@ -58,7 +58,7 @@ func TestTitleFromPath(t *testing.T) {
 	}
 }
 
-func TestParseAST(t *testing.T) {
+func TestParse(t *testing.T) {
 	tests := []struct {
 		name       string
 		body       string
@@ -68,7 +68,7 @@ func TestParseAST(t *testing.T) {
 		wantTags   []string
 		wantLinks  []string
 		wantTitle  string
-		checkText  func(*testing.T, []ASTChunk)
+		checkText  func(*testing.T, []Chunk)
 	}{
 		{
 			name:     "basic parsing with frontmatter and wikilinks",
@@ -89,7 +89,7 @@ More content.
 			wantTags:   []string{"a", "b", "hashtag"},
 			wantLinks:  []string{"WikiLink"},
 			wantTitle:  "Test Note",
-			checkText: func(t *testing.T, chunks []ASTChunk) {
+			checkText: func(t *testing.T, chunks []Chunk) {
 				if len(chunks) > 0 {
 					// The '#' should be stripped from the inline tag in prose
 					expected := "Some prose here with a WikiLink and a hashtag."
@@ -135,7 +135,7 @@ Some other text.
 			wantTags:   []string{"golang", "tag1", "tag2", "tag3"},
 			wantLinks:  []string{},
 			wantTitle:  "",
-			checkText: func(t *testing.T, chunks []ASTChunk) {
+			checkText: func(t *testing.T, chunks []Chunk) {
 				if len(chunks) != 2 {
 					t.Fatalf("expected 2 chunks, got %d", len(chunks))
 				}
@@ -153,7 +153,7 @@ Some other text.
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			res := ParseAST(tt.body, tt.slug, tt.maxRunes, 0)
+			res := Parse(tt.body, tt.slug, tt.maxRunes, 0)
 			if len(res.Chunks) != tt.wantChunks {
 				t.Errorf("got %d chunks, want %d", len(res.Chunks), tt.wantChunks)
 			}
@@ -184,7 +184,7 @@ Some other text.
 
 func TestBuildChunks_CodePreservation(t *testing.T) {
 	body := "---\ntitle: Test\n---\n# Setup\n\nSome intro text.\n\n```go\nfunc main() {\n\tfmt.Println(\"hello\")\n}\n```\n\nMore text after code."
-	res := ParseAST(body, "test-note", 2000, 0)
+	res := Parse(body, "test-note", 2000, 0)
 
 	if len(res.Chunks) == 0 {
 		t.Fatal("expected at least 1 chunk")
@@ -208,7 +208,7 @@ func TestBuildChunks_CodePreservation(t *testing.T) {
 
 func TestBuildChunks_CodeOnlyChunk(t *testing.T) {
 	body := "---\ntitle: Test\n---\n# Code Section\n\n```python\ndef hello():\n    print('world')\n```\n"
-	res := ParseAST(body, "test-note", 2000, 0)
+	res := Parse(body, "test-note", 2000, 0)
 
 	found := false
 	for _, c := range res.Chunks {
@@ -224,7 +224,7 @@ func TestBuildChunks_CodeOnlyChunk(t *testing.T) {
 	}
 }
 
-func BenchmarkParseAST(b *testing.B) {
+func BenchmarkParse(b *testing.B) {
 	body := `---
 title: "Benchmark Note"
 tags: [alpha, beta, gamma]
@@ -244,6 +244,6 @@ Final concluding paragraph with some more prose.
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		_ = ParseAST(body, "benchmark-note", 800, 100)
+		_ = Parse(body, "benchmark-note", 800, 100)
 	}
 }

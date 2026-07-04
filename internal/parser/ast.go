@@ -19,8 +19,8 @@ import (
 	"go.abhg.dev/goldmark/wikilink"
 )
 
-// ASTChunk is one section of a note, bounded by heading structure.
-type ASTChunk struct {
+// Chunk is one section of a note, bounded by heading structure.
+type Chunk struct {
 	NoteSlug    string
 	Index       int
 	Text        string // clean prose text for embedding (code blocks replaced with placeholders)
@@ -33,9 +33,9 @@ type ASTChunk struct {
 	WordCount   int
 }
 
-// ASTResult is the output from parsing the full document, containing the chunks and metadata.
-type ASTResult struct {
-	Chunks      []ASTChunk
+// Result is the output from parsing the full document, containing the chunks and metadata.
+type Result struct {
+	Chunks      []Chunk
 	Tags        []string
 	Links       []string
 	Frontmatter map[string]interface{}
@@ -56,10 +56,10 @@ var mdParser = goldmark.New(
 	),
 )
 
-// ParseAST parses body text into ASTChunks, extracting wikilinks, tags, and frontmatter.
+// Parse parses body text into Chunks, extracting wikilinks, tags, and frontmatter.
 // maxChunkRunes controls the maximum rune length per chunk. overlapRunes controls how many
 // runes are repeated at the start of the next sub-chunk when a section is split (overlap).
-func ParseAST(body, noteSlug string, maxChunkRunes, overlapRunes int) ASTResult {
+func Parse(body, noteSlug string, maxChunkRunes, overlapRunes int) Result {
 	src := []byte(body)
 	reader := text.NewReader(src)
 	doc := mdParser.Parser().Parse(reader)
@@ -109,7 +109,7 @@ func ParseAST(body, noteSlug string, maxChunkRunes, overlapRunes int) ASTResult 
 	sections := extractSections(doc, src)
 	chunks := buildChunks(sections, noteSlug, maxChunkRunes, overlapRunes)
 
-	return ASTResult{
+	return Result{
 		Chunks:      chunks,
 		Tags:        tags,
 		Links:       links,
@@ -267,8 +267,8 @@ func formatChunkText(raw string, infos []codeBlockInfo, rich bool) string {
 	return strings.TrimSpace(out)
 }
 
-func buildChunks(sections []section, noteSlug string, maxRunes, overlapRunes int) []ASTChunk {
-	chunks := make([]ASTChunk, 0, len(sections))
+func buildChunks(sections []section, noteSlug string, maxRunes, overlapRunes int) []Chunk {
+	chunks := make([]Chunk, 0, len(sections))
 	idx := 0
 
 	for _, sec := range sections {
@@ -305,7 +305,7 @@ func buildChunks(sections []section, noteSlug string, maxRunes, overlapRunes int
 		richText := formatChunkText(rawText, codeInfos, true)
 
 		if maxRunes <= 0 || utf8.RuneCountInString(cleanText) <= maxRunes {
-			chunks = append(chunks, ASTChunk{
+			chunks = append(chunks, Chunk{
 				NoteSlug:    noteSlug,
 				Index:       idx,
 				Text:        cleanText,
@@ -326,7 +326,7 @@ func buildChunks(sections []section, noteSlug string, maxRunes, overlapRunes int
 		for _, sub := range subTexts {
 			subClean := formatChunkText(sub, codeInfos, false)
 			subRich := formatChunkText(sub, codeInfos, true)
-			chunks = append(chunks, ASTChunk{
+			chunks = append(chunks, Chunk{
 				NoteSlug:    noteSlug,
 				Index:       idx,
 				Text:        subClean,

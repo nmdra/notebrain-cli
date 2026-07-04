@@ -31,7 +31,7 @@ type Pipeline struct {
 	embedder       Embedder
 	workers        int
 	MinChunkWords  int // minimum word count to keep a chunk (filters junk)
-	ChunkSize      int // maximum runes per chunk fed to ParseAST
+	ChunkSize      int // maximum runes per chunk fed to Parse
 	ChunkOverlap   int // overlap runes between sub-chunks when a section is split
 	MaxEmbedTokens int // max tokens for embed text (model sequence length)
 	RespectExclude bool
@@ -262,14 +262,14 @@ func (p *Pipeline) processFile(ctx context.Context, vaultPath string, filePath s
 	}
 
 	title := parser.TitleFromPath(relPath)
-	astRes := parser.ParseAST(string(content), slug, p.ChunkSize, p.ChunkOverlap)
+	astRes := parser.Parse(string(content), slug, p.ChunkSize, p.ChunkOverlap)
 
 	if ft, ok := astRes.Frontmatter["title"].(string); ok && ft != "" {
 		title = ft
 	}
 
 	if len(astRes.Chunks) == 0 {
-		astRes.Chunks = []parser.ASTChunk{{NoteSlug: slug, Index: 0, Text: " "}}
+		astRes.Chunks = []parser.Chunk{{NoteSlug: slug, Index: 0, Text: " "}}
 	}
 
 	// Stat the file once, outside the chunk loop
@@ -282,7 +282,7 @@ func (p *Pipeline) processFile(ctx context.Context, vaultPath string, filePath s
 	// Filter chunks: discard those below the minimum word threshold.
 	// For code-only chunks (where Text is only placeholders), check word count
 	// against RichText so code notes are preserved.
-	validChunks := make([]parser.ASTChunk, 0, len(astRes.Chunks))
+	validChunks := make([]parser.Chunk, 0, len(astRes.Chunks))
 	for _, c := range astRes.Chunks {
 		storedText := c.RichText
 		if storedText == "" {
