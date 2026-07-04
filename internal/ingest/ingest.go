@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -63,9 +64,10 @@ func (p *Pipeline) Run(ctx context.Context, vaultPath string, glob string, stdin
 	}
 
 	totalFiles := len(files)
-	_, _ = fmt.Fprintf(stdout, "Found %d markdown files to ingest\n", totalFiles)
+	slog.Info("scanning vault", "files_found", totalFiles, "vault_path", vaultPath)
 
 	if totalFiles == 0 {
+		slog.Info("no matching markdown files found", "vault_path", vaultPath, "glob", glob)
 		return nil
 	}
 
@@ -170,7 +172,7 @@ fileLoop:
 
 	// Perform batch database updates
 	if len(ingestResults) > 0 || len(staleSlugs) > 0 {
-		_, _ = fmt.Fprintln(stdout, "\nSyncing database: applying batch updates...")
+		slog.Info("syncing database: applying batch updates", "notes_updated", len(ingestResults), "stale_removed", len(staleSlugs))
 		if err := p.store.BatchIngest(ctx, ingestResults, staleSlugs); err != nil {
 			errCh <- fmt.Errorf("batch ingest: %w", err)
 		}
@@ -183,7 +185,7 @@ fileLoop:
 		if firstErr == nil {
 			firstErr = e
 		}
-		_, _ = fmt.Fprintf(stdout, "Error: %v\n", e)
+		slog.Error("ingestion worker error", "err", e)
 	}
 
 	if firstErr == nil && ctx.Err() != nil {

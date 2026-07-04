@@ -35,6 +35,10 @@ type Config struct {
 	// TopKPerNote limits the number of chunks returned per note in semantic search.
 	TopKPerNote int
 	Verbose     bool
+	// LogFormat controls log output format: "auto", "json", or "text".
+	LogFormat string
+	// LogLevel controls minimum log severity: "info", "debug", "warn", or "error".
+	LogLevel string
 }
 
 // Default returns a Config with sensible defaults.
@@ -51,5 +55,7 @@ func Default() *Config {
 		MinChunkWords:  10,  // rejects heading-only and code-placeholder fragments
 		MaxEmbedTokens: 256, // matches MiniLM sequence length
 		TopKPerNote:    3,   // top 3 most relevant chunks per note
+		LogFormat:      "auto",
+		LogLevel:       "info",
 	}
 }

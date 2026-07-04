@@ -90,6 +90,8 @@ type CoreGlobals struct {
 	VaultPath     string  `name:"vault-path" help:"Obsidian vault path"`
 	ContextWindow int     `name:"context-window" default:"0"`
 	MinScore      float64 `default:"0"`
+	LogFormat     string  `name:"log-format" default:"auto"`
+	LogLevel      string  `name:"log-level" default:"info"`
 }
 
 func TestTOMLResolver_StrictNoHTTP(t *testing.T) {
@@ -98,6 +100,8 @@ chroma-path = "/tmp/custom-chroma"
 vault_path = "/tmp/my-vault"
 context_window = 2
 min_score = 0.75
+log_format = "json"
+log-level = "debug"
 `)
 
 	resolver, err := TOMLResolver(bytes.NewReader(tomlData))
@@ -127,5 +131,11 @@ min_score = 0.75
 	}
 	if cli.MinScore != 0.75 {
 		t.Errorf("Expected MinScore 0.75, got %f", cli.MinScore)
+	}
+	if cli.LogFormat != "json" {
+		t.Errorf("Expected LogFormat 'json', got %q", cli.LogFormat)
+	}
+	if cli.LogLevel != "debug" {
+		t.Errorf("Expected LogLevel 'debug', got %q", cli.LogLevel)
 	}
 }

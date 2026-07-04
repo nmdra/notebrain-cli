@@ -3,7 +3,10 @@ package tui
 import (
 	"fmt"
 	"io"
+	"log/slog"
+	"math"
 	"os"
+	"time"
 
 	"charm.land/bubbles/v2/progress"
 	tea "charm.land/bubbletea/v2"
@@ -96,12 +99,40 @@ func RunProgress(stdin io.Reader, stdout io.Writer, totalFiles int, progressCh <
 		isTTY = term.IsTerminal(f.Fd())
 	}
 	if !isTTY || os.Getenv("TERM") == "dumb" {
+		step := totalFiles / 5
+		if step < 10 {
+			step = 10
+		}
+		if step > totalFiles && totalFiles > 0 {
+			step = totalFiles
+		}
+		if step == 0 {
+			step = 1
+		}
+		lastLogged := -step - 1
+		start := time.Now()
+
 		for u := range progressCh {
+			if u.Done >= lastLogged+step || u.Done == totalFiles || u.Final {
+				percent := 0.0
+				if totalFiles > 0 {
+					percent = math.Round(float64(u.Done)/float64(totalFiles)*10000) / 100
+				}
+				slog.Info("ingestion progress",
+					"processed", u.Done,
+					"total", totalFiles,
+					"percent", percent,
+					"current", u.Current,
+					"elapsed_ms", time.Since(start).Milliseconds())
+				lastLogged = u.Done
+			}
 			if u.Final {
 				break
 			}
 		}
-		_, _ = fmt.Fprint(stdout, "✓ Ingest complete\n\n")
+		slog.Info("ingestion completed",
+			"total_files", totalFiles,
+			"duration_ms", time.Since(start).Milliseconds())
 		return nil
 	}
 

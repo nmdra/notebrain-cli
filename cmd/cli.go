@@ -3,11 +3,13 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/alecthomas/kong"
+	"github.com/charmbracelet/x/term"
 	"github.com/nmdra/notebrain-cli/internal/configfile"
 )
 
@@ -25,6 +27,8 @@ type Globals struct {
 	MinScore       float64 `help:"suppress results below this similarity score (0–1)" default:"0"`
 	RespectExclude bool    `help:"respect Obsidian userIgnoreFilters and attachmentFolderPath settings during ingest" default:"true"`
 	UseEditor      bool    `help:"enable external editor ($EDITOR) integration as default open type" default:"false"`
+	LogFormat      string  `name:"log-format" help:"log output format (auto, json, text)" default:"auto"`
+	LogLevel       string  `name:"log-level" help:"minimum log severity (info, debug, warn, error)" default:"info"`
 
 	// Internal fields, not exposed as flags
 	Ctx context.Context `kong:"-"`
@@ -93,6 +97,8 @@ Examples:
 		kong.Configuration(configfile.IgnoreMissingFileLoader(configfile.TOMLResolver)),
 	)
 
+	setupLogger(cli.LogFormat, cli.LogLevel)
+
 	// Resolve vault display name for Obsidian URI generation.
 	// Priority: --vault-name flag / config > basename(vault-path)
 	vaultName := cli.VaultName
@@ -117,6 +123,34 @@ Examples:
 		return err
 	}
 	return nil
+}
+
+func setupLogger(logFormat, logLevel string) {
+	var level slog.Level
+	switch strings.ToLower(logLevel) {
+	case "debug":
+		level = slog.LevelDebug
+	case "warn", "warning":
+		level = slog.LevelWarn
+	case "error":
+		level = slog.LevelError
+	default: // "info"
+		level = slog.LevelInfo
+	}
+
+	opts := &slog.HandlerOptions{Level: level}
+	var handler slog.Handler
+
+	isTTY := term.IsTerminal(os.Stderr.Fd()) && os.Getenv("TERM") != "dumb"
+	format := strings.ToLower(logFormat)
+
+	if format == "json" || (format == "auto" && !isTTY) {
+		handler = slog.NewJSONHandler(os.Stderr, opts)
+	} else {
+		handler = slog.NewTextHandler(os.Stderr, opts)
+	}
+
+	slog.SetDefault(slog.New(handler))
 }
 
 // hyperlinkSupported returns true if the terminal supports OSC 8 hyperlinks

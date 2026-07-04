@@ -79,6 +79,16 @@ func TestDefault_Fields(t *testing.T) {
 			got:  func(c *Config) any { return c.MinChunkWords },
 			want: 10,
 		},
+		{
+			name: "LogFormat is auto",
+			got:  func(c *Config) any { return c.LogFormat },
+			want: "auto",
+		},
+		{
+			name: "LogLevel is info",
+			got:  func(c *Config) any { return c.LogLevel },
+			want: "info",
+		},
 	}
 
 	cfg := Default()

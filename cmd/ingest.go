@@ -23,6 +23,7 @@ package cmd
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 
 	"github.com/nmdra/notebrain-cli/internal/embedder"
@@ -50,22 +51,23 @@ func (c *IngestCmd) Run(globals *Globals) error {
 	chromaPath := globals.ChromaPath
 	ctx := globals.Ctx
 
-	fmt.Println("Opening ChromaDB store...")
+	slog.Info("opening vector store", "chroma_path", chromaPath)
 	st, err := store.Open(ctx, chromaPath)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = st.Close() }()
 
-	fmt.Println("Initializing embedded ONNX vector models...")
+	slog.Info("initializing embedded ONNX vector models")
 	emb, err := embedder.NewLocalEmbedder()
 	if err != nil {
 		return err
 	}
 	defer func() { _ = emb.Close() }()
 
-	fmt.Printf("Starting ingestion pipeline with %d workers...\n", workers)
+	slog.Info("starting ingestion pipeline", "workers", workers, "vault_path", vaultPath)
 	pipeline := ingest.NewPipeline(st, emb, workers)
+
 	pipeline.RespectExclude = globals.RespectExclude
 	// Allow flag/config overrides; 0 means "use the pipeline's built-in default".
 	if c.MinChunkWords > 0 {

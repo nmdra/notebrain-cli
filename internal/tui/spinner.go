@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 
 	"charm.land/bubbles/v2/spinner"
@@ -63,7 +64,7 @@ func (m spinnerModel) View() tea.View {
 
 func RunSpinner(message string, doneChan <-chan struct{}) error {
 	if !term.IsTerminal(os.Stderr.Fd()) || os.Getenv("TERM") == "dumb" {
-		_, _ = fmt.Fprintln(os.Stderr, message)
+		slog.Info(message)
 		<-doneChan
 		return nil
 	}
