@@ -23,10 +23,7 @@ func TestRunProgress(t *testing.T) {
 	progressCh <- ProgressUpdate{Done: 100, Current: "note100.md", Final: true}
 	close(progressCh)
 
-	err := RunProgress(100, progressCh)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	RunProgress(100, progressCh)
 
 	out := buf.String()
 	if !strings.Contains(out, "ingestion progress") {

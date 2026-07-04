@@ -91,9 +91,8 @@ func (p *Pipeline) Run(ctx context.Context, vaultPath string, glob string, stdin
 		}
 	}
 
-	// +1 for the progress logging goroutine's potential error
 	progressCh := make(chan ProgressUpdate, p.workers*2)
-	errCh := make(chan error, totalFiles+2) // +2 for progress log and batch ingest error
+	errCh := make(chan error, totalFiles+1) // +1 for batch ingest error
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -104,9 +103,7 @@ func (p *Pipeline) Run(ctx context.Context, vaultPath string, glob string, stdin
 	uiWg.Add(1)
 	go func() {
 		defer uiWg.Done()
-		if uiErr := RunProgress(totalFiles, progressCh); uiErr != nil {
-			errCh <- fmt.Errorf("progress log error: %w", uiErr)
-		}
+		RunProgress(totalFiles, progressCh)
 		if atomic.LoadInt32(&done) == 0 {
 			cancel() // Cancel workers if progress loop exits early
 		}

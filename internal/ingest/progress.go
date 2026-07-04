@@ -19,17 +19,8 @@ type ProgressUpdate struct {
 }
 
 // RunProgress logs ingestion progress via structured slog events.
-func RunProgress(totalFiles int, progressCh <-chan ProgressUpdate) error {
-	step := totalFiles / 5
-	if step < 10 {
-		step = 10
-	}
-	if step > totalFiles && totalFiles > 0 {
-		step = totalFiles
-	}
-	if step == 0 {
-		step = 1
-	}
+func RunProgress(totalFiles int, progressCh <-chan ProgressUpdate) {
+	step := max(1, min(10, totalFiles), totalFiles/5)
 	lastLogged := -step - 1
 	start := time.Now()
 
@@ -54,5 +45,4 @@ func RunProgress(totalFiles int, progressCh <-chan ProgressUpdate) error {
 	slog.Info("ingestion completed",
 		"total_files", totalFiles,
 		"duration_ms", time.Since(start).Milliseconds())
-	return nil
 }

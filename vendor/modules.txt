@@ -6,7 +6,6 @@ charm.land/bubbles/v2/internal/runeutil
 charm.land/bubbles/v2/key
 charm.land/bubbles/v2/list
 charm.land/bubbles/v2/paginator
-charm.land/bubbles/v2/progress
 charm.land/bubbles/v2/spinner
 charm.land/bubbles/v2/textinput
 # charm.land/bubbletea/v2 v2.0.7
@@ -55,9 +54,6 @@ github.com/atotto/clipboard
 # github.com/charmbracelet/colorprofile v0.4.3
 ## explicit; go 1.25.0
 github.com/charmbracelet/colorprofile
-# github.com/charmbracelet/harmonica v0.2.0
-## explicit; go 1.16
-github.com/charmbracelet/harmonica
 # github.com/charmbracelet/ultraviolet v0.0.0-20260525132238-948f4557a654
 ## explicit; go 1.25.0
 github.com/charmbracelet/ultraviolet
