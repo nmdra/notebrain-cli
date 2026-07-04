@@ -16,7 +16,8 @@ type Globals struct {
 	ChromaPath     string  `help:"path to ChromaDB persistent storage" default:"~/.notebrain/chroma"`
 	ChromaMode     string  `help:"ChromaDB client mode ('persistent' or 'http')" default:"persistent"`
 	ChromaURL      string  `help:"ChromaDB server URL (used when --chroma-mode=http)" default:"http://localhost:8000"`
-	VaultPath      string  `help:"Obsidian vault path (also used as vault name fallback)"`
+	VaultPath      string  `name:"vault-path" help:"Obsidian vault path (also used as vault name fallback)"`
+	VaultName      string  `name:"vault-name" help:"Obsidian vault name (for URI links, defaults to basename of vault-path)"`
 	Verbose        bool    `help:"enable verbose output"`
 	NoHyperlinks   bool    `help:"Disable OSC 8 terminal hyperlinks in output"`
 	Format         string  `help:"output format" enum:"text,json,tsv,ndjson" default:"text"`
@@ -28,8 +29,7 @@ type Globals struct {
 	UseEditor      bool    `help:"enable external editor ($EDITOR) integration as default open type" default:"false"`
 
 	// Internal fields, not exposed as flags
-	Ctx       context.Context `kong:"-"`
-	VaultName string          `kong:"-"` // resolved display name for Obsidian URIs
+	Ctx context.Context `kong:"-"`
 
 	Config kong.ConfigFlag `help:"Path to config file" default:"~/.notebrain/config/config.toml"`
 }
@@ -96,26 +96,12 @@ Examples:
 	)
 
 	// Resolve vault display name for Obsidian URI generation.
-	// Priority: --vault-path flag > OBSIDIAN_VAULT_NAME > OBSIDIAN_VAULT > basename(OBSIDIAN_VAULT_PATH)
-	vault := cli.VaultPath
-	if vault == "" {
-		vault = os.Getenv("OBSIDIAN_VAULT_NAME")
-		if vault == "" {
-			legacyVault := os.Getenv("OBSIDIAN_VAULT")
-			if legacyVault != "" {
-				vault = legacyVault
-			} else {
-				vaultPath := os.Getenv("OBSIDIAN_VAULT_PATH")
-				if vaultPath != "" {
-					vault = vaultPath
-				}
-			}
-		}
+	// Priority: --vault-name flag / config > basename(vault-path)
+	vaultName := cli.VaultName
+	if vaultName == "" && cli.VaultPath != "" {
+		vaultName = filepath.Base(cli.VaultPath)
 	}
-	if vault != "" {
-		vault = filepath.Base(vault)
-	}
-	cli.VaultName = vault
+	cli.VaultName = vaultName
 
 	if strings.HasPrefix(cli.ChromaPath, "~/") {
 		if home != "" && home != "." {

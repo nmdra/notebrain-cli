@@ -42,10 +42,7 @@ func (c *IngestCmd) Run(globals *Globals) error {
 	workers := c.Workers
 	vaultPath := globals.VaultPath
 	if vaultPath == "" {
-		vaultPath = os.Getenv("OBSIDIAN_VAULT_PATH")
-	}
-	if vaultPath == "" {
-		return fmt.Errorf("--vault-path flag or OBSIDIAN_VAULT_PATH env var must be specified")
+		return fmt.Errorf("--vault-path flag or config file setting must be specified")
 	}
 
 	glob := c.Glob

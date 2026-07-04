@@ -50,3 +50,37 @@ bool-field = true
 		t.Errorf("Expected default-field 'def', got %q", cli.DefaultField)
 	}
 }
+
+func TestTOMLResolver_NormalizedKeys(t *testing.T) {
+	tomlData := []byte(`
+string_field = "snake"
+int_field = 99
+bool_field = false
+`)
+
+	resolver, err := TOMLResolver(bytes.NewReader(tomlData))
+	if err != nil {
+		t.Fatalf("TOMLResolver failed: %v", err)
+	}
+
+	var cli ConfigStruct
+	parser, err := kong.New(&cli, kong.Resolvers(resolver))
+	if err != nil {
+		t.Fatalf("kong.New failed: %v", err)
+	}
+
+	_, err = parser.Parse([]string{})
+	if err != nil {
+		t.Fatalf("parser.Parse failed: %v", err)
+	}
+
+	if cli.StringField != "snake" {
+		t.Errorf("Expected string-field 'snake', got %q", cli.StringField)
+	}
+	if cli.IntField != 99 {
+		t.Errorf("Expected int-field 99, got %d", cli.IntField)
+	}
+	if cli.BoolField != false {
+		t.Errorf("Expected bool-field false, got %v", cli.BoolField)
+	}
+}

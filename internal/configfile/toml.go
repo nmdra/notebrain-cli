@@ -4,10 +4,19 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/alecthomas/kong"
 	"github.com/pelletier/go-toml/v2"
 )
+
+// normalizeKey strips hyphens and underscores and converts to lowercase
+// so that snake_case, kebab-case, and PascalCase keys match interchangeably.
+func normalizeKey(s string) string {
+	s = strings.ReplaceAll(s, "-", "")
+	s = strings.ReplaceAll(s, "_", "")
+	return strings.ToLower(s)
+}
 
 // TOMLResolver is a kong.ConfigurationLoader that parses TOML files.
 func TOMLResolver(r io.Reader) (kong.Resolver, error) {
@@ -17,11 +26,18 @@ func TOMLResolver(r io.Reader) (kong.Resolver, error) {
 		return nil, fmt.Errorf("failed to parse TOML: %w", err)
 	}
 
+	normalized := make(map[string]interface{}, len(parsed))
+	for k, v := range parsed {
+		normalized[normalizeKey(k)] = v
+	}
+
 	return kong.ResolverFunc(func(context *kong.Context, parent *kong.Path, flag *kong.Flag) (interface{}, error) {
 		name := flag.Name
 
-		val, ok := parsed[name]
-		if ok {
+		if val, ok := parsed[name]; ok {
+			return val, nil
+		}
+		if val, ok := normalized[normalizeKey(name)]; ok {
 			return val, nil
 		}
 

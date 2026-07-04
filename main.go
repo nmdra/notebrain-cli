@@ -26,12 +26,10 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/joho/godotenv"
 	"github.com/nmdra/notebrain-cli/cmd"
 )
 
 func main() {
-	_ = godotenv.Load() // Load .env file if it exists
 	ctx := context.Background()
 	if err := cmd.ParseAndRun(ctx); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
