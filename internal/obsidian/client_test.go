@@ -66,3 +66,28 @@ func TestEditorCommand(t *testing.T) {
 		})
 	}
 }
+
+func TestOpenInObsidian(t *testing.T) {
+	tests := []struct {
+		name      string
+		vaultName string
+		filePath  string
+		wantErr   bool
+	}{
+		{
+			name:      "empty file path returns nil without opening",
+			vaultName: "my-vault",
+			filePath:  "",
+			wantErr:   false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := obsidian.OpenInObsidian(tc.vaultName, tc.filePath)
+			if (err != nil) != tc.wantErr {
+				t.Errorf("OpenInObsidian() error = %v, wantErr %v", err, tc.wantErr)
+			}
+		})
+	}
+}
