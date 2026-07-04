@@ -2,6 +2,7 @@ package parser
 
 import (
 	"bytes"
+	"fmt"
 	"strings"
 
 	"github.com/yuin/goldmark"
@@ -20,7 +21,8 @@ import (
 type ASTChunk struct {
 	NoteSlug    string
 	Index       int
-	Text        string // clean prose text for embedding
+	Text        string // clean prose text for embedding (code blocks replaced with placeholders)
+	RichText    string // full text with actual code inline (for storage/retrieval)
 	HeadingPath string // e.g. "Architecture > Data Flow > Ingest"
 	Level       int    // depth of the deepest heading in this chunk (1-6)
 	CodeBlocks  int    // number of fenced code blocks in this chunk
@@ -233,6 +235,32 @@ func extractSections(doc ast.Node, src []byte) []section {
 	return sections
 }
 
+type codeBlockInfo struct {
+	lang string
+	code string
+}
+
+func formatChunkText(raw string, infos []codeBlockInfo, rich bool) string {
+	if len(infos) == 0 {
+		return strings.TrimSpace(raw)
+	}
+	out := raw
+	for i, info := range infos {
+		placeholder := fmt.Sprintf("\x00CODE:%d:%s\x00", i, info.lang)
+		if rich {
+			fence := "```" + info.lang + "\n" + strings.TrimSpace(info.code) + "\n```"
+			out = strings.ReplaceAll(out, placeholder, fence)
+		} else {
+			clean := "[code]"
+			if info.lang != "" {
+				clean = "[code:" + info.lang + "]"
+			}
+			out = strings.ReplaceAll(out, placeholder, clean)
+		}
+	}
+	return strings.TrimSpace(out)
+}
+
 func buildChunks(sections []section, noteSlug string, maxRunes, overlapRunes int) []ASTChunk {
 	var chunks []ASTChunk
 	idx := 0
@@ -243,15 +271,14 @@ func buildChunks(sections []section, noteSlug string, maxRunes, overlapRunes int
 		hasTask := false
 
 		var prose strings.Builder
+		var codeInfos []codeBlockInfo
 		for _, b := range sec.blocks {
 			switch b.kind {
 			case "code":
 				codeCount++
-				if b.language != "" {
-					prose.WriteString("[code:" + b.language + "] ")
-				} else {
-					prose.WriteString("[code] ")
-				}
+				codeIdx := len(codeInfos)
+				codeInfos = append(codeInfos, codeBlockInfo{lang: b.language, code: b.codeText})
+				_, _ = fmt.Fprintf(&prose, "\x00CODE:%d:%s\x00 ", codeIdx, b.language)
 			case "table":
 				hasTable = true
 				prose.WriteString(b.text + " ")
@@ -263,41 +290,48 @@ func buildChunks(sections []section, noteSlug string, maxRunes, overlapRunes int
 			}
 		}
 
-		text := strings.TrimSpace(prose.String())
-		if text == "" && codeCount == 0 && !hasTable && !hasTask {
+		rawText := strings.TrimSpace(prose.String())
+		if rawText == "" && codeCount == 0 && !hasTable && !hasTask {
 			continue // Skip truly empty sections
 		}
 
-		// If the section only has code blocks / tables, its 'text' might just be "[code:go] ". Let's keep it.
-		runes := []rune(text)
+		cleanText := formatChunkText(rawText, codeInfos, false)
+		richText := formatChunkText(rawText, codeInfos, true)
+
+		runes := []rune(cleanText)
 		if maxRunes <= 0 || len(runes) <= maxRunes {
 			chunks = append(chunks, ASTChunk{
 				NoteSlug:    noteSlug,
 				Index:       idx,
-				Text:        text,
+				Text:        cleanText,
+				RichText:    richText,
 				HeadingPath: sec.headingPath,
 				Level:       sec.level,
 				CodeBlocks:  codeCount,
 				HasTable:    hasTable,
 				HasTask:     hasTask,
-				WordCount:   len(strings.Fields(text)),
+				WordCount:   len(strings.Fields(cleanText)),
 			})
 			idx++
 			continue
 		}
 
-		subTexts := splitAtBoundary(runes, maxRunes, overlapRunes)
+		rawRunes := []rune(rawText)
+		subTexts := splitAtBoundary(rawRunes, maxRunes, overlapRunes)
 		for _, sub := range subTexts {
+			subClean := formatChunkText(sub, codeInfos, false)
+			subRich := formatChunkText(sub, codeInfos, true)
 			chunks = append(chunks, ASTChunk{
 				NoteSlug:    noteSlug,
 				Index:       idx,
-				Text:        sub,
+				Text:        subClean,
+				RichText:    subRich,
 				HeadingPath: sec.headingPath,
 				Level:       sec.level,
 				CodeBlocks:  codeCount,
 				HasTable:    hasTable,
 				HasTask:     hasTask,
-				WordCount:   len(strings.Fields(sub)),
+				WordCount:   len(strings.Fields(subClean)),
 			})
 			idx++
 		}

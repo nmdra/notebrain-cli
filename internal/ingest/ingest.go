@@ -285,14 +285,20 @@ func (p *Pipeline) processFile(ctx context.Context, vaultPath string, filePath s
 		modTime = info.ModTime()
 	}
 
-	// Filter chunks: discard those below the minimum word threshold and
-	// sections whose entire text is only [code:X] placeholder tokens (no prose).
+	// Filter chunks: discard those below the minimum word threshold.
+	// For code-only chunks (where Text is only placeholders), check word count
+	// against RichText so code notes are preserved.
 	var validChunks []parser.ASTChunk
 	for _, c := range astRes.Chunks {
-		if c.WordCount < p.MinChunkWords {
+		storedText := c.RichText
+		if storedText == "" {
+			storedText = c.Text
+		}
+		if len(strings.Fields(storedText)) < p.MinChunkWords {
 			continue
 		}
-		if isCodeOnlyChunk(c.Text) {
+		// If c.RichText is empty and c.Text is just code placeholders with no prose, skip.
+		if c.RichText == "" && isCodeOnlyChunk(c.Text) {
 			continue
 		}
 		validChunks = append(validChunks, c)
@@ -307,11 +313,19 @@ func (p *Pipeline) processFile(ctx context.Context, vaultPath string, filePath s
 			headingPath = title
 		}
 
+		embedContent := c.Text
+		if isCodeOnlyChunk(c.Text) && c.RichText != "" {
+			embedContent = c.RichText
+		}
+
+		storedText := c.RichText
+		if storedText == "" {
+			storedText = c.Text
+		}
+
 		// Contextual augmentation: prepend title + heading path + tags before
-		// embedding. The raw c.Text is still stored in ChromaDB for display.
-		// This "contextual chunking" technique improves retrieval relevance by
-		// grounding the vector in the document's semantic position.
-		embedText := buildEmbedText(title, headingPath, astRes.Tags, c.Text, p.MaxEmbedTokens)
+		// embedding. The storedText is stored in ChromaDB for display/retrieval.
+		embedText := buildEmbedText(title, headingPath, astRes.Tags, embedContent, p.MaxEmbedTokens)
 		emb, err := p.embedder.Embed(ctx, embedText)
 		if err != nil {
 			return nil, err
@@ -323,7 +337,7 @@ func (p *Pipeline) processFile(ctx context.Context, vaultPath string, filePath s
 			Title:        title,
 			FilePath:     relPath,
 			ChunkIndex:   i,
-			Text:         c.Text,
+			Text:         storedText,
 			Tags:         astRes.Tags,
 			HasLinks:     len(astRes.Links) > 0,
 			HeadingPath:  c.HeadingPath,

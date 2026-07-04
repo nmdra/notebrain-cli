@@ -257,3 +257,30 @@ func TestBuildEmbedText_TruncationGuard(t *testing.T) {
 		})
 	}
 }
+
+func TestPipeline_CodeOnlyNoteIngest(t *testing.T) {
+	ctx := context.Background()
+	dbDir := t.TempDir()
+	st, err := store.Open(ctx, dbDir)
+	if err != nil {
+		t.Fatalf("Failed to open store: %v", err)
+	}
+	defer func() { _ = st.Close() }()
+
+	vaultDir := t.TempDir()
+	codeNote := "---\ntitle: Code Snippet\n---\n# Helper Function\n\n```go\nfunc add(a, b int) int {\n    return a + b\n}\n```\n"
+	_ = os.WriteFile(filepath.Join(vaultDir, "code.md"), []byte(codeNote), 0644)
+
+	p := NewPipeline(st, &mockEmbedder{}, 1)
+	pr, pw := io.Pipe()
+	go func() { _ = pw.Close() }()
+	var stdout bytes.Buffer
+	if err := p.Run(ctx, vaultDir, "", pr, &stdout); err != nil {
+		t.Fatalf("Pipeline.Run failed: %v", err)
+	}
+
+	stats, _ := st.Stats(ctx)
+	if stats["chunks"] != 1 {
+		t.Errorf("Expected 1 chunk for code-only note, got %d", stats["chunks"])
+	}
+}

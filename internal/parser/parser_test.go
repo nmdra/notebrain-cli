@@ -5,6 +5,7 @@
 package parser
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -173,5 +174,47 @@ Some other text.
 				tt.checkText(t, res.Chunks)
 			}
 		})
+	}
+}
+
+func TestBuildChunks_CodePreservation(t *testing.T) {
+	body := "---\ntitle: Test\n---\n# Setup\n\nSome intro text.\n\n```go\nfunc main() {\n\tfmt.Println(\"hello\")\n}\n```\n\nMore text after code."
+	res := ParseAST(body, "test-note", 2000, 0)
+
+	if len(res.Chunks) == 0 {
+		t.Fatal("expected at least 1 chunk")
+	}
+	c := res.Chunks[0]
+
+	if !strings.Contains(c.Text, "[code:go]") {
+		t.Errorf("Text should contain [code:go] placeholder: got %q", c.Text)
+	}
+	if strings.Contains(c.Text, "fmt.Println") {
+		t.Errorf("Text should NOT contain actual code: got %q", c.Text)
+	}
+
+	if !strings.Contains(c.RichText, "fmt.Println") {
+		t.Errorf("RichText should contain actual code: got %q", c.RichText)
+	}
+	if strings.Contains(c.RichText, "[code:go]") {
+		t.Errorf("RichText should NOT contain placeholder: got %q", c.RichText)
+	}
+}
+
+func TestBuildChunks_CodeOnlyChunk(t *testing.T) {
+	body := "---\ntitle: Test\n---\n# Code Section\n\n```python\ndef hello():\n    print('world')\n```\n"
+	res := ParseAST(body, "test-note", 2000, 0)
+
+	found := false
+	for _, c := range res.Chunks {
+		if c.CodeBlocks > 0 {
+			found = true
+			if c.RichText == "" {
+				t.Error("code chunk should have non-empty RichText")
+			}
+		}
+	}
+	if !found {
+		t.Error("expected a chunk with code blocks")
 	}
 }
