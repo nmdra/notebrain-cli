@@ -21,6 +21,7 @@ To operate efficiently and prevent wasted tokens or hung sessions, follow these 
 6. **Binary Resolution & Quoting**: In development environments, execute `./notebrain` if `notebrain` is not in system PATH. Note titles often contain spaces or brackets (`"Q3 Planning [Draft]"`), so always encapsulate note titles, tags, and search queries within double quotes.
 7. **Embedded Persistent Storage**: NoteBrain runs exclusively as an embedded database (`~/.notebrain/chroma`). No standalone ChromaDB Docker containers or HTTP servers are required or supported.
 8. **Automated Ingestion**: Ingestion is handled via OS schedulers (cron/systemd timers every 3 hours). You do not need to manually run `ingest` before queries unless the user explicitly requests an immediate re-index after editing notes.
+9. **Non-Interactive Ingestion Logging**: The `ingest` command strictly outputs structured `slog` events (`ingestion progress` and `ingestion completed`) without interactive Bubble Tea animations, guaranteeing clean machine-readable logs in headless automated environments.
 
 ---
 

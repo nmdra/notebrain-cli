@@ -75,6 +75,7 @@ notebrain-cli/
 - No global mutable state. Pass dependencies explicitly (config, store, embedder).
 - Use the options/functional-options pattern where it simplifies APIs.
 - Keep packages focused: one responsibility per package.
+- **TUI vs. Domain Package Boundaries:** The `internal/tui/` package is strictly reserved for interactive terminal user interface components (e.g., Bubble Tea models, interactive spinners). Non-interactive logging, progress tracking, and machine-readable output formatting must reside directly in their respective domain packages (e.g., `internal/ingest`), never in `internal/tui/`.
 
 ## ChromaDB Collections
 
@@ -113,3 +114,4 @@ fix(ingest): handle empty frontmatter gracefully
 6. **TOML-Only Configuration:** Configuration hierarchy is strictly 2-tier: CLI flags > TOML configuration file (`~/.notebrain/config/config.toml` or `--config`). No `.env` files or application environment variable fallbacks are permitted. TOML keys support normalized matching (`snake_case` and `kebab-case` match interchangeably).
 7. **Embedded Persistent Storage Only:** NoteBrain strictly embeds ChromaDB in persistent mode (`CGO_ENABLED=1`). Standalone HTTP server connections (`CGO_ENABLED=0`) are intentionally unsupported to keep the CLI lightweight, self-contained, and zero-setup.
 8. **OS-Level Scheduled Ingestion:** In line with Unix philosophy, periodic re-indexing is handled by standard OS schedulers (cron, systemd timers) rather than a custom persistent background watch daemon or file-watching loop. Recommended ingestion interval is every 3 hours.
+9. **Decoupled Automated Ingestion Logging (No TUI for Ingestion):** Because `notebrain ingest` is frequently executed as an automated background task (cron, systemd timers, agentic workflows), it strictly uses structured logging (`log/slog`) for progress reporting. Interactive TUI progress bars (e.g., Bubble Tea) are intentionally disabled and omitted from the ingestion pipeline to guarantee clean, machine-readable operational logs.

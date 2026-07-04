@@ -2,7 +2,7 @@
 // Use of this source code is governed by the MIT license
 // that can be found in the LICENSE file.
 
-package tui
+package ingest
 
 import (
 	"bytes"
@@ -11,8 +11,7 @@ import (
 	"testing"
 )
 
-func TestRunProgress_Headless(t *testing.T) {
-	t.Setenv("TERM", "dumb")
+func TestRunProgress(t *testing.T) {
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&buf, nil))
 	oldLogger := slog.Default()
@@ -24,7 +23,7 @@ func TestRunProgress_Headless(t *testing.T) {
 	progressCh <- ProgressUpdate{Done: 100, Current: "note100.md", Final: true}
 	close(progressCh)
 
-	err := RunProgress(nil, &bytes.Buffer{}, 100, progressCh)
+	err := RunProgress(100, progressCh)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

@@ -17,7 +17,6 @@ import (
 
 	"github.com/nmdra/notebrain-cli/internal/parser"
 	"github.com/nmdra/notebrain-cli/internal/store"
-	"github.com/nmdra/notebrain-cli/internal/tui"
 )
 
 // Embedder abstracts vector embedding so the pipeline can be tested with mocks.
@@ -92,9 +91,9 @@ func (p *Pipeline) Run(ctx context.Context, vaultPath string, glob string, stdin
 		}
 	}
 
-	// +1 for the TUI goroutine's potential error
-	progressCh := make(chan tui.ProgressUpdate, p.workers*2)
-	errCh := make(chan error, totalFiles+2) // +2 for TUI and batch ingest error
+	// +1 for the progress logging goroutine's potential error
+	progressCh := make(chan ProgressUpdate, p.workers*2)
+	errCh := make(chan error, totalFiles+2) // +2 for progress log and batch ingest error
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -105,11 +104,11 @@ func (p *Pipeline) Run(ctx context.Context, vaultPath string, glob string, stdin
 	uiWg.Add(1)
 	go func() {
 		defer uiWg.Done()
-		if uiErr := tui.RunProgress(stdin, stdout, totalFiles, progressCh); uiErr != nil {
-			errCh <- fmt.Errorf("progress UI error: %w", uiErr)
+		if uiErr := RunProgress(totalFiles, progressCh); uiErr != nil {
+			errCh <- fmt.Errorf("progress log error: %w", uiErr)
 		}
 		if atomic.LoadInt32(&done) == 0 {
-			cancel() // Cancel workers if UI exits early (e.g. ctrl+c)
+			cancel() // Cancel workers if progress loop exits early
 		}
 	}()
 
@@ -156,7 +155,7 @@ fileLoop:
 			}
 
 			n := atomic.AddInt64(&completed, 1)
-			progressCh <- tui.ProgressUpdate{
+			progressCh <- ProgressUpdate{
 				Done:    int(n),
 				Total:   totalFiles,
 				Current: filepath.Base(f),
