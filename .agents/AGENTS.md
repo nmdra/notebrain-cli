@@ -65,6 +65,7 @@ notebrain-cli/
 - Use `testify` for assertions only if already in go.mod; otherwise use stdlib `testing`.
 - Name test files `*_test.go` alongside the source file.
 - **Go Vendoring:** This repository uses Go vendoring (`vendor/`). Whenever dependencies in `go.mod` or `go.sum` are added, removed, or updated, you MUST run `go mod vendor` before running tests or builds.
+- **Strict Non-Regression Guardrails:** When refactoring or removing features, always add explicit assertion tests across `config/`, `internal/configfile/`, and `internal/store/` to verify that existing core functions, default settings, TOML key resolution, and database initialization do not regress or depend on removed parameters.
 
 ## Coding Conventions
 
@@ -110,3 +111,5 @@ fix(ingest): handle empty frontmatter gracefully
 4. `DeleteNoteChunks` BEFORE `UpsertChunks` (not after) to handle interrupted re-ingests.
 5. Persistent client is single-writer — fine for CLI usage.
 6. **TOML-Only Configuration:** Configuration hierarchy is strictly 2-tier: CLI flags > TOML configuration file (`~/.notebrain/config/config.toml` or `--config`). No `.env` files or application environment variable fallbacks are permitted. TOML keys support normalized matching (`snake_case` and `kebab-case` match interchangeably).
+7. **Embedded Persistent Storage Only:** NoteBrain strictly embeds ChromaDB in persistent mode (`CGO_ENABLED=1`). Standalone HTTP server connections (`CGO_ENABLED=0`) are intentionally unsupported to keep the CLI lightweight, self-contained, and zero-setup.
+8. **OS-Level Scheduled Ingestion:** In line with Unix philosophy, periodic re-indexing is handled by standard OS schedulers (cron, systemd timers) rather than a custom persistent background watch daemon or file-watching loop. Recommended ingestion interval is every 3 hours.

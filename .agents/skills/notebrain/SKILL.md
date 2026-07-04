@@ -19,6 +19,8 @@ To operate efficiently and prevent wasted tokens or hung sessions, follow these 
 4. **Retrieve Complete Notes (`notebrain get`)**: When `search` returns a relevant note chunk, use `notebrain get <note-slug-or-path>` rather than guessing chunk indices to retrieve the complete, reconstructed markdown note text stitched together across all its indexed chunks. Never reach for `cat` on the underlying vault file — `get` reconstructs chunked notes correctly and respects the indexed state of the vault.
 5. **Retrieve Content for Synthesis (`--include-text`)**: By default, `search` and traversal commands return lightweight metadata envelopes (titles, file paths, tags, similarity scores). Whenever your task requires summarizing or reasoning about individual chunks directly from search results, append `--include-text`. The returned `text` field contains rich markdown with preserved code blocks, so code snippets are copy-pasteable.
 6. **Binary Resolution & Quoting**: In development environments, execute `./notebrain` if `notebrain` is not in system PATH. Note titles often contain spaces or brackets (`"Q3 Planning [Draft]"`), so always encapsulate note titles, tags, and search queries within double quotes.
+7. **Embedded Persistent Storage**: NoteBrain runs exclusively as an embedded database (`~/.notebrain/chroma`). No standalone ChromaDB Docker containers or HTTP servers are required or supported.
+8. **Automated Ingestion**: Ingestion is handled via OS schedulers (cron/systemd timers every 3 hours). You do not need to manually run `ingest` before queries unless the user explicitly requests an immediate re-index after editing notes.
 
 ---
 
