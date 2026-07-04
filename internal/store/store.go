@@ -18,7 +18,7 @@ type Store struct {
 	client chroma.Client
 	chunks chroma.Collection
 	links  chroma.Collection
-	mu     sync.Mutex
+	mu     sync.RWMutex
 }
 
 // Open creates or opens the persistent ChromaDB store at path.
@@ -88,6 +88,8 @@ func (s *Store) Close() error {
 
 // Reset drops and recreates both collections. Used by `notebrain reset`.
 func (s *Store) Reset(ctx context.Context) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	for _, name := range []string{CollectionChunks, CollectionLinks} {
 		if err := s.client.DeleteCollection(ctx, name); err != nil {
 			return fmt.Errorf("delete collection %s: %w", name, err)
@@ -117,6 +119,8 @@ func (s *Store) Reset(ctx context.Context) error {
 
 // Stats returns document counts for both collections.
 func (s *Store) Stats(ctx context.Context) (map[string]int64, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	nc, err := s.chunks.Count(ctx)
 	if err != nil {
 		return nil, err

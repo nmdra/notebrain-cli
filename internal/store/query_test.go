@@ -2,7 +2,9 @@ package store_test
 
 import (
 	"context"
+	"fmt"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -366,4 +368,57 @@ func TestGetChunkWindow(t *testing.T) {
 	if len(res[0].Context) != 3 {
 		t.Fatalf("Expected PopulateContext to fill 3 texts, got %d", len(res[0].Context))
 	}
+}
+
+func TestConcurrentReadWrite(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatalf("Open failed: %v", err)
+	}
+	defer func() { _ = st.Close() }()
+
+	setupTestData(t, ctx, st)
+
+	var wg sync.WaitGroup
+	qVec := []float32{1.0, 0.0, 0.0}
+
+	// Spawn 10 concurrent readers
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < 5; j++ {
+				_, _ = st.SemanticSearch(ctx, qVec, 5, 1, nil, false)
+				_, _ = st.GetNote(ctx, "note-a")
+				_, _ = st.GetNoteHashes(ctx)
+			}
+		}()
+	}
+
+	// Spawn 2 concurrent writers
+	for i := 0; i < 2; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			for j := 0; j < 3; j++ {
+				slug := fmt.Sprintf("note-conc-%d-%d", id, j)
+				chunks := []store.ChunkRecord{
+					{
+						ID:         slug + ":0",
+						NoteSlug:   slug,
+						Title:      "Conc Note",
+						FilePath:   slug + ".md",
+						ChunkIndex: 0,
+						Text:       "concurrent text",
+						Embedding:  []float32{0.5, 0.5, 0.0},
+					},
+				}
+				_ = st.UpsertChunks(ctx, chunks)
+				_ = st.UpsertLinks(ctx, slug, []string{"note-a"})
+			}
+		}(i)
+	}
+
+	wg.Wait()
 }

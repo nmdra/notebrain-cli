@@ -39,6 +39,12 @@ type NoteContent struct {
 // SemanticSearch finds the most similar chunks to queryVec.
 // Returns deduplicated chunks retaining up to topKPerNote chunks per note.
 func (s *Store) SemanticSearch(ctx context.Context, queryVec []float32, limit int, topKPerNote int, whereFilter chroma.WhereFilter, includeText bool) ([]Result, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.semanticSearch(ctx, queryVec, limit, topKPerNote, whereFilter, includeText)
+}
+
+func (s *Store) semanticSearch(ctx context.Context, queryVec []float32, limit int, topKPerNote int, whereFilter chroma.WhereFilter, includeText bool) ([]Result, error) {
 	// Fetch enough results to allow top-K deduplication across chunks
 	includes := []chroma.Include{chroma.IncludeMetadatas, chroma.IncludeDistances}
 	if includeText {
@@ -71,6 +77,8 @@ func (s *Store) SemanticSearch(ctx context.Context, queryVec []float32, limit in
 // GetNoteHashes fetches the content_hash for all notes by reading chunk_index=0.
 // Returns a map of note_slug -> content_hash.
 func (s *Store) GetNoteHashes(ctx context.Context) (map[string]string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	res, err := s.chunks.Get(ctx,
 		chroma.WithWhere(chroma.EqInt("chunk_index", 0)),
 		chroma.WithInclude(chroma.IncludeMetadatas),
@@ -94,6 +102,8 @@ func (s *Store) GetNoteHashes(ctx context.Context) (map[string]string, error) {
 
 // Backlinks returns all notes that link TO targetSlug.
 func (s *Store) Backlinks(ctx context.Context, targetSlug string) ([]Result, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	res, err := s.links.Get(ctx,
 		chroma.WithWhere(chroma.EqString("target_slug", targetSlug)),
 		chroma.WithInclude(chroma.IncludeMetadatas),
@@ -128,6 +138,8 @@ func (s *Store) Backlinks(ctx context.Context, targetSlug string) ([]Result, err
 // Connections finds notes reachable from seedSlug within maxHops.
 // BFS implemented in Go (no recursive SQL needed).
 func (s *Store) Connections(ctx context.Context, seedSlug string, maxHops int) ([]Result, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	visited := map[string]int{seedSlug: 0} // slug → hop count
 	frontier := []string{seedSlug}
 
@@ -192,12 +204,14 @@ func (s *Store) Connections(ctx context.Context, seedSlug string, maxHops int) (
 // HiddenConnections finds notes semantically similar to queryVec
 // but NOT already linked to/from seedSlug.
 func (s *Store) HiddenConnections(ctx context.Context, queryVec []float32, seedSlug string, limit int, includeText bool) ([]Result, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	// 1. Collect all slugs already linked to/from seed
 	linked := s.linkedSlugs(ctx, seedSlug)
 	linked[seedSlug] = true
 
 	// 2. Wide semantic search
-	candidates, err := s.SemanticSearch(ctx, queryVec, limit*5, 1, nil, includeText)
+	candidates, err := s.semanticSearch(ctx, queryVec, limit*5, 1, nil, includeText)
 	if err != nil {
 		return nil, err
 	}
@@ -220,6 +234,8 @@ func (s *Store) HiddenConnections(ctx context.Context, queryVec []float32, seedS
 
 // SharedTags finds notes sharing at least minShared tags with noteSlug.
 func (s *Store) SharedTags(ctx context.Context, noteSlug string, minShared int) ([]Result, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	// 1. Get tags of the seed note (from its first chunk)
 	seedTags := s.tagsForNote(ctx, noteSlug)
 	if len(seedTags) == 0 {
@@ -289,6 +305,8 @@ func TagWhereClause(tag string) chroma.WhereClause {
 
 // TagSearch finds notes that match a specific tag name.
 func (s *Store) TagSearch(ctx context.Context, tag string, limit int, whereFilter chroma.WhereFilter, includeText bool) ([]Result, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	filter := CombineWhereFilters(TagWhereClause(tag), whereFilter)
 
 	includes := []chroma.Include{chroma.IncludeMetadatas}
@@ -312,9 +330,11 @@ func (s *Store) TagSearch(ctx context.Context, tag string, limit int, whereFilte
 // GraphBoostedSearch runs semantic search, then boosts scores of notes
 // directly linked to/from seedSlug.
 func (s *Store) GraphBoostedSearch(ctx context.Context, queryVec []float32, seedSlug string, boost float64, limit int, includeText bool) ([]Result, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	linked := s.linkedSlugs(ctx, seedSlug)
 
-	candidates, err := s.SemanticSearch(ctx, queryVec, limit*3, 1, nil, includeText)
+	candidates, err := s.semanticSearch(ctx, queryVec, limit*3, 1, nil, includeText)
 	if err != nil {
 		return nil, err
 	}
@@ -574,6 +594,8 @@ func decodeTags(m chroma.DocumentMetadata) []string {
 
 // GetNote retrieves all chunks of a note and reconstructs its complete content.
 func (s *Store) GetNote(ctx context.Context, slugOrPath string) (*NoteContent, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	res, err := s.chunks.Get(ctx,
 		chroma.WithWhere(chroma.Or(
 			chroma.EqString("note_slug", slugOrPath),
@@ -641,6 +663,12 @@ type ChunkWindow struct {
 
 // GetChunkWindow fetches ±windowSize adjacent chunks around the given chunk index.
 func (s *Store) GetChunkWindow(ctx context.Context, noteSlug string, chunkIndex int, windowSize int) (*ChunkWindow, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.getChunkWindow(ctx, noteSlug, chunkIndex, windowSize)
+}
+
+func (s *Store) getChunkWindow(ctx context.Context, noteSlug string, chunkIndex int, windowSize int) (*ChunkWindow, error) {
 	if windowSize <= 0 {
 		return nil, nil
 	}
@@ -694,8 +722,10 @@ func (s *Store) PopulateContext(ctx context.Context, results []Result, windowSiz
 	if windowSize <= 0 {
 		return
 	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	for i := range results {
-		window, err := s.GetChunkWindow(ctx, results[i].NoteSlug, results[i].ChunkIndex, windowSize)
+		window, err := s.getChunkWindow(ctx, results[i].NoteSlug, results[i].ChunkIndex, windowSize)
 		if err == nil && window != nil {
 			results[i].Context = window.Texts
 		}
