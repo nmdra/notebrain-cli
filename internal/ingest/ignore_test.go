@@ -80,3 +80,19 @@ func TestIsExcluded(t *testing.T) {
 		})
 	}
 }
+
+func BenchmarkIsExcluded(b *testing.B) {
+	filters := []string{
+		"Archive",
+		"Templates/",
+		"*.pdf",
+		"**/drafts",
+		"99.Storage-Shed/Attachments",
+	}
+	path := "Projects/2026/drafts/subfolder/deep/idea.md"
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = ingest.IsExcluded(path, filters)
+	}
+}

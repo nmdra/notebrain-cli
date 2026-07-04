@@ -14,6 +14,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unicode/utf8"
 
 	"github.com/nmdra/notebrain-cli/internal/parser"
 	"github.com/nmdra/notebrain-cli/internal/store"
@@ -76,17 +77,17 @@ func (p *Pipeline) Run(ctx context.Context, vaultPath string, glob string, stdin
 	}
 
 	// Identify notes that are in the database but no longer exist on disk
-	validSlugs := make(map[string]bool)
+	validSlugs := make(map[string]struct{}, len(files))
 	for _, file := range files {
 		rel, err := filepath.Rel(vaultPath, file)
 		if err == nil {
-			validSlugs[parser.Slugify(rel)] = true
+			validSlugs[parser.Slugify(rel)] = struct{}{}
 		}
 	}
 
-	var staleSlugs []string
+	staleSlugs := make([]string, 0, len(hashes))
 	for slug := range hashes {
-		if !validSlugs[slug] {
+		if _, ok := validSlugs[slug]; !ok {
 			staleSlugs = append(staleSlugs, slug)
 		}
 	}
@@ -116,7 +117,7 @@ func (p *Pipeline) Run(ctx context.Context, vaultPath string, glob string, stdin
 	sem := make(chan struct{}, p.workers)
 
 	var mu sync.Mutex
-	var ingestResults []store.BatchIngestData
+	ingestResults := make([]store.BatchIngestData, 0, len(files))
 
 fileLoop:
 	for _, file := range files {
@@ -208,6 +209,12 @@ func (p *Pipeline) collectFiles(vaultPath, glob string) ([]string, error) {
 		}
 
 		if rel != "." {
+			if strings.HasPrefix(d.Name(), ".") {
+				if d.IsDir() {
+					return filepath.SkipDir
+				}
+				return nil
+			}
 			if IsExcluded(rel, excluded) {
 				if d.IsDir() {
 					return filepath.SkipDir
@@ -217,9 +224,6 @@ func (p *Pipeline) collectFiles(vaultPath, glob string) ([]string, error) {
 		}
 
 		if d.IsDir() {
-			if strings.HasPrefix(d.Name(), ".") {
-				return filepath.SkipDir
-			}
 			return nil
 		}
 		if filepath.Ext(path) == ".md" {
@@ -278,7 +282,7 @@ func (p *Pipeline) processFile(ctx context.Context, vaultPath string, filePath s
 	// Filter chunks: discard those below the minimum word threshold.
 	// For code-only chunks (where Text is only placeholders), check word count
 	// against RichText so code notes are preserved.
-	var validChunks []parser.ASTChunk
+	validChunks := make([]parser.ASTChunk, 0, len(astRes.Chunks))
 	for _, c := range astRes.Chunks {
 		storedText := c.RichText
 		if storedText == "" {
@@ -351,7 +355,7 @@ func (p *Pipeline) processFile(ctx context.Context, vaultPath string, filePath s
 // estimateTokens returns a conservative rough token count for English/mixed text.
 // Based on empirical ratio: ~4 runes per token for MiniLM tokenizer.
 func estimateTokens(text string) int {
-	return (len([]rune(text)) + 3) / 4
+	return (utf8.RuneCountInString(text) + 3) / 4
 }
 
 // buildEmbedText constructs contextual embedding text with a token budget guard.
@@ -381,6 +385,7 @@ func buildEmbedText(title, headingPath string, tags []string, chunkText string, 
 	prefixBudget := maxTokens - bodyTokens - 2
 
 	var sb strings.Builder
+	sb.Grow(len(title) + len(headingPath) + len(chunkText) + 64)
 
 	if prefixBudget > 0 {
 		bcTokens := estimateTokens(breadcrumb)

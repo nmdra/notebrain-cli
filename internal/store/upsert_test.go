@@ -2,6 +2,7 @@ package store_test
 
 import (
 	"context"
+	"strconv"
 	"testing"
 	"time"
 
@@ -217,5 +218,25 @@ func TestBatchIngest(t *testing.T) {
 	// Total: chunks = 2 (note-a:0, note-c:0), links = 1 (note-a -> note-c)
 	if stats["chunks"] != 2 || stats["links"] != 1 {
 		t.Errorf("Expected 2 chunks, 1 link after updates/delete, got %v", stats)
+	}
+}
+
+func BenchmarkUpsertLinks(b *testing.B) {
+	ctx := context.Background()
+	st, err := store.Open(ctx, b.TempDir())
+	if err != nil {
+		b.Fatalf("Open failed: %v", err)
+	}
+	defer func() { _ = st.Close() }()
+
+	links := make([]string, 100)
+	for i := 0; i < 100; i++ {
+		links[i] = "target-note-" + strconv.Itoa(i)
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = st.UpsertLinks(ctx, "bench-note", links)
 	}
 }

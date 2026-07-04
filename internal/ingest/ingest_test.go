@@ -284,3 +284,24 @@ func TestPipeline_CodeOnlyNoteIngest(t *testing.T) {
 		t.Errorf("Expected 1 chunk for code-only note, got %d", stats["chunks"])
 	}
 }
+
+func BenchmarkEstimateTokens(b *testing.B) {
+	text := strings.Repeat("This is a test sentence for token estimation in NoteBrain. ", 50)
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = estimateTokens(text)
+	}
+}
+
+func BenchmarkBuildEmbedText(b *testing.B) {
+	title := "System Architecture and Data Flow"
+	heading := "Internal Components > Ingestion Pipeline"
+	tags := []string{"architecture", "golang", "chromadb", "embeddings"}
+	body := strings.Repeat("The ingestion pipeline tokenizes markdown notes and stores them into ChromaDB vectors. ", 10)
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = buildEmbedText(title, heading, tags, body, 256)
+	}
+}

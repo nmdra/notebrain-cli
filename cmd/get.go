@@ -53,7 +53,7 @@ func (c *GetCmd) Run(globals *Globals) error {
 			fmt.Println(metaStyle.Render("Path:   " + note.FilePath))
 		}
 		if len(note.Tags) > 0 {
-			var chips []string
+			chips := make([]string, 0, len(note.Tags))
 			for _, t := range note.Tags {
 				chips = append(chips, "#"+t)
 			}

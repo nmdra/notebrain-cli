@@ -5,6 +5,8 @@
 package parser
 
 import (
+	"reflect"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -156,12 +158,15 @@ Some other text.
 				t.Errorf("got %d chunks, want %d", len(res.Chunks), tt.wantChunks)
 			}
 
-			// Simple check for tags (order doesn't matter, but let's just do a basic presence check)
-			if len(res.Tags) != len(tt.wantTags) {
-				t.Errorf("got %d tags (%v), want %d (%v)", len(res.Tags), res.Tags, len(tt.wantTags), tt.wantTags)
+			sort.Strings(res.Tags)
+			sort.Strings(tt.wantTags)
+			if !reflect.DeepEqual(res.Tags, tt.wantTags) {
+				t.Errorf("got tags %v, want %v", res.Tags, tt.wantTags)
 			}
-			if len(res.Links) != len(tt.wantLinks) {
-				t.Errorf("got %d links, want %d", len(res.Links), len(tt.wantLinks))
+			sort.Strings(res.Links)
+			sort.Strings(tt.wantLinks)
+			if !reflect.DeepEqual(res.Links, tt.wantLinks) {
+				t.Errorf("got links %v, want %v", res.Links, tt.wantLinks)
 			}
 
 			if tt.wantTitle != "" {
@@ -216,5 +221,29 @@ func TestBuildChunks_CodeOnlyChunk(t *testing.T) {
 	}
 	if !found {
 		t.Error("expected a chunk with code blocks")
+	}
+}
+
+func BenchmarkParseAST(b *testing.B) {
+	body := `---
+title: "Benchmark Note"
+tags: [alpha, beta, gamma]
+---
+
+# Introduction
+This is a long introductory paragraph that contains [[WikiLink1]] and [[WikiLink2]] as well as some inline #hashtags like #golang and #performance.
+
+## Subsection 1
+Here is a paragraph with more text and another sentence. We want to test how fast the AST parser can tokenize, extract metadata, and chunk this document into smaller pieces.
+
+` + "```go\nfunc main() {\n\tfmt.Println(\"Hello, World!\")\n}\n```" + `
+
+## Subsection 2
+Final concluding paragraph with some more prose.
+`
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = ParseAST(body, "benchmark-note", 800, 100)
 	}
 }

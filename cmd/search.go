@@ -71,7 +71,7 @@ func (c *SearchCmd) Run(globals *Globals) error {
 			return fmt.Errorf("interactive mode requires a TTY terminal; use --format json or remove --interactive")
 		}
 		// Build the chroma where-filter once (same logic as static path).
-		var filters []chroma.WhereClause
+		filters := make([]chroma.WhereClause, 0, 4)
 		if c.Section != "" {
 			filters = append(filters, chroma.EqString("heading_path", c.Section))
 		}
@@ -122,7 +122,7 @@ func (c *SearchCmd) Run(globals *Globals) error {
 	}
 
 	// ── Static non-interactive search ──────────────────────────────────────
-	var filters []chroma.WhereClause
+	filters := make([]chroma.WhereClause, 0, 4)
 	if c.Section != "" {
 		filters = append(filters, chroma.EqString("heading_path", c.Section))
 	}

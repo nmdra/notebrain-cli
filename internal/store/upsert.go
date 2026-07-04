@@ -64,7 +64,7 @@ func (s *Store) BatchIngest(ctx context.Context, data []BatchIngestData, staleSl
 	defer s.mu.Unlock()
 
 	// 1. Gather all slugs we need to delete from the index
-	var slugsToClean []string
+	slugsToClean := make([]string, 0, len(staleSlugs)+len(data))
 	slugsToClean = append(slugsToClean, staleSlugs...)
 	for _, d := range data {
 		slugsToClean = append(slugsToClean, d.NoteSlug)
@@ -80,7 +80,7 @@ func (s *Store) BatchIngest(ctx context.Context, data []BatchIngestData, staleSl
 			}
 			batchSlugs := slugsToClean[i:end]
 
-			var filters []chroma.WhereClause
+			filters := make([]chroma.WhereClause, 0, len(batchSlugs))
 			for _, slug := range batchSlugs {
 				filters = append(filters, chroma.EqString("note_slug", slug))
 			}
@@ -109,7 +109,7 @@ func (s *Store) BatchIngest(ctx context.Context, data []BatchIngestData, staleSl
 			}
 
 			// Fetch existing links IDs (links metadata uses source_slug instead of note_slug)
-			var linksFilters []chroma.WhereClause
+			linksFilters := make([]chroma.WhereClause, 0, len(batchSlugs))
 			for _, slug := range batchSlugs {
 				linksFilters = append(linksFilters, chroma.EqString("source_slug", slug))
 			}
@@ -138,7 +138,11 @@ func (s *Store) BatchIngest(ctx context.Context, data []BatchIngestData, staleSl
 	}
 
 	// 3. Batch upsert new chunks
-	var allChunks []ChunkRecord
+	totalChunks := 0
+	for _, d := range data {
+		totalChunks += len(d.ChunkRecords)
+	}
+	allChunks := make([]ChunkRecord, 0, totalChunks)
 	for _, d := range data {
 		allChunks = append(allChunks, d.ChunkRecords...)
 	}
@@ -249,16 +253,19 @@ func (s *Store) UpsertLinks(ctx context.Context, noteSlug string, links []string
 // upsertLinks is the unlocked implementation. Caller must hold s.mu.
 func (s *Store) upsertLinks(ctx context.Context, noteSlug string, links []string) error {
 	// Deduplicate links
-	var uniqueLinks []string
-	seenSlugs := make(map[string]bool)
-	targetSlugMap := make(map[string]string) // original -> slug
+	uniqueLinks := make([]string, 0, len(links))
+	seenSlugs := make(map[string]struct{}, len(links))
+	targetSlugMap := make(map[string]string, len(links)) // original -> slug
 
 	for _, l := range links {
 		targetSlug := parser.Slugify(l)
-		if targetSlug == "" || seenSlugs[targetSlug] {
+		if targetSlug == "" {
 			continue
 		}
-		seenSlugs[targetSlug] = true
+		if _, ok := seenSlugs[targetSlug]; ok {
+			continue
+		}
+		seenSlugs[targetSlug] = struct{}{}
 		uniqueLinks = append(uniqueLinks, l)
 		targetSlugMap[l] = targetSlug
 	}
@@ -273,13 +280,11 @@ func (s *Store) upsertLinks(ctx context.Context, noteSlug string, links []string
 	}
 
 	// 2. Identify stale links to delete
-	var staleIDs []chroma.DocumentID
+	staleIDs := make([]chroma.DocumentID, 0, len(existing.GetIDs()))
 	for _, docID := range existing.GetIDs() {
 		// docID format: source_slug + "→" + target_slug
-		parts := strings.Split(string(docID), "→")
-		if len(parts) == 2 {
-			tgtSlug := parts[1]
-			if !seenSlugs[tgtSlug] {
+		if _, tgtSlug, ok := strings.Cut(string(docID), "→"); ok {
+			if _, seen := seenSlugs[tgtSlug]; !seen {
 				staleIDs = append(staleIDs, docID)
 			}
 		}

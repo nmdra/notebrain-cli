@@ -3,7 +3,9 @@ package parser
 import (
 	"bytes"
 	"fmt"
+	"log/slog"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"
@@ -72,7 +74,7 @@ func ParseAST(body, noteSlug string, maxChunkRunes, overlapRunes int) ASTResult 
 	tagsSet := make(map[string]struct{})
 	linksSet := make(map[string]struct{})
 
-	_ = ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+	if err := ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
 		if !entering {
 			return ast.WalkContinue, nil
 		}
@@ -85,18 +87,20 @@ func ParseAST(body, noteSlug string, maxChunkRunes, overlapRunes int) ASTResult 
 		}
 
 		return ast.WalkContinue, nil
-	})
+	}); err != nil {
+		slog.Warn("ast walk encountered error during tag/link extraction", "err", err)
+	}
 
 	fmTags := extractFrontmatterTags(frontmatter)
 	for _, t := range fmTags {
 		tagsSet[t] = struct{}{}
 	}
 
-	var tags []string
+	tags := make([]string, 0, len(tagsSet))
 	for t := range tagsSet {
 		tags = append(tags, t)
 	}
-	var links []string
+	links := make([]string, 0, len(linksSet))
 	for l := range linksSet {
 		links = append(links, l)
 	}
@@ -139,7 +143,7 @@ func extractSections(doc ast.Node, src []byte) []section {
 		}
 	}
 
-	_ = ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+	if err := ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
 		if !entering {
 			return ast.WalkContinue, nil
 		}
@@ -155,7 +159,7 @@ func extractSections(doc ast.Node, src []byte) []section {
 			for i := lvl + 1; i <= 6; i++ {
 				headingStack[i] = ""
 			}
-			var parts []string
+			parts := make([]string, 0, lvl)
 			for i := 1; i <= lvl; i++ {
 				if headingStack[i] != "" {
 					parts = append(parts, headingStack[i])
@@ -223,7 +227,9 @@ func extractSections(doc ast.Node, src []byte) []section {
 		}
 
 		return ast.WalkContinue, nil
-	})
+	}); err != nil {
+		slog.Warn("ast walk encountered error during section extraction", "err", err)
+	}
 
 	if current != nil && len(current.blocks) > 0 {
 		sections = append(sections, *current)
@@ -262,7 +268,7 @@ func formatChunkText(raw string, infos []codeBlockInfo, rich bool) string {
 }
 
 func buildChunks(sections []section, noteSlug string, maxRunes, overlapRunes int) []ASTChunk {
-	var chunks []ASTChunk
+	chunks := make([]ASTChunk, 0, len(sections))
 	idx := 0
 
 	for _, sec := range sections {
@@ -298,8 +304,7 @@ func buildChunks(sections []section, noteSlug string, maxRunes, overlapRunes int
 		cleanText := formatChunkText(rawText, codeInfos, false)
 		richText := formatChunkText(rawText, codeInfos, true)
 
-		runes := []rune(cleanText)
-		if maxRunes <= 0 || len(runes) <= maxRunes {
+		if maxRunes <= 0 || utf8.RuneCountInString(cleanText) <= maxRunes {
 			chunks = append(chunks, ASTChunk{
 				NoteSlug:    noteSlug,
 				Index:       idx,
@@ -344,7 +349,7 @@ func buildChunks(sections []section, noteSlug string, maxRunes, overlapRunes int
 // overlapRunes runes from the previous part are repeated at the start of each new part
 // to preserve sentence-level continuity across sub-chunk boundaries.
 func splitAtBoundary(runes []rune, maxRunes, overlapRunes int) []string {
-	var parts []string
+	parts := make([]string, 0, (len(runes)/maxRunes)+1)
 	start := 0
 	for start < len(runes) {
 		end := start + maxRunes
@@ -379,7 +384,7 @@ func splitAtBoundary(runes []rune, maxRunes, overlapRunes int) []string {
 
 func extractText(n ast.Node, src []byte) string {
 	var buf bytes.Buffer
-	_ = ast.Walk(n, func(node ast.Node, entering bool) (ast.WalkStatus, error) {
+	if err := ast.Walk(n, func(node ast.Node, entering bool) (ast.WalkStatus, error) {
 		if !entering {
 			return ast.WalkContinue, nil
 		}
@@ -399,7 +404,9 @@ func extractText(n ast.Node, src []byte) string {
 			}
 		}
 		return ast.WalkContinue, nil
-	})
+	}); err != nil {
+		slog.Warn("ast walk encountered error during text extraction", "err", err)
+	}
 	return strings.TrimSpace(buf.String())
 }
 
@@ -424,7 +431,7 @@ func isOnlyHashtags(n ast.Node, src []byte) bool {
 	onlyHashtags := true
 	hasHashtags := false
 
-	_ = ast.Walk(n, func(node ast.Node, entering bool) (ast.WalkStatus, error) {
+	if err := ast.Walk(n, func(node ast.Node, entering bool) (ast.WalkStatus, error) {
 		if !entering {
 			return ast.WalkContinue, nil
 		}
@@ -448,7 +455,9 @@ func isOnlyHashtags(n ast.Node, src []byte) bool {
 			return ast.WalkStop, nil
 		}
 		return ast.WalkContinue, nil
-	})
+	}); err != nil {
+		slog.Warn("ast walk encountered error during hashtag check", "err", err)
+	}
 
 	return hasHashtags && onlyHashtags
 }
@@ -479,6 +488,7 @@ func extractFrontmatterTags(fm map[string]interface{}) []string {
 		} else {
 			parts = strings.Fields(val)
 		}
+		tags = make([]string, 0, len(parts))
 		for _, p := range parts {
 			t := strings.TrimSpace(p)
 			t = strings.TrimPrefix(t, "#")
@@ -487,6 +497,7 @@ func extractFrontmatterTags(fm map[string]interface{}) []string {
 			}
 		}
 	case []interface{}:
+		tags = make([]string, 0, len(val))
 		for _, item := range val {
 			if s, ok := item.(string); ok {
 				t := strings.TrimSpace(s)
@@ -497,6 +508,7 @@ func extractFrontmatterTags(fm map[string]interface{}) []string {
 			}
 		}
 	case []string:
+		tags = make([]string, 0, len(val))
 		for _, s := range val {
 			t := strings.TrimSpace(s)
 			t = strings.TrimPrefix(t, "#")

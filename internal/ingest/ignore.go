@@ -2,6 +2,8 @@ package ingest
 
 import (
 	"encoding/json"
+	"errors"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,10 +20,14 @@ type ObsidianAppConfig struct {
 func LoadExcludedPaths(vaultPath string) []string {
 	data, err := os.ReadFile(filepath.Join(vaultPath, ".obsidian", "app.json"))
 	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			slog.Warn("failed to read .obsidian/app.json", "vault_path", vaultPath, "err", err)
+		}
 		return nil
 	}
 	var config ObsidianAppConfig
 	if err := json.Unmarshal(data, &config); err != nil {
+		slog.Warn("failed to parse .obsidian/app.json", "vault_path", vaultPath, "err", err)
 		return nil
 	}
 	filters := config.UserIgnoreFilters
@@ -57,9 +63,14 @@ func matchPathOrSegments(path, pattern string) bool {
 	if matched, _ := filepath.Match(pattern, path); matched {
 		return true
 	}
-	for _, segment := range strings.Split(path, "/") {
-		if matched, _ := filepath.Match(pattern, segment); matched {
-			return true
+	remaining := path
+	for len(remaining) > 0 {
+		var segment string
+		segment, remaining, _ = strings.Cut(remaining, "/")
+		if segment != "" {
+			if matched, _ := filepath.Match(pattern, segment); matched {
+				return true
+			}
 		}
 	}
 	return false

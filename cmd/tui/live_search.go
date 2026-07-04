@@ -142,7 +142,8 @@ func NewLiveSearch(searchFn SearchFunc, vaultName string, limit int, initialQuer
 // ─── Init ─────────────────────────────────────────────────────────
 
 func (m LiveSearchModel) Init() tea.Cmd {
-	cmds := []tea.Cmd{textinput.Blink}
+	cmds := make([]tea.Cmd, 0, 2)
+	cmds = append(cmds, textinput.Blink)
 	// If a pre-populated query was provided, trigger an immediate search.
 	if q := m.input.Value(); q != "" {
 		cmds = append(cmds, m.triggerSearch(q, 0))
