@@ -15,23 +15,25 @@ import (
 
 // Globals holds shared configuration available to all subcommands.
 type Globals struct {
-	ChromaPath     string  `help:"path to ChromaDB persistent storage" default:"~/.notebrain/chroma"`
-	VaultPath      string  `name:"vault-path" help:"Obsidian vault path (also used as vault name fallback)"`
-	VaultName      string  `name:"vault-name" help:"Obsidian vault name (for URI links, defaults to basename of vault-path)"`
-	Verbose        bool    `help:"enable verbose output"`
-	NoHyperlinks   bool    `help:"Disable OSC 8 terminal hyperlinks in output"`
-	Format         string  `help:"output format" enum:"text,json,tsv,ndjson" default:"text"`
-	JSONPath       string  `name:"jsonpath" help:"extract specific fields from JSON output using a JSONPath expression (e.g. '$.results[0].note_slug')"`
-	IncludeText    bool    `help:"include matched chunk text in structured output"`
-	ContextWindow  int     `name:"context-window" help:"fetch ±N adjacent chunks around each match for context" default:"0"`
-	MinScore       float64 `help:"suppress results below this similarity score (0–1)" default:"0"`
-	RespectExclude bool    `help:"respect Obsidian userIgnoreFilters and attachmentFolderPath settings during ingest" default:"true"`
-	UseEditor      bool    `help:"enable external editor ($EDITOR) integration as default open type" default:"false"`
-	LogFormat      string  `name:"log-format" help:"log output format (auto, json, text)" default:"auto"`
-	LogLevel       string  `name:"log-level" help:"minimum log severity (info, debug, warn, error)" default:"info"`
+	ChromaPath     string           `help:"path to ChromaDB persistent storage" default:"~/.notebrain/chroma"`
+	VaultPath      string           `name:"vault-path" help:"Obsidian vault path (also used as vault name fallback)"`
+	VaultName      string           `name:"vault-name" help:"Obsidian vault name (for URI links, defaults to basename of vault-path)"`
+	Verbose        bool             `help:"enable verbose output"`
+	NoHyperlinks   bool             `help:"Disable OSC 8 terminal hyperlinks in output"`
+	Format         string           `help:"output format" enum:"text,json,tsv,ndjson" default:"text"`
+	JSONPath       string           `name:"jsonpath" help:"extract specific fields from JSON output using a JSONPath expression (e.g. '$.results[0].note_slug')"`
+	IncludeText    bool             `help:"include matched chunk text in structured output"`
+	ContextWindow  int              `name:"context-window" help:"fetch ±N adjacent chunks around each match for context" default:"0"`
+	MinScore       float64          `help:"suppress results below this similarity score (0–1)" default:"0"`
+	RespectExclude bool             `help:"respect Obsidian userIgnoreFilters and attachmentFolderPath settings during ingest" default:"true"`
+	UseEditor      bool             `help:"enable external editor ($EDITOR) integration as default open type" default:"false"`
+	LogFormat      string           `name:"log-format" help:"log output format (auto, json, text)" default:"auto"`
+	LogLevel       string           `name:"log-level" help:"minimum log severity (info, debug, warn, error)" default:"info"`
+	Version        kong.VersionFlag `name:"version" help:"Show version information"`
 
 	// Internal fields, not exposed as flags
-	Ctx context.Context `kong:"-"`
+	Ctx           context.Context `kong:"-"`
+	VersionString string          `kong:"-"`
 
 	Config kong.ConfigFlag `help:"Path to config file" default:"~/.notebrain/config/config.toml"`
 }
@@ -50,20 +52,24 @@ type CLI struct {
 	Stats       StatsCmd       `cmd:"" help:"Show collection statistics"`
 	Get         GetCmd         `cmd:"" help:"Fetch complete note content by slug or path"`
 	Reset       ResetCmd       `cmd:"" help:"Reset the ChromaDB collections"`
+	Version     VersionCmd     `cmd:"" help:"Show version information"`
 }
 
 // ParseAndRun parses CLI arguments and runs the selected subcommand.
-func ParseAndRun(ctx context.Context) error {
+func ParseAndRun(ctx context.Context, version, commit, date string) error {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		home = "."
 	}
 	defaultChromaPath := filepath.Join(home, ".notebrain", "chroma")
 
+	versionStr := fmt.Sprintf("notebrain %s (commit: %s, built: %s)", version, commit, date)
+
 	cli := CLI{
 		Globals: Globals{
-			ChromaPath: defaultChromaPath,
-			Ctx:        ctx,
+			ChromaPath:    defaultChromaPath,
+			Ctx:           ctx,
+			VersionString: versionStr,
 		},
 	}
 
@@ -95,6 +101,7 @@ Examples:
 			Summary: false,
 		}),
 		kong.Configuration(configfile.IgnoreMissingFileLoader(configfile.TOMLResolver)),
+		kong.Vars{"version": versionStr},
 	)
 
 	setupLogger(cli.LogFormat, cli.LogLevel)

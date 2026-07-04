@@ -2,7 +2,7 @@
 
 # Build with embedded persistent client (requires CGO)
 build:
-	CGO_ENABLED=1 go build -o notebrain .
+	CGO_ENABLED=1 go build -ldflags="-s -w -X main.version=$$(git describe --tags --always --dirty 2>/dev/null || echo dev) -X main.commit=$$(git rev-parse --short HEAD 2>/dev/null || echo none) -X main.date=$$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o notebrain .
 
 # Run all tests
 test:

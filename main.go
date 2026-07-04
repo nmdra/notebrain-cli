@@ -25,13 +25,27 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"runtime/debug"
 
 	"github.com/nmdra/notebrain-cli/cmd"
 )
 
+// Populated automatically by GoReleaser during git tag builds:
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
+
 func main() {
+	if version == "dev" {
+		if info, ok := debug.ReadBuildInfo(); ok && info.Main.Version != "" && info.Main.Version != "(devel)" {
+			version = info.Main.Version
+		}
+	}
+
 	ctx := context.Background()
-	if err := cmd.ParseAndRun(ctx); err != nil {
+	if err := cmd.ParseAndRun(ctx, version, commit, date); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
