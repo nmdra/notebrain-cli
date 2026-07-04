@@ -294,3 +294,76 @@ func TestSemanticSearch_TopKDeduplication(t *testing.T) {
 		t.Errorf("Expected exactly 2 chunks for note 'multi' with topK=2, got %d", count)
 	}
 }
+
+func TestGetChunkWindow(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatalf("Open failed: %v", err)
+	}
+	defer func() { _ = st.Close() }()
+
+	chunks := []store.ChunkRecord{
+		{
+			ID:         "win:0",
+			NoteSlug:   "win",
+			Title:      "Window Note",
+			FilePath:   "win.md",
+			ChunkIndex: 0,
+			Text:       "chunk zero",
+			Embedding:  []float32{1.0, 0.0, 0.0},
+		},
+		{
+			ID:         "win:1",
+			NoteSlug:   "win",
+			Title:      "Window Note",
+			FilePath:   "win.md",
+			ChunkIndex: 1,
+			Text:       "chunk one",
+			Embedding:  []float32{1.0, 0.0, 0.0},
+		},
+		{
+			ID:         "win:2",
+			NoteSlug:   "win",
+			Title:      "Window Note",
+			FilePath:   "win.md",
+			ChunkIndex: 2,
+			Text:       "chunk two",
+			Embedding:  []float32{1.0, 0.0, 0.0},
+		},
+		{
+			ID:         "win:3",
+			NoteSlug:   "win",
+			Title:      "Window Note",
+			FilePath:   "win.md",
+			ChunkIndex: 3,
+			Text:       "chunk three",
+			Embedding:  []float32{1.0, 0.0, 0.0},
+		},
+	}
+	if err := st.UpsertChunks(ctx, chunks); err != nil {
+		t.Fatalf("UpsertChunks failed: %v", err)
+	}
+
+	win, err := st.GetChunkWindow(ctx, "win", 1, 1)
+	if err != nil {
+		t.Fatalf("GetChunkWindow failed: %v", err)
+	}
+	if win == nil || win.MatchedIndex != 1 {
+		t.Fatalf("Expected window for matched index 1, got %v", win)
+	}
+	if len(win.Texts) != 3 {
+		t.Fatalf("Expected 3 texts in window, got %d: %v", len(win.Texts), win.Texts)
+	}
+	if win.Texts[0] != "chunk zero" || win.Texts[1] != "chunk one" || win.Texts[2] != "chunk two" {
+		t.Errorf("Unexpected window texts: %v", win.Texts)
+	}
+
+	res := []store.Result{
+		{NoteSlug: "win", ChunkIndex: 1},
+	}
+	st.PopulateContext(ctx, res, 1)
+	if len(res[0].Context) != 3 {
+		t.Fatalf("Expected PopulateContext to fill 3 texts, got %d", len(res[0].Context))
+	}
+}

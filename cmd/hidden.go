@@ -62,6 +62,7 @@ func (c *HiddenCmd) Run(globals *Globals) error {
 	if err != nil {
 		return err
 	}
+	st.PopulateContext(ctx, results, globals.ContextWindow)
 
 	printResultsFormatted("hidden", fmt.Sprintf("Hidden connections for: %q (slug: %s)", targetNote, targetSlug), results, globals)
 	return nil

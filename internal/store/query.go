@@ -16,10 +16,12 @@ type Result struct {
 	Title       string   `json:"title"`
 	FilePath    string   `json:"file_path"`
 	Score       float64  `json:"score"`
+	ChunkIndex  int      `json:"chunk_index,omitempty"`
 	Tags        []string `json:"tags,omitempty"`
 	Extra       string   `json:"extra,omitempty"` // e.g. shared tags, hop count
 	HeadingPath string   `json:"heading_path,omitempty"`
-	Text        string   `json:"text,omitempty"` // populated only when include-text is requested
+	Text        string   `json:"text,omitempty"`    // populated only when include-text is requested
+	Context     []string `json:"context,omitempty"` // adjacent chunks when windowing is enabled
 }
 
 // NoteContent represents the complete reconstructed text and metadata of a note.
@@ -549,14 +551,19 @@ func metaString(m chroma.DocumentMetadata, key string) string {
 	return ""
 }
 
+// metaInt safely reads an int from a DocumentMetadata.
+func metaInt(m chroma.DocumentMetadata, key string) int {
+	if c, ok := m.GetInt(key); ok {
+		return int(c)
+	} else if c, ok := m.GetFloat(key); ok {
+		return int(c)
+	}
+	return 0
+}
+
 // decodeTags reads tag_0, tag_1, … from metadata back into a []string.
 func decodeTags(m chroma.DocumentMetadata) []string {
-	count := 0
-	if c, ok := m.GetInt("tag_count"); ok {
-		count = int(c)
-	} else if c, ok := m.GetFloat("tag_count"); ok {
-		count = int(c)
-	}
+	count := metaInt(m, "tag_count")
 	tags := make([]string, 0, count)
 	for i := 0; i < count; i++ {
 		key := fmt.Sprintf("tag_%d", i)
@@ -591,12 +598,7 @@ func (s *Store) GetNote(ctx context.Context, slugOrPath string) (*NoteContent, e
 	}
 	var chunks []chunkInfo
 	for i, m := range metas {
-		idx := 0
-		if c, ok := m.GetInt("chunk_index"); ok {
-			idx = int(c)
-		} else if c, ok := m.GetFloat("chunk_index"); ok {
-			idx = int(c)
-		}
+		idx := metaInt(m, "chunk_index")
 		txt := ""
 		if len(texts) > i && texts[i] != nil {
 			txt = texts[i].ContentString()
@@ -628,4 +630,74 @@ func (s *Store) GetNote(ctx context.Context, slugOrPath string) (*NoteContent, e
 		Text:     fullText,
 		Chunks:   len(chunks),
 	}, nil
+}
+
+// ChunkWindow contains a matched chunk with its surrounding context.
+type ChunkWindow struct {
+	MatchedIndex int      `json:"matched_index"`
+	Texts        []string `json:"texts"`
+	Indices      []int    `json:"indices"`
+}
+
+// GetChunkWindow fetches ±windowSize adjacent chunks around the given chunk index.
+func (s *Store) GetChunkWindow(ctx context.Context, noteSlug string, chunkIndex int, windowSize int) (*ChunkWindow, error) {
+	if windowSize <= 0 {
+		return nil, nil
+	}
+
+	res, err := s.chunks.Get(ctx,
+		chroma.WithWhere(chroma.EqString("note_slug", noteSlug)),
+		chroma.WithInclude(chroma.IncludeMetadatas, chroma.IncludeDocuments),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("get chunk window: %w", err)
+	}
+
+	metas := res.GetMetadatas()
+	texts := res.GetDocuments()
+	if len(metas) == 0 {
+		return nil, nil
+	}
+
+	type indexedChunk struct {
+		index int
+		text  string
+	}
+	var allChunks []indexedChunk
+	for i, m := range metas {
+		idx := metaInt(m, "chunk_index")
+		txt := ""
+		if len(texts) > i && texts[i] != nil {
+			txt = texts[i].ContentString()
+		}
+		allChunks = append(allChunks, indexedChunk{index: idx, text: txt})
+	}
+
+	sort.Slice(allChunks, func(i, j int) bool { return allChunks[i].index < allChunks[j].index })
+
+	minIdx := chunkIndex - windowSize
+	maxIdx := chunkIndex + windowSize
+
+	window := &ChunkWindow{MatchedIndex: chunkIndex}
+	for _, c := range allChunks {
+		if c.index >= minIdx && c.index <= maxIdx {
+			window.Texts = append(window.Texts, c.text)
+			window.Indices = append(window.Indices, c.index)
+		}
+	}
+
+	return window, nil
+}
+
+// PopulateContext fetches adjacent chunks for each result when windowSize > 0.
+func (s *Store) PopulateContext(ctx context.Context, results []Result, windowSize int) {
+	if windowSize <= 0 {
+		return
+	}
+	for i := range results {
+		window, err := s.GetChunkWindow(ctx, results[i].NoteSlug, results[i].ChunkIndex, windowSize)
+		if err == nil && window != nil {
+			results[i].Context = window.Texts
+		}
+	}
 }

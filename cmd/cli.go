@@ -22,6 +22,7 @@ type Globals struct {
 	Format         string  `help:"output format" enum:"text,json,tsv,ndjson" default:"text"`
 	JSONPath       string  `name:"jsonpath" help:"extract specific fields from JSON output using a JSONPath expression (e.g. '$.results[0].note_slug')"`
 	IncludeText    bool    `help:"include matched chunk text in structured output"`
+	ContextWindow  int     `name:"context-window" help:"fetch ±N adjacent chunks around each match for context" default:"0"`
 	MinScore       float64 `help:"suppress results below this similarity score (0–1)" default:"0"`
 	RespectExclude bool    `help:"respect Obsidian userIgnoreFilters and attachmentFolderPath settings during ingest" default:"true"`
 	UseEditor      bool    `help:"enable external editor ($EDITOR) integration as default open type" default:"false"`

@@ -66,6 +66,7 @@ func (c *BoostedCmd) Run(globals *Globals) error {
 	if err != nil {
 		return err
 	}
+	st.PopulateContext(ctx, results, globals.ContextWindow)
 
 	printResultsFormatted("boosted", fmt.Sprintf("Graph-Boosted Search Results for: %q (seed: %s, boost: %.2f)", query, seedSlug, boost), results, globals)
 	return nil

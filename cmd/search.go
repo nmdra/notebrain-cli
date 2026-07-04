@@ -99,6 +99,9 @@ func (c *SearchCmd) Run(globals *Globals) error {
 					return
 				}
 				results, err = st.SemanticSearch(ctx, qVec, limit, topK, whereFilter, false)
+				if err == nil {
+					st.PopulateContext(ctx, results, globals.ContextWindow)
+				}
 			})
 			return results, err
 		}
@@ -113,23 +116,20 @@ func (c *SearchCmd) Run(globals *Globals) error {
 		return runErr
 	}
 
-	// ── Static one-shot search ─────────────────────────────────────────────
-	// Build filters based on flags
+	// ── Static non-interactive search ──────────────────────────────────────
 	var filters []chroma.WhereClause
-
-	if section := c.Section; section != "" {
-		filters = append(filters, chroma.EqString("heading_path", section))
+	if c.Section != "" {
+		filters = append(filters, chroma.EqString("heading_path", c.Section))
 	}
-	if hasTasks := c.HasTasks; hasTasks {
+	if c.HasTasks {
 		filters = append(filters, chroma.EqBool("has_task", true))
 	}
-	if hasCode := c.HasCode; hasCode {
+	if c.HasCode {
 		filters = append(filters, chroma.EqBool("has_code", true))
 	}
-	if c.Tag != "" {
+	if c.Tag != "" && c.Query != "" {
 		filters = append(filters, store.TagWhereClause(c.Tag))
 	}
-
 	var whereFilter chroma.WhereFilter
 	if len(filters) == 1 {
 		whereFilter = filters[0]
@@ -142,6 +142,7 @@ func (c *SearchCmd) Run(globals *Globals) error {
 		if err != nil {
 			return err
 		}
+		st.PopulateContext(ctx, results, globals.ContextWindow)
 		printResultsFormatted("search", fmt.Sprintf("Tag Search: %q", c.Tag), results, globals)
 		return nil
 	}
@@ -155,6 +156,7 @@ func (c *SearchCmd) Run(globals *Globals) error {
 	if err != nil {
 		return err
 	}
+	st.PopulateContext(ctx, results, globals.ContextWindow)
 
 	printResultsFormatted("search", fmt.Sprintf("Semantic Search: %q", c.Query), results, globals)
 	return nil
