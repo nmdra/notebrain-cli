@@ -17,7 +17,7 @@ To operate efficiently and prevent wasted tokens or hung sessions, follow these 
 2. **Non-Interactive Execution (`--format json`)**: By default, NoteBrain launches an interactive terminal TUI (Bubble Tea) designed for human browsing. This interactive interface will hang automated agent sessions. Always specify `--format json` (or `--format ndjson` / `--format tsv`) on query commands so you receive structured, parseable data immediately. Note that all JSON envelope fields use clean `snake_case` keys (`note_slug`, `title`, `file_path`, `score`, `tags`, `text`).
 3. **AI Agent Command Chaining (`--jsonpath`)**: Whenever you only need specific fields (like extracting note slugs or text to pipe into follow-up commands), use `--jsonpath` (e.g., `--jsonpath="$.results[0].note_slug"` or `--jsonpath="$.results[*].note_slug"`). When `--jsonpath` is used, scalar values are output as raw unquoted strings and arrays print each item on a new line, enabling seamless shell variable extraction without needing `jq`.
 4. **Retrieve Complete Notes (`notebrain get`)**: When `search` returns a relevant note chunk, use `notebrain get <note-slug-or-path>` rather than guessing chunk indices to retrieve the complete, reconstructed markdown note text stitched together across all its indexed chunks. Never reach for `cat` on the underlying vault file — `get` reconstructs chunked notes correctly and respects the indexed state of the vault.
-5. **Retrieve Content for Synthesis (`--include-text`)**: By default, `search` and traversal commands return lightweight metadata envelopes (titles, file paths, tags, similarity scores). Whenever your task requires summarizing or reasoning about individual chunks directly from search results, append `--include-text`.
+5. **Retrieve Content for Synthesis (`--include-text`)**: By default, `search` and traversal commands return lightweight metadata envelopes (titles, file paths, tags, similarity scores). Whenever your task requires summarizing or reasoning about individual chunks directly from search results, append `--include-text`. The returned `text` field contains rich markdown with preserved code blocks, so code snippets are copy-pasteable.
 6. **Binary Resolution & Quoting**: In development environments, execute `./notebrain` if `notebrain` is not in system PATH. Note titles often contain spaces or brackets (`"Q3 Planning [Draft]"`), so always encapsulate note titles, tags, and search queries within double quotes.
 
 ---
@@ -48,6 +48,26 @@ Select the specialized command tailored to the user's analytical goal:
 notebrain search "kubernetes reconciliation" --tag="Kubernetes" --limit 5 --format json --include-text
 ```
 
+#### Key search flags
+
+| Flag                | Purpose                                                                                                         | Default |
+| ------------------- | --------------------------------------------------------------------------------------------------------------- | ------- |
+| `--top-k N`         | Maximum chunks to retain **per note**. Prevents one long note from dominating results while preserving depth.    | `3`     |
+| `--context-window N`| Fetches ±N adjacent chunks around each match and populates the `context` array. Use `1` or `2` for most tasks. | `0`     |
+| `--has-tasks`       | Only return chunks that contain task lists (checkboxes).                                                        | off     |
+| `--has-code`        | Only return chunks that contain fenced code blocks.                                                             | off     |
+| `--section`         | Filter results to chunks under a specific heading path (e.g., `"Architecture > Components"`).                  | —       |
+| `--limit N`         | Maximum total results to return.                                                                                | `10`    |
+| `--tag "TagName"`   | Filter or search by tag name.                                                                                   | —       |
+| `--min-score F`     | Suppress results below this similarity score (0–1).                                                             | `0`     |
+
+#### When to use `--context-window` vs `notebrain get`
+
+- **Use `--context-window 1`** when you need lightweight surrounding context for multiple search results at once. This is efficient — one search call gives you both the matched chunks and their neighbors, enough to understand the local context without fetching entire notes.
+- **Use `notebrain get`** when you need the *complete* reconstructed note text — for instance, when the user asks to read or summarize a specific note, or when you need to see the full document structure.
+
+The windowing approach is especially valuable when processing many search results, because fetching full notes for every result would be wasteful. Fetch the window first, then selectively `get` only the notes that truly need full context.
+
 ### Complete Note Retrieval (`get`)
 
 ```bash
@@ -63,25 +83,71 @@ notebrain hidden "Microservices" --limit 5 --format json --include-text
 
 ---
 
-## Deepening Answer Quality: Backlinks + Connections First
+## JSON Output Schema
 
-Before answering any "what do I know about X" or "summarize my notes on X" style question, don't stop at a single `search` call. Search results alone only surface chunks that are semantically close to the query — they miss the surrounding context the user has deliberately built into their graph. Always widen the picture using `backlinks`, `connections` or `boosted`:
+Understanding the result structure is essential for reliable field extraction. Every query command wraps results in this envelope:
 
-1. **Search to find the anchor note(s)** — run `search` to identify the one or two most relevant notes (the "seed" notes) for the topic.
+```json
+{
+  "command": "search",
+  "query": "Semantic Search: \"kubernetes\"",
+  "total": 3,
+  "results": [
+    {
+      "note_slug": "02areaskubernetes-architecture",
+      "title": "Kubernetes Architecture",
+      "file_path": "02.Areas/Kubernetes/Architecture.md",
+      "score": 0.82,
+      "chunk_index": 2,
+      "tags": ["Kubernetes", "DevOps"],
+      "heading_path": "Components > Control Plane",
+      "text": "The API server validates and configures...",
+      "context": [
+        "Previous chunk text about etcd storage...",
+        "The API server validates and configures...",
+        "The scheduler watches for newly created Pods..."
+      ]
+    }
+  ]
+}
+```
+
+| Field          | Present When                     | Description                                                          |
+| -------------- | -------------------------------- | -------------------------------------------------------------------- |
+| `note_slug`    | Always                           | URL-safe identifier derived from the file path.                      |
+| `title`        | Always                           | Note title from frontmatter or filename.                             |
+| `file_path`    | Always                           | Relative path within the vault.                                      |
+| `score`        | Always                           | Similarity score (0–1) for search; hop count for connections.        |
+| `chunk_index`  | Search, hidden, boosted          | Which chunk of the note matched (0-indexed).                         |
+| `tags`         | When note has tags               | Array of tag strings.                                                |
+| `heading_path` | When chunk is under a heading    | Breadcrumb path like `"Section > Subsection"`.                       |
+| `text`         | When `--include-text` is passed  | The matched chunk's full markdown text, with code blocks preserved.  |
+| `context`      | When `--context-window N` > 0    | Array of ±N adjacent chunk texts, ordered by chunk index.            |
+| `extra`        | Connections, tags, boosted       | Command-specific info (e.g., `"2 hop(s)"`, `"graph-boosted"`).      |
+
+---
+
+## Deepening Answer Quality: Multi-Signal Retrieval
+
+Before answering any "what do I know about X" or "summarize my notes on X" style question, don't stop at a single `search` call. Search results alone only surface chunks that are semantically close to the query — they miss the surrounding context the user has deliberately built into their graph. Always widen the picture:
+
+1. **Search with context** — run `search` with `--context-window 1 --include-text --top-k 2` to get the most relevant chunks with their surrounding paragraphs. This gives you both precision (the matched chunk) and context (what comes before and after) in a single call.
 2. **Pull backlinks for each seed** — run `notebrain backlinks <seed-slug> --format json --include-text` to extract every note that explicitly links into the seed. These are notes the user has manually curated as related, so their content is almost always high-signal and should be weighted heavily in your synthesis.
 3. **Walk connections outward** — run `notebrain connections <seed-slug> --hops 2 --format json` to map the local graph neighborhood around the seed. This reveals structurally adjacent notes (e.g., notes two links away) that may not show up in a pure vector search but are part of the same knowledge cluster.
-4. **Check for hidden links** — run `notebrain hidden <seed-slug> --include-text` to catch conceptually related notes the user hasn't linked yet. Call these out explicitly to the user as potential missing links in their vault, since this is one of NoteBrain's most valuable differentiators over plain search.
+4. **Check for hidden links** — run `notebrain hidden <seed-slug> --include-text --context-window 1` to catch conceptually related notes the user hasn't linked yet. Call these out explicitly to the user as potential missing links in their vault, since this is one of NoteBrain's most valuable differentiators over plain search.
 5. **Synthesize, don't just list** — combine the seed note(s), their backlinks, their `connections` neighborhood, and any `hidden` results into a single coherent answer, distinguishing what's explicitly linked (high confidence) from what's only semantically similar (worth double-checking).
 
 This `search → backlinks → connections → hidden` chain should be the default workflow for any non-trivial exploratory question, not just a single `search` call, because it surfaces both the explicit structure the user built and the implicit structure NoteBrain can detect.
 
-### AI Agent Chaining Pipeline (Search → Get Full Note → Backlinks → Connections)
+### AI Agent Chaining Pipeline
 
 ```bash
-# 1. Extract the top matching note slug cleanly into a shell variable
-SLUG=$(notebrain search "message broker backpressure" --limit 1 --jsonpath="$.results[0].note_slug")
+# 1. Search with surrounding context — top-k keeps results diverse across notes
+SLUG=$(notebrain search "message broker backpressure" --limit 3 --top-k 2 \
+  --context-window 1 --include-text --format json \
+  --jsonpath="$.results[0].note_slug")
 
-# 2. Fetch the complete reconstructed note text
+# 2. Fetch the complete reconstructed note text for the top hit
 notebrain get "$SLUG" --jsonpath="$.text"
 
 # 3. Find all backlink note slugs pointing to this note, with their content,
@@ -92,8 +158,25 @@ notebrain backlinks "$SLUG" --format json --include-text
 #    that vector search alone would miss
 notebrain connections "$SLUG" --hops 2 --format json
 
-# 5. Surface unlinked-but-related notes as potential missing connections
-notebrain hidden "$SLUG" --limit 5 --format json --include-text
+# 5. Surface unlinked-but-related notes as potential missing connections,
+#    with windowed context so you can assess relevance without fetching full notes
+notebrain hidden "$SLUG" --limit 5 --format json --include-text --context-window 1
+```
+
+### Targeted Retrieval Patterns
+
+```bash
+# Find code examples about a topic
+notebrain search "docker compose networking" --has-code --include-text --format json
+
+# Find actionable tasks related to a project
+notebrain search "sprint planning" --has-tasks --include-text --format json
+
+# Search within a specific section hierarchy
+notebrain search "authentication" --section="Architecture > Security" --format json
+
+# Get multiple chunks per note for comprehensive coverage of a deep topic
+notebrain search "distributed consensus" --top-k 5 --limit 3 --include-text --format json
 ```
 
 ---
@@ -102,7 +185,7 @@ notebrain hidden "$SLUG" --limit 5 --format json --include-text
 
 NoteBrain resolves settings in priority order:
 
-1. CLI command flags (`--vault-path`, `--chroma-path`)
+1. CLI command flags (`--vault-path`, `--chroma-path`, `--top-k`, `--context-window`)
 2. Environment variables defined in local `.env` (`OBSIDIAN_VAULT_PATH`, `OBSIDIAN_VAULT_NAME`)
 3. Global configuration file (`~/.notebrain/config/config.toml`)
 
