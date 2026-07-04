@@ -1,0 +1,16 @@
+[Unit]
+Description=NoteBrain CLI — Automated Vault Ingestion Service
+Documentation=https://github.com/nmdra/notebrain-cli
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/notebrain ingest
+# Run with low CPU and I/O priority so background indexing never impacts interactive desktop performance
+Nice=19
+IOSchedulingClass=idle
+StandardOutput=append:/home/%u/.notebrain/ingest.log
+StandardError=append:/home/%u/.notebrain/ingest.log
+
+[Install]
+WantedBy=default.target

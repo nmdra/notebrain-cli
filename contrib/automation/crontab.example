@@ -1,0 +1,8 @@
+# NoteBrain CLI — Crontab Schedule Template (3-Hour Window)
+#
+# To install this schedule for your current user:
+# 1. Open your crontab editor: crontab -e
+# 2. Append the line below (adjusting the path to your notebrain binary if needed):
+
+# Run automated incremental vault indexing every 3 hours (at minute 0 past every 3rd hour)
+0 */3 * * * /usr/local/bin/notebrain ingest >> ~/.notebrain/ingest.log 2>&1

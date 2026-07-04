@@ -33,7 +33,7 @@ NoteBrain uses a dedicated TOML file for persisting CLI arguments and configurat
 
 ### TOML Configuration (`~/.notebrain/config/config.toml`)
 
-You can persistently set any global CLI flag using a TOML file (either at `~/.notebrain/config/config.toml` or by passing `--config=/path/to/config.toml`). Copy `config.example.toml` to get started:
+You can persistently set any global CLI flag using a TOML file (either at `~/.notebrain/config/config.toml` or by passing `--config=/path/to/config.toml`). Copy [config.example.toml](./config.example.toml) to get started:
 
 ```toml
 # The absolute path to your Obsidian vault on disk
@@ -56,9 +56,6 @@ respect-exclude = true
 use-editor = false
 ```
 
-> [!NOTE]
-> NoteBrain supports normalized configuration keys: whether you write `vault-path` (kebab-case) or `vault_path` (snake_case) in your TOML file, settings are automatically resolved to the matching CLI flags.
-
 ## Quick Start
 
 1. **Install** NoteBrain (see [Installation](wiki/Installation.md)).
@@ -78,6 +75,8 @@ use-editor = false
    # Retrieve complete reconstructed note text
    notebrain get "$SLUG" --jsonpath="$.text"
    ```
+5. **Automate** background ingestion:
+   - Configure a 3-hour cron job or OS timer so your index stays automatically updated (see [Scheduled Ingestion](wiki/Scheduled_Ingestion.md)).
 
 ## Architecture
 

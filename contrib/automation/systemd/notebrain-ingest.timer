@@ -1,0 +1,14 @@
+[Unit]
+Description=NoteBrain CLI — Automated 3-Hour Ingestion Timer
+Documentation=https://github.com/nmdra/notebrain-cli
+
+[Timer]
+# Trigger 15 minutes after boot
+OnBootSec=15m
+# Trigger every 3 hours after the last activation
+OnUnitActiveSec=3h
+# Immediately catch up on missed runs if the machine was asleep or powered off
+Persistent=true
+
+[Install]
+WantedBy=timers.target

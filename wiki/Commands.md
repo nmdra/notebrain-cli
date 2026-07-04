@@ -58,6 +58,7 @@ notebrain ingest --vault-path "/path/to/vault" [--workers 4]
 - Extracts Wikilinks (`[[target]]`) and Tags (`#tag`).
 - Chunks content and embeds via ONNX locally.
 - *Note: Run this command whenever your vault has significantly changed.*
+- *Tip: You can automate periodic background indexing using OS cron jobs or systemd timers (see [Scheduled Ingestion](Scheduled_Ingestion.md)).*
 
 ## `search`
 Performs a semantic search against your vault chunks. Supports optional tag filtering via `--tag`.
