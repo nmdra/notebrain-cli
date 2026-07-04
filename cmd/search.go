@@ -24,9 +24,11 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"os"
 
 	tea "charm.land/bubbletea/v2"
 	chroma "github.com/amikos-tech/chroma-go/pkg/api/v2"
+	"github.com/charmbracelet/x/term"
 	"github.com/nmdra/notebrain-cli/cmd/tui"
 	"github.com/nmdra/notebrain-cli/internal/embedder"
 	"github.com/nmdra/notebrain-cli/internal/store"
@@ -65,6 +67,9 @@ func (c *SearchCmd) Run(globals *Globals) error {
 
 	// ── Interactive live-search TUI ────────────────────────────────────────
 	if c.Interactive {
+		if !term.IsTerminal(os.Stdout.Fd()) || os.Getenv("TERM") == "dumb" {
+			return fmt.Errorf("interactive mode requires a TTY terminal; use --format json or remove --interactive")
+		}
 		// Build the chroma where-filter once (same logic as static path).
 		var filters []chroma.WhereClause
 		if c.Section != "" {

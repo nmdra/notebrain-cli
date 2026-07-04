@@ -2,11 +2,13 @@ package tui
 
 import (
 	"fmt"
+	"io"
 	"os"
 
 	"charm.land/bubbles/v2/progress"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/term"
 )
 
 var (
@@ -86,4 +88,28 @@ func (m ProgressModel) View() tea.View {
 	}
 	label := lipgloss.NewStyle().Foreground(colorMuted).Render(m.current)
 	return tea.NewView(fmt.Sprintf("%s\n%s  (%d/%d)\n", m.bar.View(), label, m.done, m.total))
+}
+
+func RunProgress(stdin io.Reader, stdout io.Writer, totalFiles int, progressCh <-chan ProgressUpdate) error {
+	isTTY := false
+	if f, ok := stdout.(*os.File); ok {
+		isTTY = term.IsTerminal(f.Fd())
+	}
+	if !isTTY || os.Getenv("TERM") == "dumb" {
+		for u := range progressCh {
+			if u.Final {
+				break
+			}
+		}
+		_, _ = fmt.Fprint(stdout, "✓ Ingest complete\n\n")
+		return nil
+	}
+
+	pUI := tea.NewProgram(
+		NewProgressModel(totalFiles, progressCh),
+		tea.WithInput(stdin),
+		tea.WithOutput(stdout),
+	)
+	_, err := pUI.Run()
+	return err
 }

@@ -14,7 +14,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	tea "charm.land/bubbletea/v2"
 	"github.com/nmdra/notebrain-cli/internal/parser"
 	"github.com/nmdra/notebrain-cli/internal/store"
 	"github.com/nmdra/notebrain-cli/internal/tui"
@@ -100,18 +99,11 @@ func (p *Pipeline) Run(ctx context.Context, vaultPath string, glob string, stdin
 
 	var done int32
 
-	// Launch UI program in background
-	pUI := tea.NewProgram(
-		tui.NewProgressModel(totalFiles, progressCh),
-		tea.WithInput(stdin),
-		tea.WithOutput(stdout),
-	)
-
 	var uiWg sync.WaitGroup
 	uiWg.Add(1)
 	go func() {
 		defer uiWg.Done()
-		if _, uiErr := pUI.Run(); uiErr != nil {
+		if uiErr := tui.RunProgress(stdin, stdout, totalFiles, progressCh); uiErr != nil {
 			errCh <- fmt.Errorf("progress UI error: %w", uiErr)
 		}
 		if atomic.LoadInt32(&done) == 0 {

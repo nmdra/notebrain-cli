@@ -2,10 +2,12 @@ package tui
 
 import (
 	"fmt"
+	"os"
 
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/term"
 )
 
 var (
@@ -57,4 +59,18 @@ func (m spinnerModel) View() tea.View {
 		return tea.NewView("")
 	}
 	return tea.NewView(fmt.Sprintf("%s %s\n", m.spinner.View(), m.message))
+}
+
+func RunSpinner(message string, doneChan <-chan struct{}) error {
+	if !term.IsTerminal(os.Stderr.Fd()) || os.Getenv("TERM") == "dumb" {
+		_, _ = fmt.Fprintln(os.Stderr, message)
+		<-doneChan
+		return nil
+	}
+	p := tea.NewProgram(
+		NewSpinner(message, doneChan),
+		tea.WithOutput(os.Stderr),
+	)
+	_, err := p.Run()
+	return err
 }

@@ -3,9 +3,7 @@ package embedder
 import (
 	"context"
 	"fmt"
-	"os"
 
-	tea "charm.land/bubbletea/v2"
 	"github.com/amikos-tech/chroma-go/pkg/embeddings/ort"
 	"github.com/nmdra/notebrain-cli/internal/tui"
 )
@@ -26,11 +24,7 @@ func NewLocalEmbedder() (*LocalEmbedder, error) {
 		ef, destroy, err = ort.NewDefaultEmbeddingFunction()
 	}()
 
-	p := tea.NewProgram(
-		tui.NewSpinner("Setting up MiniLM (first run downloads ~33 MB)...", done),
-		tea.WithOutput(os.Stderr),
-	)
-	if _, pErr := p.Run(); pErr != nil {
+	if pErr := tui.RunSpinner("Setting up MiniLM (first run downloads ~33 MB)...", done); pErr != nil {
 		return nil, fmt.Errorf("spinner error: %w", pErr)
 	}
 
