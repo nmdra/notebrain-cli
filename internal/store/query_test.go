@@ -384,24 +384,22 @@ func TestConcurrentReadWrite(t *testing.T) {
 	qVec := []float32{1.0, 0.0, 0.0}
 
 	// Spawn 10 concurrent readers
-	for i := 0; i < 10; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for j := 0; j < 5; j++ {
+	for range 10 {
+		wg.Go(func() {
+			for range 5 {
 				_, _ = st.SemanticSearch(ctx, qVec, 5, 1, nil, false)
 				_, _ = st.GetNote(ctx, "note-a")
 				_, _ = st.GetNoteHashes(ctx)
 			}
-		}()
+		})
 	}
 
 	// Spawn 2 concurrent writers
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		wg.Add(1)
 		go func(id int) {
 			defer wg.Done()
-			for j := 0; j < 3; j++ {
+			for j := range 3 {
 				slug := fmt.Sprintf("note-conc-%d-%d", id, j)
 				chunks := []store.ChunkRecord{
 					{

@@ -74,10 +74,7 @@ func (s *Store) BatchIngest(ctx context.Context, data []BatchIngestData, staleSl
 		// 2. Fetch and delete existing chunks and links for these slugs in batches of 100
 		const batchSize = 100
 		for i := 0; i < len(slugsToClean); i += batchSize {
-			end := i + batchSize
-			if end > len(slugsToClean) {
-				end = len(slugsToClean)
-			}
+			end := min(i+batchSize, len(slugsToClean))
 			batchSlugs := slugsToClean[i:end]
 
 			filters := make([]chroma.WhereClause, 0, len(batchSlugs))
@@ -180,10 +177,7 @@ func (s *Store) upsertChunks(ctx context.Context, chunks []ChunkRecord) error {
 
 	const batchSize = 2000
 	for i := 0; i < len(chunks); i += batchSize {
-		end := i + batchSize
-		if end > len(chunks) {
-			end = len(chunks)
-		}
+		end := min(i+batchSize, len(chunks))
 		batch := chunks[i:end]
 
 		ids := make([]chroma.DocumentID, len(batch))
@@ -311,7 +305,7 @@ func (s *Store) upsertLinks(ctx context.Context, noteSlug string, links []string
 		if texts[i] == "" {
 			texts[i] = "-"
 		}
-		metaMap := map[string]interface{}{
+		metaMap := map[string]any{
 			"source_slug":  noteSlug,
 			"target_slug":  targetSlug,
 			"target_path":  l,
@@ -329,7 +323,7 @@ func (s *Store) upsertLinks(ctx context.Context, noteSlug string, links []string
 	// on identical/degenerate vector spaces.
 	for i := range uniqueLinks {
 		vec := make([]float32, 16)
-		for j := 0; j < 16; j++ {
+		for j := range 16 {
 			vec[j] = rand.Float32()
 		}
 		embs[i] = embeddings.NewEmbeddingFromFloat32(vec)
@@ -345,8 +339,8 @@ func (s *Store) upsertLinks(ctx context.Context, noteSlug string, links []string
 
 // ─── Metadata helpers ────────────────────────────────────────────
 
-func buildChunkMeta(c ChunkRecord) map[string]interface{} {
-	meta := map[string]interface{}{
+func buildChunkMeta(c ChunkRecord) map[string]any {
+	meta := map[string]any{
 		"note_slug":     c.NoteSlug,
 		"title":         c.Title,
 		"file_path":     c.FilePath,

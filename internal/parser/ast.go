@@ -38,7 +38,7 @@ type Result struct {
 	Chunks      []Chunk
 	Tags        []string
 	Links       []string
-	Frontmatter map[string]interface{}
+	Frontmatter map[string]any
 }
 
 // mdParser is the shared goldmark instance configured with GFM, hashtags, wikilinks, and metadata.
@@ -65,7 +65,7 @@ func Parse(body, noteSlug string, maxChunkRunes, overlapRunes int) Result {
 	doc := mdParser.Parser().Parse(reader)
 
 	// Extract frontmatter metadata stored by goldmark-meta
-	var frontmatter map[string]interface{}
+	var frontmatter map[string]any
 	if md := doc.OwnerDocument().Meta(); md != nil {
 		frontmatter = md
 	}
@@ -287,12 +287,15 @@ func buildChunks(sections []section, noteSlug string, maxRunes, overlapRunes int
 				_, _ = fmt.Fprintf(&prose, "\x00CODE:%d:%s\x00 ", codeIdx, b.language)
 			case "table":
 				hasTable = true
-				prose.WriteString(b.text + " ")
+				prose.WriteString(b.text)
+				prose.WriteByte(' ')
 			case "task_list":
 				hasTask = true
-				prose.WriteString(b.text + " ")
+				prose.WriteString(b.text)
+				prose.WriteByte(' ')
 			default:
-				prose.WriteString(b.text + " ")
+				prose.WriteString(b.text)
+				prose.WriteByte(' ')
 			}
 		}
 
@@ -462,12 +465,12 @@ func isOnlyHashtags(n ast.Node, src []byte) bool {
 	return hasHashtags && onlyHashtags
 }
 
-func extractFrontmatterTags(fm map[string]interface{}) []string {
+func extractFrontmatterTags(fm map[string]any) []string {
 	if fm == nil {
 		return nil
 	}
 
-	var rawTags interface{}
+	var rawTags any
 	if val, ok := fm["tags"]; ok {
 		rawTags = val
 	} else if val, ok := fm["tag"]; ok {
@@ -496,7 +499,7 @@ func extractFrontmatterTags(fm map[string]interface{}) []string {
 				tags = append(tags, t)
 			}
 		}
-	case []interface{}:
+	case []any:
 		tags = make([]string, 0, len(val))
 		for _, item := range val {
 			if s, ok := item.(string); ok {

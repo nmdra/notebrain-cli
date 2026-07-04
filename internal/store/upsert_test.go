@@ -230,7 +230,7 @@ func BenchmarkUpsertLinks(b *testing.B) {
 	defer func() { _ = st.Close() }()
 
 	links := make([]string, 100)
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		links[i] = "target-note-" + strconv.Itoa(i)
 	}
 

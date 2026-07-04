@@ -42,7 +42,7 @@ func Open(ctx context.Context, path string) (*Store, error) {
 	}
 
 	// Tune HNSW index for chunks (MiniLM embeddings are cosine-optimized)
-	chunksMeta := map[string]interface{}{
+	chunksMeta := map[string]any{
 		"hnsw:space":           "cosine",
 		"hnsw:search_ef":       50, // Lower value improves query speed
 		"hnsw:num_threads":     1,  // Prevent hnswlib background thread crash
@@ -62,7 +62,7 @@ func Open(ctx context.Context, path string) (*Store, error) {
 	}
 
 	// Tune HNSW index for links (uses dummy embeddings, L2 distance avoids cosine degeneracy)
-	linksMeta := map[string]interface{}{
+	linksMeta := map[string]any{
 		"hnsw:space":       "l2",
 		"hnsw:num_threads": 1,
 	}
@@ -96,7 +96,7 @@ func (s *Store) Reset(ctx context.Context) error {
 		}
 	}
 
-	chunksMeta := map[string]interface{}{
+	chunksMeta := map[string]any{
 		"hnsw:space":           "cosine",
 		"hnsw:search_ef":       50,
 		"hnsw:num_threads":     1,
@@ -109,7 +109,7 @@ func (s *Store) Reset(ctx context.Context) error {
 		return err
 	}
 
-	linksMeta := map[string]interface{}{
+	linksMeta := map[string]any{
 		"hnsw:space":       "l2",
 		"hnsw:num_threads": 1,
 	}

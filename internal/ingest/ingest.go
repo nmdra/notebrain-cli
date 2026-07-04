@@ -98,20 +98,18 @@ func (p *Pipeline) Run(ctx context.Context, vaultPath string, glob string, stdin
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	var done int32
+	var done atomic.Int32
 
 	var uiWg sync.WaitGroup
-	uiWg.Add(1)
-	go func() {
-		defer uiWg.Done()
+	uiWg.Go(func() {
 		RunProgress(totalFiles, progressCh)
-		if atomic.LoadInt32(&done) == 0 {
+		if done.Load() == 0 {
 			cancel() // Cancel workers if progress loop exits early
 		}
-	}()
+	})
 
 	// Atomic counter for monotonically increasing progress
-	var completed int64
+	var completed atomic.Int64
 
 	var workerWg sync.WaitGroup
 	sem := make(chan struct{}, p.workers)
@@ -152,7 +150,7 @@ fileLoop:
 				mu.Unlock()
 			}
 
-			n := atomic.AddInt64(&completed, 1)
+			n := completed.Add(1)
 			progressCh <- ProgressUpdate{
 				Done:    int(n),
 				Total:   totalFiles,
@@ -163,7 +161,7 @@ fileLoop:
 
 	// Wait for all workers to finish, then signal the UI to quit
 	workerWg.Wait()
-	atomic.StoreInt32(&done, 1)
+	done.Store(1)
 	close(progressCh)
 	uiWg.Wait()
 

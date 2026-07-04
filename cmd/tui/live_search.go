@@ -325,10 +325,7 @@ func (m LiveSearchModel) recalcLayout() LiveSearchModel {
 		return m
 	}
 	// Input width: terminal width minus border (2) minus padding (2 each side = 4)
-	inputWidth := m.width - 6
-	if inputWidth < 10 {
-		inputWidth = 10
-	}
+	inputWidth := max(m.width-6, 10)
 	m.input.SetWidth(inputWidth)
 
 	const (
@@ -337,10 +334,7 @@ func (m LiveSearchModel) recalcLayout() LiveSearchModel {
 		helpH   = 1
 		padding = 1
 	)
-	listH := m.height - inputH - statusH - helpH - padding
-	if listH < 3 {
-		listH = 3
-	}
+	listH := max(m.height-inputH-statusH-helpH-padding, 3)
 	m.list.SetSize(m.width, listH)
 	return m
 }

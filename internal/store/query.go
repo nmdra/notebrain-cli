@@ -51,10 +51,7 @@ func (s *Store) semanticSearch(ctx context.Context, queryVec []float32, limit in
 		includes = append(includes, chroma.IncludeDocuments)
 	}
 
-	fetchCount := limit * 3
-	if fetchCount < limit*topKPerNote {
-		fetchCount = limit * topKPerNote
-	}
+	fetchCount := max(limit*3, limit*topKPerNote)
 
 	opts := []chroma.QueryOption{
 		chroma.WithQueryEmbeddings(embeddings.NewEmbeddingFromFloat32(queryVec)),
@@ -297,7 +294,7 @@ func CombineWhereFilters(f1, f2 chroma.WhereFilter) chroma.WhereFilter {
 // TagWhereClause constructs a Chroma Or filter matching tag against tag_0 through tag_19.
 func TagWhereClause(tag string) chroma.WhereClause {
 	var clauses []chroma.WhereClause
-	for n := 0; n < 20; n++ {
+	for n := range 20 {
 		clauses = append(clauses, chroma.EqString(fmt.Sprintf("tag_%d", n), tag))
 	}
 	return chroma.Or(clauses...)
@@ -519,7 +516,7 @@ func (s *Store) tagsForNote(ctx context.Context, noteSlug string) []string {
 func (s *Store) notesWithTag(ctx context.Context, tag string) []string {
 	// Query all chunks for each possible tag_N position (up to 20 tags)
 	var filters []chroma.WhereClause
-	for n := 0; n < 20; n++ {
+	for n := range 20 {
 		filters = append(filters, chroma.EqString(fmt.Sprintf("tag_%d", n), tag))
 	}
 	res, err := s.chunks.Get(ctx,
@@ -585,7 +582,7 @@ func metaInt(m chroma.DocumentMetadata, key string) int {
 func decodeTags(m chroma.DocumentMetadata) []string {
 	count := metaInt(m, "tag_count")
 	tags := make([]string, 0, count)
-	for i := 0; i < count; i++ {
+	for i := range count {
 		key := fmt.Sprintf("tag_%d", i)
 		tags = append(tags, metaString(m, key))
 	}

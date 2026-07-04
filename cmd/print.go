@@ -137,12 +137,12 @@ func normalizeJSONPath(jp string) string {
 	return jp
 }
 
-func printJSONPathResult(obj interface{}, jp string) error {
+func printJSONPathResult(obj any, jp string) error {
 	data, err := json.Marshal(obj)
 	if err != nil {
 		return fmt.Errorf("jsonpath marshal: %w", err)
 	}
-	var raw interface{}
+	var raw any
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return fmt.Errorf("jsonpath unmarshal: %w", err)
 	}
@@ -158,7 +158,7 @@ func printJSONPathResult(obj interface{}, jp string) error {
 	}
 
 	switch val := res.(type) {
-	case []interface{}:
+	case []any:
 		for _, item := range val {
 			printSingleJSONPathValue(item)
 		}
@@ -168,7 +168,7 @@ func printJSONPathResult(obj interface{}, jp string) error {
 	return nil
 }
 
-func printSingleJSONPathValue(val interface{}) {
+func printSingleJSONPathValue(val any) {
 	switch v := val.(type) {
 	case string:
 		fmt.Println(v)
