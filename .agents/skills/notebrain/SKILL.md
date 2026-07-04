@@ -22,6 +22,7 @@ To operate efficiently and prevent wasted tokens or hung sessions, follow these 
 7. **Embedded Persistent Storage**: NoteBrain runs exclusively as an embedded database (`~/.notebrain/chroma`). No standalone ChromaDB Docker containers or HTTP servers are required or supported.
 8. **Automated Ingestion**: Ingestion is handled via OS schedulers (cron/systemd timers every 3 hours). You do not need to manually run `ingest` before queries unless the user explicitly requests an immediate re-index after editing notes.
 9. **Non-Interactive Ingestion Logging**: The `ingest` command strictly outputs structured `slog` events (`ingestion progress` and `ingestion completed`) without interactive Bubble Tea animations, guaranteeing clean machine-readable logs in headless automated environments.
+10. **Exact CLI Flag & Argument Enforcement**: When calling `notebrain` commands, strictly use `--vault-path` and `--chroma-path` for vault and database locations (never `--vault` or `--db`). For graph and note commands (`backlinks`, `connections`, `hidden`, `tags`, `get`), pass exactly one positional argument: the target note slug (`<note>`). For `boosted` search, you must specify the seed note slug via `--seed=<slug>`. For automated database resets, pipe confirmation via stdin (`echo yes | notebrain reset`).
 
 ---
 
@@ -77,11 +78,32 @@ The windowing approach is especially valuable when processing many search result
 notebrain get "02areaskubernetesckadkubernetes-native-applications" --format json
 ```
 
-### Graph Connections & Hidden Links (`connections`, `hidden`)
+### Graph Connections, Hidden Links & Tags (`connections`, `hidden`, `tags`, `backlinks`)
+
+All graph and tag commands accept **exactly one positional argument**: the target note slug.
 
 ```bash
-notebrain connections "Distributed Systems" --hops 2 --format json
-notebrain hidden "Microservices" --limit 5 --format json --include-text
+# Find explicit backlinks pointing to a note
+notebrain backlinks "kubernetes-architecture" --format json --include-text
+
+# Traverse wikilink graph connections up to N hops
+notebrain connections "kubernetes-architecture" --hops 2 --format json
+
+# Discover unlinked-but-semantically-similar notes
+notebrain hidden "kubernetes-architecture" --limit 5 --format json --include-text
+
+# Find notes sharing common tags with the target note
+notebrain tags "kubernetes-architecture" --min-shared 1 --format json
+```
+
+### Graph-Boosted Search (`boosted`) & Database Reset (`reset`)
+
+```bash
+# Graph-boosted search requires specifying a seed note slug via --seed
+notebrain boosted --seed="kubernetes-architecture" "control plane components" --boost 1.5 --format json
+
+# Automated/non-interactive database reset requires piping confirmation via stdin
+echo yes | notebrain reset --chroma-path="~/.notebrain/chroma"
 ```
 
 ---
