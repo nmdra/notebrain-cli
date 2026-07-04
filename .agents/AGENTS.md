@@ -7,7 +7,7 @@ NoteBrain is a Go CLI tool that indexes an Obsidian vault into ChromaDB for sema
 ## Technology Stack
 
 - **Language:** Go 1.26.3
-- **CLI Framework:** [cobra](https://github.com/spf13/cobra) v1.8.x
+- **CLI Framework:** [kong](https://github.com/alecthomas/kong) v1.15.x (with custom TOML configuration resolver)
 - **Vector Store:** ChromaDB via [chroma-go](https://github.com/amikos-tech/chroma-go) v0.4.x (`pkg/api/v2`)
 - **Build:** `CGO_ENABLED=1` for persistent client; `CGO_ENABLED=0` for HTTP-only mode
 
@@ -64,6 +64,7 @@ notebrain-cli/
 - Use table-driven tests where appropriate.
 - Use `testify` for assertions only if already in go.mod; otherwise use stdlib `testing`.
 - Name test files `*_test.go` alongside the source file.
+- **Go Vendoring:** This repository uses Go vendoring (`vendor/`). Whenever dependencies in `go.mod` or `go.sum` are added, removed, or updated, you MUST run `go mod vendor` before running tests or builds.
 
 ## Coding Conventions
 
@@ -108,3 +109,4 @@ fix(ingest): handle empty frontmatter gracefully
 3. `nb_links` uses dummy 1-dim embeddings since Chroma requires uniform dimensions per collection.
 4. `DeleteNoteChunks` BEFORE `UpsertChunks` (not after) to handle interrupted re-ingests.
 5. Persistent client is single-writer — fine for CLI usage.
+6. **TOML-Only Configuration:** Configuration hierarchy is strictly 2-tier: CLI flags > TOML configuration file (`~/.notebrain/config/config.toml` or `--config`). No `.env` files or application environment variable fallbacks are permitted. TOML keys support normalized matching (`snake_case` and `kebab-case` match interchangeably).

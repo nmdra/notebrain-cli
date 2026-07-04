@@ -185,9 +185,8 @@ notebrain search "distributed consensus" --top-k 5 --limit 3 --include-text --fo
 
 NoteBrain resolves settings in priority order:
 
-1. CLI command flags (`--vault-path`, `--chroma-path`, `--top-k`, `--context-window`)
-2. Environment variables defined in local `.env` (`OBSIDIAN_VAULT_PATH`, `OBSIDIAN_VAULT_NAME`)
-3. Global configuration file (`~/.notebrain/config/config.toml`)
+1. CLI command flags (`--vault-path`, `--vault-name`, `--chroma-path`, `--top-k`, `--context-window`)
+2. Configuration file (`~/.notebrain/config/config.toml` or specified via `--config`)
 
 ---
 

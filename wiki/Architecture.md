@@ -20,3 +20,4 @@ The data is separated into two primary collections within ChromaDB:
 - **Parser (`internal/parser`)**: Extracts frontmatter tags and Obsidian wikilinks. It cleans the markdown content and divides it into coherent chunks for embedding.
 - **Ingest (`internal/ingest`)**: Handles multi-worker concurrent directory walking. It reads `.md` files, calls the parser, generates embeddings, and passes the chunks/links to the Store.
 - **Store (`internal/store`)**: The ChromaDB wrapper that abstracts collection creation, chunk upsertion, link deduplication, and exposes all graph and semantic queries.
+- **Configuration (`internal/configfile`)**: Manages TOML configuration loading via Kong resolvers. Supports normalized key lookups (`snake_case` and `kebab-case`) and resolves flags without relying on `.env` files or application environment variables.

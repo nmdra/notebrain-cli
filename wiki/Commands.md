@@ -119,15 +119,17 @@ notebrain reset
 
 ## Configuration File
 
-You can set any global flag persistently by creating a `config.toml` file at `~/.notebrain/config/config.toml`. 
+You can set any global flag persistently by creating a `config.toml` file at `~/.notebrain/config/config.toml` (or passing `--config=/path/to/config.toml`). 
 
-Flags are mapped implicitly to TOML keys (without the `--` prefix).
+Flags are mapped implicitly to TOML keys (without the `--` prefix). NoteBrain supports normalized configuration keys, meaning `snake_case` (`vault_path`) and `kebab-case` (`vault-path`) work interchangeably.
 
 ```toml
 vault-path = "/path/to/my/Second Brain"
+vault-name = "Second Brain"
 format = "json"
-chroma-path = "/custom/path/to/chroma"
+chroma-path = "~/.notebrain/chroma"
 verbose = true
+context-window = 1
 ```
 
 ## Machine-Readable Output & AI Agent Chaining

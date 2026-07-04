@@ -29,16 +29,25 @@ NoteBrain is a high-performance Go CLI tool designed to index an Obsidian vault 
 
 ## Configuration
 
-NoteBrain supports both `.env` files and a dedicated `config.toml` file for persisting CLI arguments.
+NoteBrain uses a dedicated TOML file for persisting CLI arguments and configuration settings.
 
 ### TOML Configuration (`~/.notebrain/config/config.toml`)
 
-You can persistently set any global CLI flag using a TOML file. For example, to avoid typing `--vault-path` and `--format` every time:
+You can persistently set any global CLI flag using a TOML file (either at `~/.notebrain/config/config.toml` or by passing `--config=/path/to/config.toml`). Copy `config.example.toml` to get started:
 
 ```toml
+# The absolute path to your Obsidian vault on disk
 vault-path = "/path/to/Second Brain 2.0"
+
+# The display name of your Obsidian vault (used for obsidian:// URIs)
+vault-name = "Second Brain 2.0"
+
+# Default output format ("text", "json", "tsv", "ndjson")
 format = "text"
 verbose = false
+
+# Number of adjacent chunks (±N) to fetch around each match for surrounding context
+context-window = 1
 
 # Respect Obsidian settings (default: true)
 respect-exclude = true
@@ -47,20 +56,8 @@ respect-exclude = true
 use-editor = false
 ```
 
-### Environment Variables (`.env`)
-
-You can also manage configuration via environment variables. Copy `.env.example` to `.env` in the project root:
-
-```env
-# The absolute path to your Obsidian vault on disk (used by 'ingest')
-OBSIDIAN_VAULT_PATH="/path/to/Second Brain 2.0"
-
-# The name of your Obsidian vault (used by 'search' for obsidian:// URIs)
-OBSIDIAN_VAULT_NAME="Second Brain 2.0"
-
-# Set to 1 to globally disable OSC 8 terminal hyperlinks in output
-# NO_HYPERLINKS=1
-```
+> [!NOTE]
+> NoteBrain supports normalized configuration keys: whether you write `vault-path` (kebab-case) or `vault_path` (snake_case) in your TOML file, settings are automatically resolved to the matching CLI flags.
 
 ## Quick Start
 

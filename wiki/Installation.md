@@ -30,9 +30,22 @@ You can download the pre-built Linux or macOS binaries from the [GitHub Releases
 
 ## Configuration
 
-By default, NoteBrain stores the local ChromaDB database in your home directory:
-```
-~/.notebrain/chroma
-```
+NoteBrain uses a TOML file for persistent configuration (defaults to `~/.notebrain/config/config.toml`).
 
-You can change this using the global `--chroma-path` flag on any command.
+1. Create your configuration directory:
+   ```bash
+   mkdir -p ~/.notebrain/config
+   ```
+2. Copy the template from the repository:
+   ```bash
+   cp config.example.toml ~/.notebrain/config/config.toml
+   ```
+3. Edit `~/.notebrain/config/config.toml` to set your vault path, database storage location, and default formatting:
+   ```toml
+   vault-path = "/path/to/your/Obsidian Vault"
+   vault-name = "My Vault"
+   chroma-path = "~/.notebrain/chroma"
+   format = "text"
+   ```
+
+By default, NoteBrain stores the local ChromaDB database at `~/.notebrain/chroma`. You can override any setting using command-line flags (e.g., `--chroma-path`, `--vault-path`, `--format`).
