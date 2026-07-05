@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.1.0] - 2026-07-05
+
+### Added
+- **Chunk Windowing (`--window`)**: Adjacent context retrieval returns surrounding chunks for richer semantic context (`feat(store,cli)`).
+- **Top-K Deduplication**: Search results are now deduplicated per note, returning only the best-scoring chunk per document (`feat(store,query)`).
+- **Raw Code Block Preservation**: Code blocks are now preserved verbatim in stored chunk text during parsing and ingestion (`feat(parser,ingest)`).
+- **Skip-Attachments & Skip-Phantom Filtering**: New `--skip-attachments` and `--skip-phantom` flags filter attachment files and phantom (non-existent) links from results (`feat(store)`).
+- **Structured JSON Logging**: Added `--log-format=json` for machine-readable structured logs via `log/slog`, optimized for headless/cron execution (`feat(log)`).
+- **Git-Tag Release Versioning**: `notebrain version` subcommand now reports the build version from git tags (`feat(cli)`).
+- **Scheduled Ingestion Templates**: Added systemd timer and cron templates for automated 3-hour ingestion cycles (`feat(automation)`).
+- **TOML-Only Configuration**: Removed `.env` support; all configuration is now strictly CLI flags > TOML file with normalized key matching (`feat(config)`).
+
+### Fixed
+- **Token-Aware Truncation Guard**: Embedding text is now truncated to the model's max token limit before encoding, preventing silent failures on very large chunks (`fix(ingest)`).
+- **TTY Detection for Headless Execution**: Interactive TUI components are now automatically disabled when running under systemd, cron, or non-TTY environments (`fix(tui)`).
+
+### Changed
+- **Embedded Persistent Storage Only**: Removed HTTP/standalone ChromaDB server mode; the CLI now strictly uses embedded persistent storage (`refactor(core)`).
+- **Decoupled Progress Logging**: Ingestion progress logging moved out of `internal/tui/` into the ingest domain package for cleaner headless operation (`refactor(ingest)`).
+- **RWMutex for Concurrent Reads**: Store layer upgraded from `sync.Mutex` to `sync.RWMutex`, allowing concurrent read queries (`refactor(store)`).
+- **Parser AST Type Rename**: Removed package-name stutter from AST types and methods for idiomatic Go (`refactor(parser)`).
+- **Modern Go Idioms**: Applied optimized string builder writes and modern Go patterns across core packages (`refactor(core)`).
+
+### Performance
+- **Memory & String Optimizations**: Reduced allocations and optimized string processing across parser, store, and embedder packages (`perf(core)`).
+
+### Build
+- **Go 1.26.4**: Bumped Go version to 1.26.4 (`build(deps)`).
+
+### Tests
+- **Embedder & Obsidian Package Tests**: Added comprehensive table-driven unit tests for embedder and obsidian client packages (`test(core)`).
+
 ## [v2.0.0] - 2026-06-30
 
 ### Breaking Changes
