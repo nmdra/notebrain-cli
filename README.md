@@ -1,112 +1,186 @@
 # NoteBrain CLI
 
-NoteBrain is a high-performance Go CLI tool designed to index an Obsidian vault into a local **ChromaDB** vector database. It enables powerful semantic search, backlink traversal, graph connections, hidden connections, shared tags discovery, and graph-boosted semantic queries across your personal knowledge base.
+A Go CLI tool that turns your [Obsidian](https://obsidian.md/) vault into a fully offline knowledge backend for **AI coding agents**. NoteBrain indexes markdown notes into a local **ChromaDB** vector database and exposes semantic search, wikilink graph traversal, and hidden connection discovery through structured JSON output — designed to be chained directly by autonomous agents, shell pipelines, and LLM tool-use workflows. Ships with a built-in [AI agent skill](wiki/Skill_Usage.md) for zero-config integration with assistants like Google Antigravity and Gemini.
 
 [![Release](https://github.com/nmdra/notebrain-cli/actions/workflows/release.yml/badge.svg)](https://github.com/nmdra/notebrain-cli/actions/workflows/release.yml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/nmdra/notebrain-cli.svg)](https://pkg.go.dev/github.com/nmdra/notebrain-cli)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/nmdra/notebrain-cli)](https://github.com/nmdra/notebrain-cli/blob/master/go.mod)
 [![License: MIT](https://img.shields.io/github/license/nmdra/notebrain-cli)](https://github.com/nmdra/notebrain-cli/blob/main/LICENSE)
 [![GitHub release](https://img.shields.io/github/v/release/nmdra/notebrain-cli)](https://github.com/nmdra/notebrain-cli/releases)
 [![GitHub stars](https://img.shields.io/github/stars/nmdra/notebrain-cli?style=social)](https://github.com/nmdra/notebrain-cli/stargazers)
 
-## Features
+<p align="center">
+  <img src="assets/banner.jpg" alt="NoteBrain CLI — AI-powered knowledge backend for your Obsidian vault" width="100%">
+</p>
 
-- **Blazing Fast Ingestion**: Uses Go concurrency and local ONNX embedding models to index your Markdown files rapidly.
-- **Embedded ChromaDB**: Stores vectors directly on disk using `chroma-go` v2 (no external database server required).
-- **Semantic Search**: Find notes by meaning, not just keywords.
-- **Beautiful TUI Integration**: Enjoy an interactive terminal UI for navigating search results with fuzzy-finding and live ingestion progress bars powered by `charm.land/bubbles`.
-- **Goldmark AST-Aware Chunking**: Intelligently chunks markdown sections according to header hierarchies instead of arbitrary character splits, preserving code blocks and structural metadata.
-- **Advanced Filtering**: Use `--section`, `--has-code`, and `--has-tasks` to filter searches precisely by document structures.
-- **Machine-Readable Outputs & AI Agent Chaining**: Supports structured `snake_case` JSON, TSV, and NDJSON with `--format` flags. Integrated `--jsonpath` filtering allows direct scalar extraction without external dependencies like `jq` for effortless command pipelines.
-- **Complete Note Retrieval**: Reconstruct full note content on the fly from indexed document chunks (`notebrain get`).
-- **Tag Search & Filtering**: Filter vector similarity searches by tag (`--tag`) or inspect structured tag arrays across your notes.
-- **OSC 8 Terminal Hyperlinks**: Automatically renders clickable `obsidian://open` links right in your CLI for seamlessly opening matched chunks inside Obsidian (supported terminals only).
-- **External Editor Integration**: Launch your preferred terminal/GUI editor (`$EDITOR` environment variable) directly from the TUI results view.
-- **Obsidian Excluded Files & Attachments**: Automatically honors your Obsidian configuration (`userIgnoreFilters` and `attachmentFolderPath`) during ingestion to keep databases clean.
-- **Graph Traversal**: Explores your Obsidian wikilinks graph (`[[Note]]`).
-- **Hidden Connections**: Discovers notes that are semantically identical but not explicitly linked.
-- **Graph-Boosted Search**: Combines semantic search scores with structural graph proximities.
+## Prerequisites
 
-## Configuration
+- **Go 1.26.4+** (for building from source)
+- **CGO-enabled toolchain** — GCC or Clang on Linux/macOS (the embedded vector store uses C/C++ bindings via SQLite and HNSW)
+- **~33 MB disk** for the ONNX embedding model (auto-downloaded on first run)
+- Linux or macOS (Windows is untested)
 
-NoteBrain uses a dedicated TOML file for persisting CLI arguments and configuration settings.
+## Installation
 
-### TOML Configuration (`~/.notebrain/config/config.toml`)
+Download a pre-built binary from the [GitHub Releases](https://github.com/nmdra/notebrain-cli/releases) page, or build from source:
 
-You can persistently set any global CLI flag using a TOML file (either at `~/.notebrain/config/config.toml` or by passing `--config=/path/to/config.toml`). Copy [config.example.toml](./config.example.toml) to get started:
-
-```toml
-# The absolute path to your Obsidian vault on disk
-vault-path = "/path/to/Second Brain 2.0"
-
-# The display name of your Obsidian vault (used for obsidian:// URIs)
-vault-name = "Second Brain 2.0"
-
-# Default output format ("text", "json", "tsv", "ndjson")
-format = "text"
-verbose = false
-
-# Number of adjacent chunks (±N) to fetch around each match for surrounding context
-context-window = 1
-
-# Respect Obsidian settings (default: true)
-respect-exclude = true
-
-# Use $EDITOR as default opener instead of Obsidian (default: false)
-use-editor = false
+```bash
+git clone https://github.com/nmdra/notebrain-cli.git
+cd notebrain-cli
+make build          # CGO_ENABLED=1 go build -o notebrain .
+sudo mv notebrain /usr/local/bin/
 ```
+
+See the full [Installation Guide](wiki/Installation.md) for details.
 
 ## Quick Start
 
-1. **Install** NoteBrain (see [Installation](wiki/Installation.md)).
-2. **Ingest** your vault:
-   ```bash
-   notebrain ingest --vault-path "/path/to/your/Obsidian Vault"
-   ```
-3. **Search** your thoughts:
-   ```bash
-   notebrain search "how do message brokers work?" --limit 5
-   ```
-4. **Retrieve** full note content or chain commands for AI agents:
-   ```bash
-   # Extract top matching note slug directly into a shell variable
-   SLUG=$(notebrain search "message broker" --limit 1 --jsonpath="$.results[0].note_slug")
+**1. Index your vault:**
 
-   # Retrieve complete reconstructed note text
-   notebrain get "$SLUG" --jsonpath="$.text"
-   ```
-5. **Automate** background ingestion:
-   - Configure a 3-hour cron job or OS timer so your index stays automatically updated (see [Scheduled Ingestion](wiki/Scheduled_Ingestion.md)).
-
-## Architecture
-
-```mermaid
-flowchart TD
-    A[Obsidian Vault] -->|Markdown Files| B(Parser Engine)
-    B -->|Chunks & Frontmatter| C{Ingestion Pipeline}
-    B -->|Wikilinks| C
-
-    C -->|SHA-256 Hash Check| D[ChromaDB Local Vector Store]
-    C -->|ONNX Embeddings| D
-
-    E[CLI Commands] -->|Query| D
-    D -->|Semantic Search| E
-    D -->|BFS Graph Traversal| E
+```bash
+notebrain ingest --vault-path "/path/to/your/Obsidian Vault"
 ```
+
+**2. Search your notes by meaning:**
+
+```bash
+notebrain search "how do message brokers work?" --limit 5
+```
+
+```
+Semantic Search: "how do message brokers work?"
+
+─────────────────────────────
+ 1. Redis Queue                          score=0.8234  [#Redis #Queue]
+ 2. Apache Kafka                         score=0.7891  [#Kafka #Messaging]
+ 3. RabbitMQ                             score=0.7645  [#RabbitMQ #AMQP]
+ 4. Event Driven Architecture            score=0.7412  [#Architecture]
+ 5. Microservices Communication           score=0.7103  [#Microservices]
+
+  (Ctrl+click or Cmd+click a title to open in Obsidian)
+```
+
+**3. Get structured output for scripts and AI agents:**
+
+```bash
+notebrain search "kubernetes" --limit 2 --format json
+```
+
+<details>
+<summary>Example JSON output</summary>
+
+```json
+{
+  "command": "search",
+  "query": "Semantic Search: \"kubernetes\"",
+  "total": 2,
+  "results": [
+    {
+      "note_slug": "02areaskubernetesk8s-primerkubernetes-introduction",
+      "title": "Kubernetes Introduction",
+      "file_path": "02.Areas/Kubernetes/K8s-Primer/Kubernetes Introduction.md",
+      "score": 0.7377,
+      "tags": ["Kubernetes", "Kubernetes/Primer", "CNCF"],
+      "heading_path": "What is Kubernetes"
+    },
+    {
+      "note_slug": "02areaskubernetesk8s-primerk8s-principles",
+      "title": "K8s Principles",
+      "file_path": "02.Areas/Kubernetes/K8s-Primer/K8s Principles.md",
+      "score": 0.7294,
+      "tags": ["Kubernetes/Networking", "Kubernetes/Primer", "Kubernetes"],
+      "heading_path": "Pods"
+    }
+  ]
+}
+```
+
+</details>
+
+**4. Chain commands to retrieve full notes:**
+
+```bash
+# Extract slug from top search result
+SLUG=$(notebrain search "message broker" --limit 1 --jsonpath="$.results[0].note_slug")
+
+# Retrieve complete reconstructed note text
+notebrain get "$SLUG" --jsonpath="$.text"
+```
+
+**5. Automate indexing** with a cron job or systemd timer so your index stays fresh (see [Scheduled Ingestion](wiki/Scheduled_Ingestion.md)).
+
+## Features
+
+- **Semantic Search** — Find notes by meaning, not just keywords. Uses the [`all-MiniLM-L6-v2`](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) ONNX model (384-dim embeddings, ~33 MB download on first run) for fully offline, on-device inference.
+- **Graph Traversal** — Walk your Obsidian wikilink graph (`[[Note]]`) via BFS: `backlinks`, `connections` (multi-hop), `tags` (shared tag neighbors).
+- **Hidden Connections** — Discover notes that are semantically similar but not explicitly linked.
+- **Graph-Boosted Search** — Combine semantic similarity scores with structural graph proximity for richer results.
+- **Interactive TUI** — Navigate search results with fuzzy-finding, arrow keys, and live ingestion progress. Powered by [Bubble Tea](https://github.com/charmbracelet/bubbletea).
+- **Advanced Filtering** — Narrow searches by `--section`, `--has-code`, `--has-tasks`, or `--tag`.
+- **Full Note Retrieval** — Reconstruct complete note content on the fly from indexed chunks (`notebrain get`).
+- **Machine-Readable Output** — Structured JSON, TSV, and NDJSON via `--format` flags, plus built-in `--jsonpath` extraction (no `jq` needed).
+- **OSC 8 Hyperlinks** — Clickable `obsidian://open` links directly in your terminal. Works in [iTerm2](https://iterm2.com/), [WezTerm](https://wezfurlong.org/wezterm/), [kitty](https://sw.kovidgoyal.net/kitty/), [Windows Terminal](https://github.com/microsoft/terminal), and others supporting the [OSC 8 spec](https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda). Disable with `--no-hyperlinks` if unsupported.
+- **Editor Integration** — Open matched notes in `$EDITOR` or Obsidian directly from the TUI.
+- **Obsidian-Aware Ingestion** — Honors `userIgnoreFilters` and `attachmentFolderPath` from your Obsidian config. Optionally skip phantom links and attachment references.
+
+### Under the Hood
+
+- **Goldmark AST-Aware Chunking** — Splits markdown by header hierarchy rather than arbitrary character offsets, preserving code blocks and structural metadata.
+- **Embedded ChromaDB** — Stores vectors directly on disk via [`chroma-go`](https://github.com/amikos-tech/chroma-go) v0.4.x (no external database server required).
+- **Incremental Ingestion** — SHA-256 content hashing skips unmodified notes in milliseconds on re-runs.
+- **AI Agent Skill** — Ships with a built-in AI agent skill (`.agents/skills/notebrain/`) for autonomous knowledge retrieval (see [AI Agent Skill Usage](wiki/Skill_Usage.md)).
+
+## Configuration
+
+NoteBrain reads configuration from a TOML file at `~/.notebrain/config/config.toml` (or pass `--config=/path/to/config.toml`). CLI flags always override TOML values.
+
+Copy the template to get started:
+
+```bash
+mkdir -p ~/.notebrain/config
+cp config.example.toml ~/.notebrain/config/config.toml
+```
+
+Key settings ([full reference](./config.example.toml)):
+
+```toml
+vault-path = "/path/to/Second Brain 2.0"
+vault-name = "Second Brain 2.0"
+format     = "text"              # "text", "json", "tsv", "ndjson"
+
+skip-attachments = true          # ignore image/file links in graph
+skip-phantom     = true          # exclude uncreated "phantom" notes
+respect-exclude  = true          # honor Obsidian's ignore rules
+```
+
+### Data Location
+
+All persistent data is stored under `~/.notebrain/`:
+
+| Path                              | Contents                                                 |
+| --------------------------------- | -------------------------------------------------------- |
+| `~/.notebrain/chroma/`            | ChromaDB vector store (embeddings, metadata, link graph) |
+| `~/.notebrain/config/config.toml` | User configuration file                                  |
+
+To fully uninstall, remove the `notebrain` binary and delete `~/.notebrain/`.
 
 ## Documentation
 
-Comprehensive documentation is available in the `wiki/` directory:
+| Guide                                                | Description                                                |
+| ---------------------------------------------------- | ---------------------------------------------------------- |
+| [Installation](wiki/Installation.md)                 | Prerequisites, pre-built binaries, building from source    |
+| [Commands Reference](wiki/Commands.md)               | Full CLI command and flag documentation                    |
+| [Architecture](wiki/Architecture.md)                 | Internals: chunking pipeline, embedding, ChromaDB schema   |
+| [Scheduled Ingestion](wiki/Scheduled_Ingestion.md)   | Cron and systemd timer setup for background indexing       |
+| [AI Agent Skill Usage](wiki/Skill_Usage.md)          | Using the built-in AI agent skill for autonomous retrieval |
+| [DeepWiki](https://deepwiki.com/nmdra/notebrain-cli) | AI-generated codebase documentation and exploration        |
 
-- [Installation Guide](wiki/Installation.md)
-- [Architecture Details](wiki/Architecture.md)
-- [AI Agent Skill Usage](wiki/Skill_Usage.md)
+## Contributing
 
-### CLI Command Reference
+Contributions are welcome! Please open an issue or pull request on [GitHub](https://github.com/nmdra/notebrain-cli).
 
-Full documentation for all NoteBrain commands:
-
-- [Commands Reference](wiki/Commands.md)
+This project uses [Conventional Commits](https://www.conventionalcommits.org/), Go vendoring (`vendor/`), and pre-commit hooks via [Lefthook](https://github.com/evilmartians/lefthook).
 
 ## License
 
-MIT License
+[MIT License](LICENSE) — Copyright © 2026 nmdra

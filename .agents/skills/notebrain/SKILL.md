@@ -1,7 +1,7 @@
 ---
 name: notebrain-assistant
 description: Use NoteBrain to search, index, and explore an Obsidian vault via ChromaDB. Make sure to use this skill whenever the user mentions their notes, knowledge base, Obsidian vault, semantic search, finding connections, unlinked notes, or asks general exploratory questions like "what do I know about X", "find notes related to Y", "what connects to Z", or "summarize my notes on W", even if they don't explicitly mention NoteBrain, vector search, or ChromaDB.
-license: Apache-2.0
+license: MIT
 allowed-tools: Bash(notebrain:*), Bash(./notebrain:*)
 ---
 
