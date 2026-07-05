@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/nmdra/notebrain-cli/internal/obsidian"
+	"github.com/nmdra/notebrain-cli/v2/internal/obsidian"
 )
 
 type editorFinishedMsg struct {

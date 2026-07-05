@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nmdra/notebrain-cli/internal/store"
+	"github.com/nmdra/notebrain-cli/v2/internal/store"
 )
 
 func setupTestData(t *testing.T, ctx context.Context, st *store.Store) {

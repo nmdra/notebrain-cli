@@ -29,9 +29,9 @@ import (
 	tea "charm.land/bubbletea/v2"
 	chroma "github.com/amikos-tech/chroma-go/pkg/api/v2"
 	"github.com/charmbracelet/x/term"
-	"github.com/nmdra/notebrain-cli/cmd/tui"
-	"github.com/nmdra/notebrain-cli/internal/embedder"
-	"github.com/nmdra/notebrain-cli/internal/store"
+	"github.com/nmdra/notebrain-cli/v2/cmd/tui"
+	"github.com/nmdra/notebrain-cli/v2/internal/embedder"
+	"github.com/nmdra/notebrain-cli/v2/internal/store"
 )
 
 type SearchCmd struct {

@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/nmdra/notebrain-cli/internal/embedder"
+	"github.com/nmdra/notebrain-cli/v2/internal/embedder"
 )
 
 func TestLocalEmbedder(t *testing.T) {

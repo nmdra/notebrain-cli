@@ -26,9 +26,9 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/nmdra/notebrain-cli/internal/embedder"
-	"github.com/nmdra/notebrain-cli/internal/ingest"
-	"github.com/nmdra/notebrain-cli/internal/store"
+	"github.com/nmdra/notebrain-cli/v2/internal/embedder"
+	"github.com/nmdra/notebrain-cli/v2/internal/ingest"
+	"github.com/nmdra/notebrain-cli/v2/internal/store"
 )
 
 type IngestCmd struct {

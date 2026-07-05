@@ -1,4 +1,4 @@
-module github.com/nmdra/notebrain-cli
+module github.com/nmdra/notebrain-cli/v2
 
 go 1.26.4
 

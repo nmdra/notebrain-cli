@@ -8,7 +8,7 @@ import (
 
 	chroma "github.com/amikos-tech/chroma-go/pkg/api/v2"
 	"github.com/amikos-tech/chroma-go/pkg/embeddings"
-	"github.com/nmdra/notebrain-cli/internal/parser"
+	"github.com/nmdra/notebrain-cli/v2/internal/parser"
 )
 
 // Result is one row returned by any query.

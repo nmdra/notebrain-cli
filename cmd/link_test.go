@@ -3,7 +3,7 @@ package cmd
 import (
 	"testing"
 
-	"github.com/nmdra/notebrain-cli/internal/store"
+	"github.com/nmdra/notebrain-cli/v2/internal/store"
 )
 
 func TestObsidianURI(t *testing.T) {

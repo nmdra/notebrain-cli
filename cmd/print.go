@@ -8,7 +8,7 @@ import (
 
 	"charm.land/lipgloss/v2"
 	"github.com/PaesslerAG/jsonpath"
-	"github.com/nmdra/notebrain-cli/internal/store"
+	"github.com/nmdra/notebrain-cli/v2/internal/store"
 )
 
 // hyperlink wraps visible text in an OSC 8 terminal hyperlink.

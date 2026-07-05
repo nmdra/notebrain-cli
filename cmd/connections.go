@@ -24,8 +24,8 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/nmdra/notebrain-cli/internal/parser"
-	"github.com/nmdra/notebrain-cli/internal/store"
+	"github.com/nmdra/notebrain-cli/v2/internal/parser"
+	"github.com/nmdra/notebrain-cli/v2/internal/store"
 )
 
 type ConnectionsCmd struct {

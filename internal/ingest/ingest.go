@@ -16,8 +16,8 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/nmdra/notebrain-cli/internal/parser"
-	"github.com/nmdra/notebrain-cli/internal/store"
+	"github.com/nmdra/notebrain-cli/v2/internal/parser"
+	"github.com/nmdra/notebrain-cli/v2/internal/store"
 )
 
 // Embedder abstracts vector embedding so the pipeline can be tested with mocks.

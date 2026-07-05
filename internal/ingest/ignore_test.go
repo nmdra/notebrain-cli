@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/nmdra/notebrain-cli/internal/ingest"
+	"github.com/nmdra/notebrain-cli/v2/internal/ingest"
 )
 
 func TestLoadExcludedPaths(t *testing.T) {

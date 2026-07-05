@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/nmdra/notebrain-cli/internal/obsidian"
+	"github.com/nmdra/notebrain-cli/v2/internal/obsidian"
 )
 
 func TestEditorCommand(t *testing.T) {

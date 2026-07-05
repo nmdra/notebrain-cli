@@ -10,7 +10,7 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/charmbracelet/x/term"
-	"github.com/nmdra/notebrain-cli/internal/configfile"
+	"github.com/nmdra/notebrain-cli/v2/internal/configfile"
 )
 
 // Globals holds shared configuration available to all subcommands.

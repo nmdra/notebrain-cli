@@ -7,7 +7,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/nmdra/notebrain-cli/internal/store"
+	"github.com/nmdra/notebrain-cli/v2/internal/store"
 )
 
 // EditorCommand constructs an *exec.Cmd to launch the user's $EDITOR for filePath.

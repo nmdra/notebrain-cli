@@ -27,7 +27,7 @@ import (
 	"os"
 	"runtime/debug"
 
-	"github.com/nmdra/notebrain-cli/cmd"
+	"github.com/nmdra/notebrain-cli/v2/cmd"
 )
 
 // Populated automatically by GoReleaser during git tag builds:

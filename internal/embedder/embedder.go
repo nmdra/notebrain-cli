@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/amikos-tech/chroma-go/pkg/embeddings/ort"
-	"github.com/nmdra/notebrain-cli/internal/tui"
+	"github.com/nmdra/notebrain-cli/v2/internal/tui"
 )
 
 type LocalEmbedder struct {
