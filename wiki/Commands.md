@@ -5,145 +5,376 @@ NoteBrain provides a variety of commands to ingest, query, and analyze your Obsi
 ```text
 Usage: notebrain <command> [flags]
 
-Index and search your Obsidian vault with semantic intelligence
+Index and search your Obsidian vault with semantic intelligence.
 
-Flags:
-  -h, --help             Show context-sensitive help.
-      --chroma-path="~/.notebrain/chroma"
-                         path to ChromaDB persistent storage
-      --vault-path=STRING    Obsidian vault path (also used as vault name fallback)
-      --verbose              enable verbose output
-      --no-hyperlinks        Disable OSC 8 terminal hyperlinks in output
-      --format="text"        output format (text, json, tsv, ndjson)
-      --jsonpath=STRING      JSONPath expression for filtering output (e.g., $.results[0].note_slug)
-      --include-text         include matched chunk text in structured output
-      --min-score=0          suppress results below this similarity score (0–1)
-      --respect-exclude      respect Obsidian userIgnoreFilters and attachmentFolderPath settings during ingest (default: true)
-      --use-editor           enable external editor ($EDITOR) integration as default open type (default: false)
-      --config="~/.notebrain/config/config.toml"
-                             Path to config file
-
-Commands:
-  ingest         Ingest markdown files from a vault
-  search         Semantic search across indexed notes
-  get            Retrieve the full reconstructed markdown text of a note
-  backlinks      Find incoming links to a note
-  connections    Traverse graph connections
-  hidden         Discover hidden semantic links between unlinked notes
-  tags           Find notes sharing common tags
-  boosted        Graph-boosted semantic search
-  stats          Show collection statistics
-  reset          Reset the ChromaDB collections
+NoteBrain uses local LLM embeddings to index your Markdown notes into ChromaDB,
+enabling powerful semantic search, hidden graph connections, and AI-friendly
+automation workflows.
 ```
 
-### 🪄 Interactive Terminal UI
-For all query commands (`search`, `backlinks`, `connections`, `hidden`, `boosted`, `tags`), NoteBrain will launch a **beautiful interactive terminal UI**! 
-- Use the **Up/Down** arrow keys to navigate the results.
-- Press **/** to live-filter the results.
-- Press **Enter** to open the selected note using your default method (Obsidian, or your editor if `--use-editor` is enabled).
-- Press **o** to open the note explicitly in Obsidian.
-- Press **e** to open the note explicitly in your terminal or GUI editor (defined by the `$EDITOR` environment variable).
-- Press **q** or **Esc** to exit.
+---
 
-## `ingest`
-Indexes your Obsidian vault into the local ChromaDB database.
+## Global Flags
+
+These flags can be applied to `notebrain` before any subcommand (e.g., `notebrain --verbose search "query"`) or defined in your configuration file.
+
+| Flag                 | Type      | Default                           | Description                                                                                                                                |
+| :------------------- | :-------- | :-------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------- |
+| `--config`           | `string`  | `~/.notebrain/config/config.toml` | Path to the TOML config file.                                                                                                              |
+| `--chroma-path`      | `string`  | `~/.notebrain/chroma`             | Path to ChromaDB persistent storage. Can also be set via the `$CHROMA_PATH` environment variable.                                          |
+| `--vault-path`       | `string`  | _(None)_                          | **Required.** Absolute path to your Obsidian vault.                                                                                        |
+| `--vault-name`       | `string`  | _(Basename of vault)_             | Obsidian vault name (used for generating `obsidian://` URI links).                                                                         |
+| `--verbose`          | `boolean` | `false`                           | Enable verbose debug logging output.                                                                                                       |
+| `--no-hyperlinks`    | `boolean` | `false`                           | Disable OSC 8 terminal hyperlinks in output. Can also be set via `$NO_HYPERLINKS`.                                                         |
+| `--format`           | `string`  | `text`                            | Output format: `text` (standard/TUI), `json` (pretty structured JSON), `tsv` (Tab-Separated Values), or `ndjson` (Newline Delimited JSON). |
+| `--jsonpath`         | `string`  | _(None)_                          | JSONPath expression to extract and filter specific fields from JSON output (e.g., `$.results[0].note_slug`).                               |
+| `--include-text`     | `boolean` | `false`                           | Include matched chunk text inside structured outputs (JSON, TSV, NDJSON).                                                                  |
+| `--context-window`   | `integer` | `0`                               | Fetch ±N adjacent chunks around each match for additional semantic context.                                                                |
+| `--min-score`        | `float`   | `0.0`                             | Suppress search results below this similarity score (0.0 to 1.0).                                                                          |
+| `--respect-exclude`  | `boolean` | `true`                            | Respect Obsidian user ignore filters and attachment folder exclusions during ingestion.                                                    |
+| `--use-editor`       | `boolean` | `false`                           | Enable external editor (`$EDITOR` environment variable) integration as the default action to open notes.                                   |
+| `--log-format`       | `string`  | `auto`                            | Log format: `auto` (detects TTY), `json`, or `text`.                                                                                       |
+| `--log-level`        | `string`  | `info`                            | Minimum log severity to show: `info`, `debug`, `warn`, or `error`.                                                                         |
+| `--skip-attachments` | `boolean` | `true`                            | Exclude attachment and image links from graph edges.                                                                                       |
+| `--skip-phantom`     | `boolean` | `true`                            | Exclude uncreated notes (phantom links) from query results.                                                                                |
+| `--version`          | `boolean` | `false`                           | Show version information.                                                                                                                  |
+
+---
+
+## Interactive Terminal UI (TUI)
+
+For query-based commands (`search`, `backlinks`, `connections`, `hidden`, `boosted`, `tags`), NoteBrain launches an interactive terminal interface when output format is set to `text` and executed in a TTY:
+
+- **Up/Down / J/K:** Navigate through results.
+- **Slash (`/`):** Enter live-filter mode to filter results.
+- **Enter:** Open the selected note using the default method (Obsidian, or your editor if `--use-editor` is enabled).
+- **`o`:** Explicitly open the note in Obsidian.
+- **`e`:** Explicitly open the note in your terminal or GUI editor (defined by the `$EDITOR` environment variable).
+- **`q` / `Esc`:** Exit the TUI.
+
+---
+
+## Command Reference
+
+### `ingest`
+
+Indexes markdown files from your Obsidian vault, parses Wikilinks and tags, chunks the contents, and generates local vector embeddings.
+
+#### Usage
+
 ```bash
-notebrain ingest --vault-path "/path/to/vault" [--workers 4]
+notebrain ingest [<glob>] [flags]
 ```
-- Parses Markdown files.
-- Extracts Wikilinks (`[[target]]`) and Tags (`#tag`).
-- Chunks content and embeds via ONNX locally.
-- *Note: Run this command whenever your vault has significantly changed.*
-- *Tip: You can automate periodic background indexing using OS cron jobs or systemd timers (see [Scheduled Ingestion](Scheduled_Ingestion.md)).*
 
-## `search`
-Performs a semantic search against your vault chunks. Supports optional tag filtering via `--tag`.
+#### Arguments
+
+- `[<glob>]` _(optional)_: Glob pattern targeting specific files/folders to ingest (e.g. `Projects/**`).
+
+#### Command-Specific Flags
+
+| Flag                | Type      | Default | Description                                                                         |
+| :------------------ | :-------- | :------ | :---------------------------------------------------------------------------------- |
+| `--workers`         | `integer` | `4`     | Number of concurrent ingestion workers.                                             |
+| `--min-chunk-words` | `integer` | `0`     | Skip chunks with fewer words than this (0 defaults to 10 words).                    |
+| `--chunk-size`      | `integer` | `0`     | Maximum runes per chunk for the parser (0 defaults to 800 runes).                   |
+| `--chunk-overlap`   | `integer` | `0`     | Overlap runes between sub-chunks when a section is split (0 defaults to 100 runes). |
+
+#### Examples
+
 ```bash
-notebrain search "how do message brokers work?" --limit 5
-notebrain search "kubernetes reconciliation" --tag="Kubernetes" --limit 5
+# Ingest entire vault
+notebrain ingest --vault-path "/path/to/vault"
+
+# Ingest with customized chunk parameters and 8 worker threads
+notebrain ingest --vault-path "/path/to/vault" --workers 8 --chunk-size 1000 --chunk-overlap 150
+
+# Ingest only a specific folder pattern
+notebrain ingest "Daily Notes/*.md" --vault-path "/path/to/vault"
 ```
 
-## `get`
-Retrieves and reconstructs the full markdown content of a note by combining all indexed chunks matching the given note slug or file path.
+---
+
+### `search`
+
+Performs semantic vector search across all indexed chunks in your vault. Supports filtering by sections, tags, tasks, and code.
+
+#### Usage
+
 ```bash
-notebrain get "02areaskubernetesckadkubernetes-native-applications"
+notebrain search [<query>] [flags]
 ```
 
-## `backlinks`
-Finds notes linking to a given note. Replaces the native Obsidian backlinks panel but queries directly via the local graph index.
+#### Arguments
+
+- `[<query>]` _(optional)_: The semantic query string. (Can be omitted if `--interactive` or `--tag` is specified).
+
+#### Command-Specific Flags
+
+| Flag            | Type      | Default  | Description                                                                          |
+| :-------------- | :-------- | :------- | :----------------------------------------------------------------------------------- |
+| `--limit`       | `integer` | `10`     | Maximum number of results to return.                                                 |
+| `--top-k`       | `integer` | `3`      | Maximum number of chunks to return per note.                                         |
+| `--section`     | `string`  | _(None)_ | Filter results by heading path.                                                      |
+| `--tag`         | `string`  | _(None)_ | Filter results by tag name (prefixed `#` is optional).                               |
+| `--has-tasks`   | `boolean` | `false`  | Only return chunks containing markdown task lists (`- [ ]`).                         |
+| `--has-code`    | `boolean` | `false`  | Only return chunks containing code blocks.                                           |
+| `--interactive` | `boolean` | `false`  | Launch a live interactive search TUI where you can type queries and preview results. |
+
+#### Examples
+
 ```bash
+# Basic semantic search
+notebrain search "reconciliation loop in kubernetes" --limit 5
+
+# Search specifically for tasks under the Kubernetes tag
+notebrain search "deploy service" --tag "Kubernetes" --has-tasks
+
+# Launch live-search interactive terminal
+notebrain search --interactive
+```
+
+---
+
+### `get`
+
+Reconstructs and displays the complete markdown text of a note by joining all of its indexed chunks.
+
+#### Usage
+
+```bash
+notebrain get <slug> [flags]
+```
+
+#### Arguments
+
+- `<slug>` _(required)_: Note slug (e.g. `kubernetes-native-applications`) or vault file path.
+
+#### Examples
+
+```bash
+# Retrieve full content of a note by slug
+notebrain get "kubernetes-native-applications"
+
+# Retrieve full content of a note, outputting to JSON
+notebrain get "kubernetes-native-applications" --format json
+```
+
+---
+
+### `backlinks`
+
+Finds all notes linking to the target note using the local Wikilink graph.
+
+#### Usage
+
+```bash
+notebrain backlinks <note> [flags]
+```
+
+#### Arguments
+
+- `<note>` _(required)_: The target note slug or title.
+
+#### Examples
+
+```bash
+# Find what notes link to "Redis"
 notebrain backlinks "Redis"
 ```
 
-## `connections`
-Finds notes connected via a breadth-first graph traversal.
+---
+
+### `connections`
+
+Performs breadth-first traversal of the Wikilink graph to find connected notes up to a specified number of hops.
+
+#### Usage
+
 ```bash
+notebrain connections <note> [flags]
+```
+
+#### Arguments
+
+- `<note>` _(required)_: The starting note slug or title.
+
+#### Command-Specific Flags
+
+| Flag     | Type      | Default | Description                               |
+| :------- | :-------- | :------ | :---------------------------------------- |
+| `--hops` | `integer` | `2`     | Maximum number of graph hops to traverse. |
+
+#### Examples
+
+```bash
+# Find notes connected within 2 hops of "Redis"
 notebrain connections "Redis" --hops 2
 ```
-- `--hops`: Defines the depth of the graph traversal (default is 2).
 
-## `hidden`
-Discovers "hidden connections" — notes that are semantically close to the given note but have no direct wikilink relationship in Obsidian.
+---
+
+### `hidden`
+
+Discovers "hidden" semantic connections: notes that are semantically similar but do not have direct Wikilinks in Obsidian.
+
+#### Usage
+
 ```bash
+notebrain hidden <note> [flags]
+```
+
+#### Arguments
+
+- `<note>` _(required)_: The target note slug or title.
+
+#### Command-Specific Flags
+
+| Flag      | Type      | Default | Description                                     |
+| :-------- | :-------- | :------ | :---------------------------------------------- |
+| `--limit` | `integer` | `10`    | Maximum number of hidden connections to return. |
+
+#### Examples
+
+```bash
+# Discover 5 closest semantic notes to "Redis" that are not linked
 notebrain hidden "Redis" --limit 5
 ```
 
-## `boosted`
-Graph-boosted semantic search. Performs a semantic query, but boosts the score of chunks that are structurally connected to a "seed" note.
-```bash
-notebrain boosted "message queues and broker" --seed "Redis" --boost 2.0 --limit 5
-```
-- `--seed`: The origin note for graph boosting.
-- `--boost`: The multiplier applied to graph-connected results.
+---
 
-## `tags`
-Find notes sharing tags with a given note.
+### `tags`
+
+Finds notes sharing tags with a given note, ranked by the number of shared tags.
+
+#### Usage
+
 ```bash
-notebrain tags "Redis" --min-shared 1
+notebrain tags <note> [flags]
 ```
 
-## `stats`
-Displays statistics for the ChromaDB collections used by NoteBrain.
+#### Arguments
+
+- `<note>` _(required)_: The target note slug or title.
+
+#### Command-Specific Flags
+
+| Flag           | Type      | Default | Description                                        |
+| :------------- | :-------- | :------ | :------------------------------------------------- |
+| `--min-shared` | `integer` | `1`     | Minimum number of shared tags to include a result. |
+
+#### Examples
+
+```bash
+# Find notes sharing at least 2 tags with "Redis"
+notebrain tags "Redis" --min-shared 2
+```
+
+---
+
+### `boosted`
+
+Graph-boosted semantic search. Combines semantic vector similarity with Wikilink graph distance from a seed note, boosting similarity scores for notes structurally connected to the seed.
+
+#### Usage
+
+```bash
+notebrain boosted <query> --seed=STRING [flags]
+```
+
+#### Arguments
+
+- `<query>` _(required)_: Search query.
+
+#### Command-Specific Flags
+
+| Flag      | Type      | Default  | Description                                                     |
+| :-------- | :-------- | :------- | :-------------------------------------------------------------- |
+| `--seed`  | `string`  | _(None)_ | **Required.** The origin note slug or title for graph boosting. |
+| `--boost` | `float`   | `1.5`    | Multiplier applied to scores of graph-connected results.        |
+| `--limit` | `integer` | `10`     | Maximum number of results to return.                            |
+
+#### Examples
+
+```bash
+# Perform search boosted by structural connections to "Redis"
+notebrain boosted "caching strategies" --seed "Redis" --boost 2.0 --limit 5
+```
+
+---
+
+### `stats`
+
+Displays statistics for your NoteBrain collection (total number of indexed chunks and links).
+
+#### Usage
+
+```bash
+notebrain stats [flags]
+```
+
+#### Examples
+
 ```bash
 notebrain stats
 ```
 
-## `reset`
-Drops all collections and starts fresh. This operation is irreversible.
+---
+
+### `reset`
+
+Drops all NoteBrain collections (`nb_chunks` and `nb_links`) and starts fresh. This operation is irreversible.
+
+#### Usage
+
 ```bash
-notebrain reset
+notebrain reset [flags]
 ```
 
-## Configuration File
+_Note: For automated scripts, you can bypass the interactive confirmation prompt by piping `yes`:_
 
-You can set any global flag persistently by creating a `config.toml` file at `~/.notebrain/config/config.toml` (or passing `--config=/path/to/config.toml`). 
+```bash
+echo yes | notebrain reset
+```
 
-Flags are mapped implicitly to TOML keys (without the `--` prefix). NoteBrain supports normalized configuration keys, meaning `snake_case` (`vault_path`) and `kebab-case` (`vault-path`) work interchangeably.
+---
+
+### `version`
+
+Prints version information, including build commit hash and compile date.
+
+#### Usage
+
+```bash
+notebrain version [flags]
+```
+
+---
+
+## ⚙️ Configuration File
+
+Any global flag can be persistently configured in `~/.notebrain/config/config.toml` (or custom path passed to `--config`). Keys in the config file support interchangeable `kebab-case` and `snake_case` styles.
 
 ```toml
-vault-path = "/path/to/my/Second Brain"
-vault-name = "Second Brain"
-format = "json"
+# ~/.notebrain/config/config.toml
+vault-path = "/home/user/Obsidian/MainVault"
+vault-name = "MainVault"
 chroma-path = "~/.notebrain/chroma"
+format = "json"
 verbose = true
 context-window = 1
+skip-attachments = true
 ```
 
-## Machine-Readable Output & AI Agent Chaining
+---
 
-NoteBrain supports structured `snake_case` JSON, TSV, and NDJSON outputs (`note_slug`, `title`, `file_path`, `score`, `tags`, `text`) for clean automation and AI agent workflows. The TUI is automatically suppressed when formatting is not `text`.
+## Machine-Readable Output & AI Chain Automation
 
-```bash
-notebrain search "golang concurrency" --format json --include-text
-```
-
-For direct shell pipeline extraction without external JSON tools like `jq`, use `--jsonpath`:
+Using output formats like JSON or NDJSON and extracting fields via `--jsonpath` allows easy piping to shell tools and AI agents:
 
 ```bash
-# 1. Extract note slug directly
-SLUG=$(notebrain search "message broker backpressure" --limit 1 --jsonpath="$.results[0].note_slug")
+# Extract the slug of the top result
+TOP_SLUG=$(notebrain search "golang channels" --limit 1 --jsonpath="$.results[0].note_slug")
 
-# 2. Fetch full note text or related backlinks
-notebrain get "$SLUG" --jsonpath="$.text"
-notebrain backlinks "$SLUG" --jsonpath="$.results[*].note_slug"
+# Pass it to fetch full content
+notebrain get "$TOP_SLUG" --jsonpath="$.text"
 ```
