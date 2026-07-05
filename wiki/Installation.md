@@ -1,7 +1,7 @@
 # Installation
 
 ## Prerequisites
-- Go 1.26.3 or higher.
+- Go 1.26.4 or higher.
 - `make` (optional, for building from source).
 - CGO enabled toolchain (GCC/Clang on Linux/macOS) since the embedded vector database requires C/C++ bindings.
 
