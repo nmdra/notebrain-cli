@@ -99,6 +99,7 @@ Comprehensive documentation is available in the `wiki/` directory:
 
 - [Installation Guide](wiki/Installation.md)
 - [Architecture Details](wiki/Architecture.md)
+- [AI Agent Skill Usage](wiki/Skill_Usage.md)
 
 ### CLI Command Reference
 
