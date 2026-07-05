@@ -8,6 +8,7 @@ import (
 
 	chroma "github.com/amikos-tech/chroma-go/pkg/api/v2"
 	"github.com/amikos-tech/chroma-go/pkg/embeddings"
+	"github.com/nmdra/notebrain-cli/internal/parser"
 )
 
 // Result is one row returned by any query.
@@ -16,6 +17,7 @@ type Result struct {
 	Title       string   `json:"title"`
 	FilePath    string   `json:"file_path"`
 	Score       float64  `json:"score"`
+	IsPhantom   bool     `json:"is_phantom,omitempty"`
 	ChunkIndex  int      `json:"chunk_index,omitempty"`
 	Tags        []string `json:"tags,omitempty"`
 	Extra       string   `json:"extra,omitempty"` // e.g. shared tags, hop count
@@ -112,18 +114,22 @@ func (s *Store) Backlinks(ctx context.Context, targetSlug string) ([]Result, err
 	seen := map[string]bool{}
 	var out []Result
 	for _, meta := range res.GetMetadatas() {
+		if s.SkipAttachments && (parser.IsAttachmentLink(metaString(meta, "target_path")) || parser.IsAttachmentLink(metaString(meta, "display_text"))) {
+			continue
+		}
 		slug := metaString(meta, "source_slug")
 		if seen[slug] {
 			continue
 		}
 		seen[slug] = true
-		title, filePath := s.noteInfoForSlug(ctx, slug)
+		title, filePath, found := s.noteInfoForSlug(ctx, slug)
 		out = append(out, Result{
-			NoteSlug: slug,
-			Title:    title,
-			FilePath: filePath,
-			Score:    1.0,
-			Extra:    metaString(meta, "display_text"),
+			NoteSlug:  slug,
+			Title:     title,
+			FilePath:  filePath,
+			Score:     1.0,
+			Extra:     metaString(meta, "display_text"),
+			IsPhantom: !found,
 		})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Title < out[j].Title })
@@ -150,6 +156,9 @@ func (s *Store) Connections(ctx context.Context, seedSlug string, maxHops int) (
 			)
 			if out != nil {
 				for _, meta := range out.GetMetadatas() {
+					if s.SkipAttachments && (parser.IsAttachmentLink(metaString(meta, "target_path")) || parser.IsAttachmentLink(metaString(meta, "display_text"))) {
+						continue
+					}
 					tgt := metaString(meta, "target_slug")
 					if _, ok := visited[tgt]; !ok {
 						visited[tgt] = hop
@@ -164,6 +173,9 @@ func (s *Store) Connections(ctx context.Context, seedSlug string, maxHops int) (
 			)
 			if in != nil {
 				for _, meta := range in.GetMetadatas() {
+					if s.SkipAttachments && (parser.IsAttachmentLink(metaString(meta, "target_path")) || parser.IsAttachmentLink(metaString(meta, "display_text"))) {
+						continue
+					}
 					tgt := metaString(meta, "source_slug")
 					if _, ok := visited[tgt]; !ok {
 						visited[tgt] = hop
@@ -178,13 +190,14 @@ func (s *Store) Connections(ctx context.Context, seedSlug string, maxHops int) (
 	delete(visited, seedSlug)
 	var out []Result
 	for slug, hop := range visited {
-		title, filePath := s.noteInfoForSlug(ctx, slug)
+		title, filePath, found := s.noteInfoForSlug(ctx, slug)
 		out = append(out, Result{
-			NoteSlug: slug,
-			Title:    title,
-			FilePath: filePath,
-			Score:    float64(hop),
-			Extra:    fmt.Sprintf("%d hop(s)", hop),
+			NoteSlug:  slug,
+			Title:     title,
+			FilePath:  filePath,
+			Score:     float64(hop),
+			Extra:     fmt.Sprintf("%d hop(s)", hop),
+			IsPhantom: !found,
 		})
 	}
 	sort.Slice(out, func(i, j int) bool {
@@ -260,13 +273,14 @@ func (s *Store) SharedTags(ctx context.Context, noteSlug string, minShared int) 
 		if count < minShared {
 			continue
 		}
-		title, filePath := s.noteInfoForSlug(ctx, slug)
+		title, filePath, found := s.noteInfoForSlug(ctx, slug)
 		out = append(out, Result{
-			NoteSlug: slug,
-			Title:    title,
-			FilePath: filePath,
-			Score:    float64(count),
-			Tags:     noteTagNames[slug],
+			NoteSlug:  slug,
+			Title:     title,
+			FilePath:  filePath,
+			Score:     float64(count),
+			Tags:      noteTagNames[slug],
+			IsPhantom: !found,
 		})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Score > out[j].Score })
@@ -540,7 +554,7 @@ func (s *Store) notesWithTag(ctx context.Context, tag string) []string {
 }
 
 // noteInfoForSlug fetches the title and file path of a note's first chunk.
-func (s *Store) noteInfoForSlug(ctx context.Context, slug string) (title, filePath string) {
+func (s *Store) noteInfoForSlug(ctx context.Context, slug string) (title, filePath string, found bool) {
 	res, err := s.chunks.Get(ctx,
 		chroma.WithWhere(chroma.And(
 			chroma.EqString("note_slug", slug),
@@ -549,7 +563,7 @@ func (s *Store) noteInfoForSlug(ctx context.Context, slug string) (title, filePa
 		chroma.WithInclude(chroma.IncludeMetadatas),
 	)
 	if err != nil || len(res.GetMetadatas()) == 0 {
-		return slug, ""
+		return slug, "", false
 	}
 	m := res.GetMetadatas()[0]
 	title = metaString(m, "title")
@@ -557,7 +571,7 @@ func (s *Store) noteInfoForSlug(ctx context.Context, slug string) (title, filePa
 		title = slug
 	}
 	filePath = metaString(m, "file_path")
-	return title, filePath
+	return title, filePath, true
 }
 
 // metaString safely reads a string from a DocumentMetadata.

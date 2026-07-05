@@ -15,10 +15,11 @@ const (
 
 // Store wraps two ChromaDB collections.
 type Store struct {
-	client chroma.Client
-	chunks chroma.Collection
-	links  chroma.Collection
-	mu     sync.RWMutex
+	client          chroma.Client
+	chunks          chroma.Collection
+	links           chroma.Collection
+	mu              sync.RWMutex
+	SkipAttachments bool
 }
 
 // Open creates or opens the persistent ChromaDB store at path.
@@ -78,7 +79,7 @@ func Open(ctx context.Context, path string) (*Store, error) {
 		return nil, fmt.Errorf("get/create links collection: %w", err)
 	}
 
-	return &Store{client: client, chunks: chunks, links: links}, nil
+	return &Store{client: client, chunks: chunks, links: links, SkipAttachments: true}, nil
 }
 
 // Close releases all resources.

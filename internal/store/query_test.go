@@ -420,3 +420,125 @@ func TestConcurrentReadWrite(t *testing.T) {
 
 	wg.Wait()
 }
+
+func TestConnections_PhantomAndAttachment(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatalf("Open failed: %v", err)
+	}
+	defer func() { _ = st.Close() }()
+
+	chunks := []store.ChunkRecord{
+		{
+			ID:         "src-note:0",
+			NoteSlug:   "src-note",
+			Title:      "Source Note",
+			FilePath:   "Source Note.md",
+			ChunkIndex: 0,
+			Text:       "source text",
+			Embedding:  []float32{1.0, 0.0, 0.0},
+		},
+		{
+			ID:         "real-target:0",
+			NoteSlug:   "real-target",
+			Title:      "Real Target",
+			FilePath:   "Real Target.md",
+			ChunkIndex: 0,
+			Text:       "real target text",
+			Embedding:  []float32{0.0, 1.0, 0.0},
+		},
+	}
+	if err := st.UpsertChunks(ctx, chunks); err != nil {
+		t.Fatalf("UpsertChunks failed: %v", err)
+	}
+
+	// Link to a real note, a phantom (uncreated) note, and an image attachment.
+	st.SkipAttachments = false
+	links := []string{"real-target", "Phantom Note", "image.webp"}
+	if err := st.UpsertLinks(ctx, "src-note", links); err != nil {
+		t.Fatalf("UpsertLinks failed: %v", err)
+	}
+
+	// Case 1: SkipAttachments = true (default)
+	st.SkipAttachments = true
+	res, err := st.Connections(ctx, "src-note", 1)
+	if err != nil {
+		t.Fatalf("Connections failed: %v", err)
+	}
+
+	if len(res) != 2 {
+		t.Fatalf("Expected 2 connections when SkipAttachments=true, got %d: %v", len(res), res)
+	}
+
+	resMap := make(map[string]store.Result)
+	for _, r := range res {
+		resMap[r.NoteSlug] = r
+	}
+
+	realRes, ok := resMap["real-target"]
+	if !ok || realRes.IsPhantom {
+		t.Errorf("Expected real-target in results with IsPhantom=false, got %v", realRes)
+	}
+
+	phantomRes, ok := resMap["phantom-note"]
+	if !ok || !phantomRes.IsPhantom {
+		t.Errorf("Expected phantom-note in results with IsPhantom=true, got %v", phantomRes)
+	}
+
+	if _, ok := resMap["imagewebp"]; ok {
+		t.Errorf("Did not expect image.webp in results when SkipAttachments=true")
+	}
+
+	// Case 2: SkipAttachments = false
+	st.SkipAttachments = false
+	resNoSkip, err := st.Connections(ctx, "src-note", 1)
+	if err != nil {
+		t.Fatalf("Connections failed: %v", err)
+	}
+	if len(resNoSkip) != 3 {
+		t.Fatalf("Expected 3 connections when SkipAttachments=false, got %d: %v", len(resNoSkip), resNoSkip)
+	}
+}
+
+func TestBacklinks_Attachment(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatalf("Open failed: %v", err)
+	}
+	defer func() { _ = st.Close() }()
+
+	chunks := []store.ChunkRecord{
+		{
+			ID:         "src-note:0",
+			NoteSlug:   "src-note",
+			Title:      "Source Note",
+			FilePath:   "Source Note.md",
+			ChunkIndex: 0,
+			Text:       "source text",
+			Embedding:  []float32{1.0, 0.0, 0.0},
+		},
+	}
+	_ = st.UpsertChunks(ctx, chunks)
+	st.SkipAttachments = false
+	_ = st.UpsertLinks(ctx, "src-note", []string{"diagram.canvas"})
+
+	st.SkipAttachments = true
+	res, err := st.Backlinks(ctx, "diagramcanvas")
+	if err != nil {
+		t.Fatalf("Backlinks failed: %v", err)
+	}
+	if len(res) != 0 {
+		t.Errorf("Expected 0 backlinks for attachment when SkipAttachments=true, got %v", res)
+	}
+
+	st.SkipAttachments = false
+	resNoSkip, err := st.Backlinks(ctx, "diagramcanvas")
+	if err != nil {
+		t.Fatalf("Backlinks failed: %v", err)
+	}
+	if len(resNoSkip) != 1 || resNoSkip[0].NoteSlug != "src-note" {
+		t.Errorf("Expected 1 backlink when SkipAttachments=false, got %v", resNoSkip)
+	}
+}

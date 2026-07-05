@@ -58,6 +58,33 @@ func TestTitleFromPath(t *testing.T) {
 	}
 }
 
+func TestIsAttachmentLink(t *testing.T) {
+	tests := []struct {
+		name   string
+		target string
+		want   bool
+	}{
+		{name: "empty", target: "", want: false},
+		{name: "simple note", target: "Apache Kafka", want: false},
+		{name: "note with folder", target: "01.Projects/System Design/Apache Flink", want: false},
+		{name: "note with md extension", target: "My Note.md", want: false},
+		{name: "note with heading", target: "My Note#Section 1", want: false},
+		{name: "note with alias", target: "My Note|Display Text", want: false},
+		{name: "note with anchor and alias", target: "My Note#Heading|Alias", want: false},
+		{name: "webp image", target: "redis-queue-1741846972555.webp", want: true},
+		{name: "png image with alias", target: "image.png|My Image", want: true},
+		{name: "pdf document", target: "docs/spec.pdf", want: true},
+		{name: "canvas file", target: "architecture.canvas", want: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsAttachmentLink(tt.target); got != tt.want {
+				t.Errorf("IsAttachmentLink(%q) = %v, want %v", tt.target, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestParse(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -153,7 +180,7 @@ Some other text.
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			res := Parse(tt.body, tt.slug, tt.maxRunes, 0)
+			res := Parse(tt.body, tt.slug, tt.maxRunes, 0, false)
 			if len(res.Chunks) != tt.wantChunks {
 				t.Errorf("got %d chunks, want %d", len(res.Chunks), tt.wantChunks)
 			}
@@ -184,7 +211,7 @@ Some other text.
 
 func TestBuildChunks_CodePreservation(t *testing.T) {
 	body := "---\ntitle: Test\n---\n# Setup\n\nSome intro text.\n\n```go\nfunc main() {\n\tfmt.Println(\"hello\")\n}\n```\n\nMore text after code."
-	res := Parse(body, "test-note", 2000, 0)
+	res := Parse(body, "test-note", 2000, 0, false)
 
 	if len(res.Chunks) == 0 {
 		t.Fatal("expected at least 1 chunk")
@@ -208,7 +235,7 @@ func TestBuildChunks_CodePreservation(t *testing.T) {
 
 func TestBuildChunks_CodeOnlyChunk(t *testing.T) {
 	body := "---\ntitle: Test\n---\n# Code Section\n\n```python\ndef hello():\n    print('world')\n```\n"
-	res := Parse(body, "test-note", 2000, 0)
+	res := Parse(body, "test-note", 2000, 0, false)
 
 	found := false
 	for _, c := range res.Chunks {
@@ -221,6 +248,22 @@ func TestBuildChunks_CodeOnlyChunk(t *testing.T) {
 	}
 	if !found {
 		t.Error("expected a chunk with code blocks")
+	}
+}
+
+func TestParse_SkipAttachments(t *testing.T) {
+	body := "Here is a note link [[Apache Kafka]] and an image link ![[redis-queue-1741846972555.webp]] and pdf [[doc.pdf]]."
+
+	resSkip := Parse(body, "test-note", 1000, 0, true)
+	if len(resSkip.Links) != 1 || resSkip.Links[0] != "Apache Kafka" {
+		t.Errorf("expected only Apache Kafka when skipAttachments=true, got %v", resSkip.Links)
+	}
+
+	resNoSkip := Parse(body, "test-note", 1000, 0, false)
+	sort.Strings(resNoSkip.Links)
+	expected := []string{"Apache Kafka", "doc.pdf", "redis-queue-1741846972555.webp"}
+	if !reflect.DeepEqual(resNoSkip.Links, expected) {
+		t.Errorf("expected all links when skipAttachments=false, got %v, want %v", resNoSkip.Links, expected)
 	}
 }
 
@@ -244,6 +287,6 @@ Final concluding paragraph with some more prose.
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		_ = Parse(body, "benchmark-note", 800, 100)
+		_ = Parse(body, "benchmark-note", 800, 100, false)
 	}
 }

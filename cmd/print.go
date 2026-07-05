@@ -29,12 +29,16 @@ type jsonEnvelope struct {
 
 // printResultsFormatted renders a list of results to stdout based on the requested format.
 func printResultsFormatted(commandName string, query string, results []store.Result, globals *Globals) {
-	// 1. Filter by min score
+	// 1. Filter by min score and phantom links
 	filtered := make([]store.Result, 0, len(results))
 	for _, r := range results {
-		if r.Score >= globals.MinScore {
-			filtered = append(filtered, r)
+		if r.Score < globals.MinScore {
+			continue
 		}
+		if globals.SkipPhantom && r.IsPhantom {
+			continue
+		}
+		filtered = append(filtered, r)
 	}
 
 	if globals.JSONPath != "" {
@@ -110,6 +114,9 @@ func printResultsFormatted(commandName string, query string, results []store.Res
 			}
 			if r.Extra != "" {
 				line += "  " + extraStyle.Render("["+r.Extra+"]")
+			}
+			if r.IsPhantom {
+				line += "  " + extraStyle.Render("[phantom]")
 			}
 			fmt.Println(line)
 		}

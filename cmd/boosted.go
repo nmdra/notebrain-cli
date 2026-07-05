@@ -50,6 +50,7 @@ func (c *BoostedCmd) Run(globals *Globals) error {
 		return err
 	}
 	defer func() { _ = st.Close() }()
+	st.SkipAttachments = globals.SkipAttachments
 
 	emb, err := embedder.NewLocalEmbedder()
 	if err != nil {

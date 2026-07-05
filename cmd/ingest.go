@@ -57,6 +57,7 @@ func (c *IngestCmd) Run(globals *Globals) error {
 		return err
 	}
 	defer func() { _ = st.Close() }()
+	st.SkipAttachments = globals.SkipAttachments
 
 	slog.Info("initializing embedded ONNX vector models")
 	emb, err := embedder.NewLocalEmbedder()
@@ -69,6 +70,7 @@ func (c *IngestCmd) Run(globals *Globals) error {
 	pipeline := ingest.NewPipeline(st, emb, workers)
 
 	pipeline.RespectExclude = globals.RespectExclude
+	pipeline.SkipAttachments = globals.SkipAttachments
 	// Allow flag/config overrides; 0 means "use the pipeline's built-in default".
 	if c.MinChunkWords > 0 {
 		pipeline.MinChunkWords = c.MinChunkWords

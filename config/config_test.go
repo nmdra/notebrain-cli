@@ -89,6 +89,16 @@ func TestDefault_Fields(t *testing.T) {
 			got:  func(c *Config) any { return c.LogLevel },
 			want: "info",
 		},
+		{
+			name: "SkipAttachments is true",
+			got:  func(c *Config) any { return c.SkipAttachments },
+			want: true,
+		},
+		{
+			name: "SkipPhantom is true",
+			got:  func(c *Config) any { return c.SkipPhantom },
+			want: true,
+		},
 	}
 
 	cfg := Default()

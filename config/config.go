@@ -38,24 +38,28 @@ type Config struct {
 	// LogFormat controls log output format: "auto", "json", or "text".
 	LogFormat string
 	// LogLevel controls minimum log severity: "info", "debug", "warn", or "error".
-	LogLevel string
+	LogLevel        string
+	SkipAttachments bool
+	SkipPhantom     bool
 }
 
 // Default returns a Config with sensible defaults.
 func Default() *Config {
 	home, _ := os.UserHomeDir()
 	return &Config{
-		ChromaPath:     filepath.Join(home, ".notebrain", "chroma"),
-		Embedder:       "minilm",
-		OllamaURL:      "http://localhost:11434",
-		OllamaModel:    "nomic-embed-text",
-		ChunkSize:      800, // runes; ~178 tokens — leaves ~78-token headroom for title/heading prefix
-		ChunkOverlap:   100, // runes; ~1-2 sentences of overlap for sub-chunk splits
-		Limit:          10,
-		MinChunkWords:  10,  // rejects heading-only and code-placeholder fragments
-		MaxEmbedTokens: 256, // matches MiniLM sequence length
-		TopKPerNote:    3,   // top 3 most relevant chunks per note
-		LogFormat:      "auto",
-		LogLevel:       "info",
+		ChromaPath:      filepath.Join(home, ".notebrain", "chroma"),
+		Embedder:        "minilm",
+		OllamaURL:       "http://localhost:11434",
+		OllamaModel:     "nomic-embed-text",
+		ChunkSize:       800, // runes; ~178 tokens — leaves ~78-token headroom for title/heading prefix
+		ChunkOverlap:    100, // runes; ~1-2 sentences of overlap for sub-chunk splits
+		Limit:           10,
+		MinChunkWords:   10,  // rejects heading-only and code-placeholder fragments
+		MaxEmbedTokens:  256, // matches MiniLM sequence length
+		TopKPerNote:     3,   // top 3 most relevant chunks per note
+		LogFormat:       "auto",
+		LogLevel:        "info",
+		SkipAttachments: true,
+		SkipPhantom:     true,
 	}
 }

@@ -27,14 +27,15 @@ type Embedder interface {
 
 // Pipeline orchestrates the ingestion of markdown files into the ChromaDB store.
 type Pipeline struct {
-	store          *store.Store
-	embedder       Embedder
-	workers        int
-	MinChunkWords  int // minimum word count to keep a chunk (filters junk)
-	ChunkSize      int // maximum runes per chunk fed to Parse
-	ChunkOverlap   int // overlap runes between sub-chunks when a section is split
-	MaxEmbedTokens int // max tokens for embed text (model sequence length)
-	RespectExclude bool
+	store           *store.Store
+	embedder        Embedder
+	workers         int
+	MinChunkWords   int // minimum word count to keep a chunk (filters junk)
+	ChunkSize       int // maximum runes per chunk fed to Parse
+	ChunkOverlap    int // overlap runes between sub-chunks when a section is split
+	MaxEmbedTokens  int // max tokens for embed text (model sequence length)
+	RespectExclude  bool
+	SkipAttachments bool
 }
 
 // NewPipeline creates an ingestion pipeline with the given number of concurrent workers.
@@ -48,10 +49,11 @@ func NewPipeline(s *store.Store, e Embedder, workers int) *Pipeline {
 		embedder: e,
 		workers:  workers,
 		// Defaults matching config.Default() — callers should override from config.
-		ChunkSize:      800,
-		ChunkOverlap:   100,
-		MaxEmbedTokens: 256,
-		RespectExclude: true,
+		ChunkSize:       800,
+		ChunkOverlap:    100,
+		MaxEmbedTokens:  256,
+		RespectExclude:  true,
+		SkipAttachments: true,
 	}
 }
 
@@ -260,7 +262,7 @@ func (p *Pipeline) processFile(ctx context.Context, vaultPath string, filePath s
 	}
 
 	title := parser.TitleFromPath(relPath)
-	astRes := parser.Parse(string(content), slug, p.ChunkSize, p.ChunkOverlap)
+	astRes := parser.Parse(string(content), slug, p.ChunkSize, p.ChunkOverlap, p.SkipAttachments)
 
 	if ft, ok := astRes.Frontmatter["title"].(string); ok && ft != "" {
 		title = ft

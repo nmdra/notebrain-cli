@@ -45,6 +45,7 @@ func (c *ConnectionsCmd) Run(globals *Globals) error {
 		return err
 	}
 	defer func() { _ = st.Close() }()
+	st.SkipAttachments = globals.SkipAttachments
 
 	nodes, err := st.Connections(ctx, targetSlug, hops)
 	if err != nil {

@@ -45,6 +45,7 @@ func (c *TagsCmd) Run(globals *Globals) error {
 		return err
 	}
 	defer func() { _ = st.Close() }()
+	st.SkipAttachments = globals.SkipAttachments
 
 	nodes, err := st.SharedTags(ctx, targetSlug, minShared)
 	if err != nil {

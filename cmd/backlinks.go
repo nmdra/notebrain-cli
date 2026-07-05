@@ -43,6 +43,7 @@ func (c *BacklinksCmd) Run(globals *Globals) error {
 		return err
 	}
 	defer func() { _ = st.Close() }()
+	st.SkipAttachments = globals.SkipAttachments
 
 	links, err := st.Backlinks(ctx, targetSlug)
 	if err != nil {

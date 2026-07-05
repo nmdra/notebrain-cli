@@ -59,7 +59,8 @@ var mdParser = goldmark.New(
 // Parse parses body text into Chunks, extracting wikilinks, tags, and frontmatter.
 // maxChunkRunes controls the maximum rune length per chunk. overlapRunes controls how many
 // runes are repeated at the start of the next sub-chunk when a section is split (overlap).
-func Parse(body, noteSlug string, maxChunkRunes, overlapRunes int) Result {
+// If skipAttachments is true, links pointing to non-markdown attachments (images, PDFs, etc.) are ignored.
+func Parse(body, noteSlug string, maxChunkRunes, overlapRunes int, skipAttachments bool) Result {
 	src := []byte(body)
 	reader := text.NewReader(src)
 	doc := mdParser.Parser().Parse(reader)
@@ -83,7 +84,10 @@ func Parse(body, noteSlug string, maxChunkRunes, overlapRunes int) Result {
 		case *hashtag.Node:
 			tagsSet[string(node.Tag)] = struct{}{}
 		case *wikilink.Node:
-			linksSet[string(node.Target)] = struct{}{}
+			target := string(node.Target)
+			if !skipAttachments || !IsAttachmentLink(target) {
+				linksSet[target] = struct{}{}
+			}
 		}
 
 		return ast.WalkContinue, nil

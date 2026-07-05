@@ -79,6 +79,11 @@ chunk-overlap = 100
 # Defaults to 10
 min-chunk-words = 10
 
+# Skip image and file attachment links (e.g., ![[image.png]] or [[file.pdf]]) during indexing.
+# If true, attachment links are ignored and excluded from the wikilink graph.
+# Defaults to true
+skip-attachments = true
+
 # ------------------------------------------------------------------------------
 # Search and Traversal Settings
 # ------------------------------------------------------------------------------
@@ -86,3 +91,8 @@ min-chunk-words = 10
 # Default maximum number of results to return for search, boosted, and hidden commands.
 # Defaults to 10
 limit = 10
+
+# Skip uncreated "phantom" notes (notes linked via wikilinks that do not exist as markdown files on disk).
+# If true, phantom notes are excluded from graph results (backlinks, connections, tags).
+# Defaults to true
+skip-phantom = true

@@ -86,12 +86,14 @@ bool_field = false
 }
 
 type CoreGlobals struct {
-	ChromaPath    string  `help:"path to ChromaDB persistent storage" default:"~/.notebrain/chroma"`
-	VaultPath     string  `name:"vault-path" help:"Obsidian vault path"`
-	ContextWindow int     `name:"context-window" default:"0"`
-	MinScore      float64 `default:"0"`
-	LogFormat     string  `name:"log-format" default:"auto"`
-	LogLevel      string  `name:"log-level" default:"info"`
+	ChromaPath      string  `help:"path to ChromaDB persistent storage" default:"~/.notebrain/chroma"`
+	VaultPath       string  `name:"vault-path" help:"Obsidian vault path"`
+	ContextWindow   int     `name:"context-window" default:"0"`
+	MinScore        float64 `default:"0"`
+	LogFormat       string  `name:"log-format" default:"auto"`
+	LogLevel        string  `name:"log-level" default:"info"`
+	SkipAttachments bool    `name:"skip-attachments" default:"true"`
+	SkipPhantom     bool    `name:"skip-phantom" default:"true"`
 }
 
 func TestTOMLResolver_StrictNoHTTP(t *testing.T) {
@@ -137,5 +139,35 @@ log-level = "debug"
 	}
 	if cli.LogLevel != "debug" {
 		t.Errorf("Expected LogLevel 'debug', got %q", cli.LogLevel)
+	}
+}
+
+func TestTOMLResolver_SkipFlags(t *testing.T) {
+	tomlData := []byte(`
+skip-attachments = false
+skip_phantom = false
+`)
+
+	resolver, err := TOMLResolver(bytes.NewReader(tomlData))
+	if err != nil {
+		t.Fatalf("TOMLResolver failed: %v", err)
+	}
+
+	var cli CoreGlobals
+	parser, err := kong.New(&cli, kong.Resolvers(resolver))
+	if err != nil {
+		t.Fatalf("kong.New failed: %v", err)
+	}
+
+	_, err = parser.Parse([]string{})
+	if err != nil {
+		t.Fatalf("parser.Parse failed: %v", err)
+	}
+
+	if cli.SkipAttachments != false {
+		t.Errorf("Expected SkipAttachments false, got %v", cli.SkipAttachments)
+	}
+	if cli.SkipPhantom != false {
+		t.Errorf("Expected SkipPhantom false, got %v", cli.SkipPhantom)
 	}
 }

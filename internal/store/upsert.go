@@ -252,6 +252,9 @@ func (s *Store) upsertLinks(ctx context.Context, noteSlug string, links []string
 	targetSlugMap := make(map[string]string, len(links)) // original -> slug
 
 	for _, l := range links {
+		if s.SkipAttachments && parser.IsAttachmentLink(l) {
+			continue
+		}
 		targetSlug := parser.Slugify(l)
 		if targetSlug == "" {
 			continue
