@@ -1,6 +1,7 @@
 # NoteBrain CLI
 
-A Go CLI tool that turns your [Obsidian](https://obsidian.md/) vault into a fully offline knowledge backend for **AI coding agents**. NoteBrain indexes markdown notes into a local **ChromaDB** vector database and exposes semantic search, wikilink graph traversal, and hidden connection discovery through structured JSON output — designed to be chained directly by autonomous agents, shell pipelines, and LLM tool-use workflows. Ships with a built-in [AI agent skill](wiki/Skill_Usage.md) for zero-config integration with assistants like Google Antigravity and Gemini.
+A Go CLI tool that turns your [Obsidian](https://obsidian.md/) vault into a fully offline knowledge backend for **AI coding agents**. NoteBrain indexes markdown notes into a local **[ChromaDB](https://www.trychroma.com/)** vector database and exposes semantic search, wikilink graph traversal, and hidden connection discovery through structured JSON output — designed to be chained directly by autonomous agents, shell pipelines, and LLM tool-use workflows.  
+Ships with a built-in [AI agent skill](wiki/Skill_Usage.md) for integration with assistants like [Google Antigravity](https://antigravity.google/) and [Pi agent](https://pi.dev).
 
 [![Release](https://github.com/nmdra/notebrain-cli/actions/workflows/release.yml/badge.svg)](https://github.com/nmdra/notebrain-cli/actions/workflows/release.yml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/nmdra/notebrain-cli.svg)](https://pkg.go.dev/github.com/nmdra/notebrain-cli)
@@ -13,12 +14,19 @@ A Go CLI tool that turns your [Obsidian](https://obsidian.md/) vault into a full
   <img src="assets/banner.jpg" alt="NoteBrain CLI — AI-powered knowledge backend for your Obsidian vault" width="100%">
 </p>
 
+> [!NOTE]
+> **Hi, I'm [Nimendra](https://nimendra.xyz).**  
+> I use [Obsidian](https://obsidian.md/) daily as my primary note-taking solution. When AI agents emerged, I wanted to use my Obsidian vault as an [LLM wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f).But most existing solutions don't fulfill my requirements.  
+> While researching, I came across [this article](https://motherduck.com/blog/obsidian-rag-duckdb-motherduck/), which inspired this project.So I built this for my personal use. While you can use it directly, I highly encourage you to fork and modify this solution for your own use case.
+>
+> > _I don't use Windows or macOS, so those versions aren't shipped directly, but you can compile the binary using the source code._
+
 ## Prerequisites
 
 - **Go 1.26.4+** (for building from source)
 - **CGO-enabled toolchain** — GCC or Clang on Linux/macOS (the embedded vector store uses C/C++ bindings via SQLite and HNSW)
 - **~33 MB disk** for the ONNX embedding model (auto-downloaded on first run)
-- Linux or macOS (Windows is untested)
+- Linux (macOS and Windows is untested)
 
 ## Installation
 
@@ -55,7 +63,7 @@ Semantic Search: "how do message brokers work?"
  2. Apache Kafka                         score=0.7891  [#Kafka #Messaging]
  3. RabbitMQ                             score=0.7645  [#RabbitMQ #AMQP]
  4. Event Driven Architecture            score=0.7412  [#Architecture]
- 5. Microservices Communication           score=0.7103  [#Microservices]
+ 5. Microservices Communication          score=0.7103  [#Microservices]
 
   (Ctrl+click or Cmd+click a title to open in Obsidian)
 ```
@@ -119,7 +127,7 @@ notebrain get "$SLUG" --jsonpath="$.text"
 - **Advanced Filtering** — Narrow searches by `--section`, `--has-code`, `--has-tasks`, or `--tag`.
 - **Full Note Retrieval** — Reconstruct complete note content on the fly from indexed chunks (`notebrain get`).
 - **Machine-Readable Output** — Structured JSON, TSV, and NDJSON via `--format` flags, plus built-in `--jsonpath` extraction (no `jq` needed).
-- **OSC 8 Hyperlinks** — Clickable `obsidian://open` links directly in your terminal. Works in [iTerm2](https://iterm2.com/), [WezTerm](https://wezfurlong.org/wezterm/), [kitty](https://sw.kovidgoyal.net/kitty/), [Windows Terminal](https://github.com/microsoft/terminal), and others supporting the [OSC 8 spec](https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda). Disable with `--no-hyperlinks` if unsupported.
+- **OSC 8 Hyperlinks** — Clickable `obsidian://open` links directly in your terminal. Works in [alacritty](https://github.com/alacritty/alacritty), [iTerm2](https://iterm2.com/), [WezTerm](https://wezfurlong.org/wezterm/), [kitty](https://sw.kovidgoyal.net/kitty/), [Windows Terminal](https://github.com/microsoft/terminal), and others supporting the [OSC 8 spec](https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda). Disable with `--no-hyperlinks` if unsupported.
 - **Editor Integration** — Open matched notes in `$EDITOR` or Obsidian directly from the TUI.
 - **Obsidian-Aware Ingestion** — Honors `userIgnoreFilters` and `attachmentFolderPath` from your Obsidian config. Optionally skip phantom links and attachment references.
 
