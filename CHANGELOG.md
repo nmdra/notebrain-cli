@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.1.1] - 2026-07-05
+
+### Added
+- **System Architecture & Schema Docs**: Added comprehensive Mermaid architecture diagram and detailed ChromaDB collection schema (`nb_chunks`, `nb_links`) to Wiki (`docs(wiki)`).
+- **Dependabot Configuration**: Added automated Go module dependency tracking via Dependabot (`chore(deps)`).
+
+### Changed
+- **GoReleaser Vendoring**: Configured GoReleaser to use `-mod=vendor` flag and run `go mod vendor` in pre-release hooks (`ci`).
+- **README Refinements**: Added creator note and updated OSC 8 terminal support list (`docs(readme)`).
+- **Dependency Upgrades**: Updated `charm.land/bubbletea/v2` (v2.0.8), `charm.land/bubbles/v2` (v2.1.1), `charm.land/lipgloss/v2` (v2.0.5), `github.com/pelletier/go-toml/v2` (v2.4.3), and `golang.org/x/sys` (v0.46.0) (`build(deps)`).
+
 ## [v2.1.0] - 2026-07-05
 
 ### Added
