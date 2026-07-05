@@ -16,7 +16,7 @@ Ships with a built-in [AI agent skill](wiki/Skill_Usage.md) for integration with
 
 > [!NOTE]
 > **Hi, I'm [Nimendra](https://nimendra.xyz).**  
-> I use [Obsidian](https://obsidian.md/) daily as my primary note-taking solution. When AI agents emerged, I wanted to use my Obsidian vault as an [LLM wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f).But most existing solutions don't fulfill my requirements.  
+> I use [Obsidian](https://obsidian.md/) daily as my primary note-taking solution. When AI agents emerged, I wanted to use my Obsidian vault as an RAG system.But most existing solutions don't fulfill my requirements.  
 > While researching, I came across [this article](https://motherduck.com/blog/obsidian-rag-duckdb-motherduck/), which inspired this project.So I built this for my personal use. While you can use it directly, I highly encourage you to fork and modify this solution for your own use case.
 >
 > > _I don't use Windows or macOS, so those versions aren't shipped directly, but you can compile the binary using the source code._
@@ -26,7 +26,7 @@ Ships with a built-in [AI agent skill](wiki/Skill_Usage.md) for integration with
 - **Go 1.26.4+** (for building from source)
 - **CGO-enabled toolchain** — GCC or Clang on Linux/macOS (the embedded vector store uses C/C++ bindings via SQLite and HNSW)
 - **~33 MB disk** for the ONNX embedding model (auto-downloaded on first run)
-- Linux (macOS and Windows is untested)
+- Linux (macOS and Windows binaries are untested)
 
 ## Installation
 
@@ -119,15 +119,15 @@ notebrain get "$SLUG" --jsonpath="$.text"
 
 ## Features
 
-- **Semantic Search** — Find notes by meaning, not just keywords. Uses the [`all-MiniLM-L6-v2`](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) ONNX model (384-dim embeddings, ~33 MB download on first run) for fully offline, on-device inference.
+- **Semantic Search** — Find notes by meaning, not just keywords. Uses the [`all-MiniLM-L6-v2`](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) ONNX model for fully offline, on-device inference.
 - **Graph Traversal** — Walk your Obsidian wikilink graph (`[[Note]]`) via BFS: `backlinks`, `connections` (multi-hop), `tags` (shared tag neighbors).
 - **Hidden Connections** — Discover notes that are semantically similar but not explicitly linked.
 - **Graph-Boosted Search** — Combine semantic similarity scores with structural graph proximity for richer results.
 - **Interactive TUI** — Navigate search results with fuzzy-finding, arrow keys, and live ingestion progress. Powered by [Bubble Tea](https://github.com/charmbracelet/bubbletea).
 - **Advanced Filtering** — Narrow searches by `--section`, `--has-code`, `--has-tasks`, or `--tag`.
 - **Full Note Retrieval** — Reconstruct complete note content on the fly from indexed chunks (`notebrain get`).
-- **Machine-Readable Output** — Structured JSON, TSV, and NDJSON via `--format` flags, plus built-in `--jsonpath` extraction (no `jq` needed).
-- **OSC 8 Hyperlinks** — Clickable `obsidian://open` links directly in your terminal. Works in [alacritty](https://github.com/alacritty/alacritty), [iTerm2](https://iterm2.com/), [WezTerm](https://wezfurlong.org/wezterm/), [kitty](https://sw.kovidgoyal.net/kitty/), [Windows Terminal](https://github.com/microsoft/terminal), and others supporting the [OSC 8 spec](https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda). Disable with `--no-hyperlinks` if unsupported.
+- **Machine-Readable Output** — Structured JSON, TSV via `--format` flags, plus built-in `--jsonpath` extraction (no `jq` needed).
+- **OSC 8 Hyperlinks** — Clickable `obsidian://open` links directly in your terminal. Works in [alacritty](https://github.com/alacritty/alacritty), [WezTerm](https://wezfurlong.org/wezterm/), [kitty](https://sw.kovidgoyal.net/kitty/) and others supporting the [OSC 8 spec](https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda).
 - **Editor Integration** — Open matched notes in `$EDITOR` or Obsidian directly from the TUI.
 - **Obsidian-Aware Ingestion** — Honors `userIgnoreFilters` and `attachmentFolderPath` from your Obsidian config. Optionally skip phantom links and attachment references.
 
@@ -181,7 +181,7 @@ To fully uninstall, remove the `notebrain` binary and delete `~/.notebrain/`.
 | [Architecture](wiki/Architecture.md)                 | Internals: chunking pipeline, embedding, ChromaDB schema   |
 | [Scheduled Ingestion](wiki/Scheduled_Ingestion.md)   | Cron and systemd timer setup for background indexing       |
 | [AI Agent Skill Usage](wiki/Skill_Usage.md)          | Using the built-in AI agent skill for autonomous retrieval |
-| [DeepWiki](https://deepwiki.com/nmdra/notebrain-cli) | AI-generated codebase documentation and exploration        |
+| [DeepWiki](https://deepwiki.com/nmdra/notebrain-cli) | AI-generated codebase documentation                        |
 
 ## Contributing
 
