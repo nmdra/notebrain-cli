@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **System Architecture & Schema Docs**: Added comprehensive Mermaid architecture diagram and detailed ChromaDB collection schema (`nb_chunks`, `nb_links`) to Wiki (`docs(wiki)`).
 - **Dependabot Configuration**: Added automated Go module dependency tracking via Dependabot (`chore(deps)`).
 
+### Fixed
+- **Go Modules v2 SIV Compliance**: Updated module path in `go.mod` and all internal import statements to `github.com/nmdra/notebrain-cli/v2`, fixing Go module resolution (`go get`, `pkg.go.dev`) for v2 releases (`refactor(build)`).
+
 ### Changed
 - **GoReleaser Vendoring**: Configured GoReleaser to use `-mod=vendor` flag and run `go mod vendor` in pre-release hooks (`ci`).
 - **README Refinements**: Added creator note and updated OSC 8 terminal support list (`docs(readme)`).
