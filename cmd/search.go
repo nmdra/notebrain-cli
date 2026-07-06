@@ -80,6 +80,9 @@ func resolveQueries(queries []string, split bool, splitBy string) []string {
 }
 
 func (c *SearchCmd) Run(globals *Globals) error {
+	if c.TopKPerNote >= 4 {
+		fmt.Fprintf(os.Stderr, "warning: --top-k >= 4 may exceed upstream ChromaDB embedded 1 MiB FFI limit on large notes\n")
+	}
 	resolved := resolveQueries(c.Queries, c.Split, c.SplitBy)
 	if !c.Interactive && len(resolved) == 0 && c.Tag == "" {
 		return fmt.Errorf("query or --tag is required (or use --interactive for live search)")

@@ -67,7 +67,7 @@ func (s *Store) semanticSearch(ctx context.Context, queryVec []float32, limit in
 
 	res, err := s.chunks.Query(ctx, opts...)
 	if err != nil {
-		return nil, fmt.Errorf("semantic search: %w", err)
+		return nil, fmt.Errorf("semantic search: %w", wrapChromaErr(err))
 	}
 	return deduplicateByNote(res, limit, topKPerNote), nil
 }
@@ -111,7 +111,7 @@ func (s *Store) MultiSemanticSearch(ctx context.Context, queryVecs [][]float32, 
 		}
 		subRes, err := s.semanticSearch(ctx, vec, fetchLimit, fetchTopK, whereFilter, includeText)
 		if err != nil {
-			return nil, fmt.Errorf("semantic search for query %q: %w", qStr, err)
+			return nil, fmt.Errorf("semantic search for query %q: %w", qStr, wrapChromaErr(err))
 		}
 		for _, r := range subRes {
 			if r.Score <= 0.0 {
@@ -185,7 +185,7 @@ func (s *Store) GetNoteHashes(ctx context.Context) (map[string]string, error) {
 		chroma.WithInclude(chroma.IncludeMetadatas),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("get note hashes: %w", err)
+		return nil, fmt.Errorf("get note hashes: %w", wrapChromaErr(err))
 	}
 
 	hashes := make(map[string]string)
@@ -210,7 +210,7 @@ func (s *Store) Backlinks(ctx context.Context, targetSlug string) ([]Result, err
 		chroma.WithInclude(chroma.IncludeMetadatas),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("backlinks: %w", err)
+		return nil, fmt.Errorf("backlinks: %w", wrapChromaErr(err))
 	}
 
 	seen := map[string]bool{}
@@ -432,7 +432,7 @@ func (s *Store) TagSearch(ctx context.Context, tag string, limit int, whereFilte
 		chroma.WithInclude(includes...),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("tag search: %w", err)
+		return nil, fmt.Errorf("tag search: %w", wrapChromaErr(err))
 	}
 
 	return getResultToResults(res, limit), nil
@@ -717,7 +717,7 @@ func (s *Store) GetNote(ctx context.Context, slugOrPath string) (*NoteContent, e
 		chroma.WithInclude(chroma.IncludeMetadatas, chroma.IncludeDocuments),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("get note: %w", err)
+		return nil, fmt.Errorf("get note: %w", wrapChromaErr(err))
 	}
 
 	metas := res.GetMetadatas()
@@ -791,7 +791,7 @@ func (s *Store) getChunkWindow(ctx context.Context, noteSlug string, chunkIndex 
 		chroma.WithInclude(chroma.IncludeMetadatas, chroma.IncludeDocuments),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("get chunk window: %w", err)
+		return nil, fmt.Errorf("get chunk window: %w", wrapChromaErr(err))
 	}
 
 	metas := res.GetMetadatas()
@@ -843,4 +843,19 @@ func (s *Store) PopulateContext(ctx context.Context, results []Result, windowSiz
 			results[i].Context = window.Texts
 		}
 	}
+}
+
+// wrapChromaErr annotates ChromaDB decoding errors caused by the embedded FFI 1 MiB string limit.
+func wrapChromaErr(err error) error {
+	if err == nil {
+		return nil
+	}
+	errStr := err.Error()
+	if strings.Contains(errStr, "upstream ChromaDB embedded 1 MiB FFI limit") {
+		return err
+	}
+	if strings.Contains(errStr, "unexpected end of JSON input") || strings.Contains(errStr, "failed to decode") {
+		return fmt.Errorf("%w: upstream ChromaDB embedded 1 MiB FFI limit exceeded on large records payload; try lowering --top-k or --limit", err)
+	}
+	return err
 }
