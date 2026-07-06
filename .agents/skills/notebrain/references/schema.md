@@ -6,7 +6,6 @@ When executing NoteBrain queries non-interactively, selecting the right format a
 
 - **`json` (Default Recommendation)**: Returns a structured JSON envelope containing a `results` array and metadata. Best when using `--jsonpath` or when inspecting complex multi-field objects.
 - **`tsv` (Token-Optimized for Scan-Only Steps)**: Returns tab-separated values without repeating JSON key names (`note_slug`, `title`, `file_path`, `score`, `tags`) on every row. Highly recommended when scanning lists of notes (e.g., mapping backlinks or graph connections without `--include-text`).
-- **`ndjson`**: Streamed newline-delimited JSON objects. Useful for streaming pipeline processing.
 
 ## JSON Envelope Field Specification
 
