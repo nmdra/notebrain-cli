@@ -9,18 +9,24 @@ allowed-tools: Bash(notebrain:*), Bash(./notebrain:*)
 
 NoteBrain indexes an Obsidian vault into local ChromaDB for semantic search, graph traversal, and note retrieval.
 
+## Chunk-Based Architecture & Retrieval Strategy
+
+Why doesn't NoteBrain search whole notes at once? In Obsidian vaults, markdown files can be thousands of lines long. During ingestion, NoteBrain parses and splits notes into smaller semantic chunks (hierarchically by headings, paragraphs, task lists, and code blocks) and indexes each chunk as a distinct vector in ChromaDB (`nb_chunks`). This allows semantic search (`search`, `hidden`, `boosted`) to pinpoint the exact relevant paragraph or section (`chunk_index` and `heading_path`) without needing to load or process the entire document. This architecture is why `--context-window N` works so effectively—fetching $\pm N$ adjacent chunks around the matched index gives you the exact surrounding context needed while keeping your token footprint lean!
+
+---
+
 ## Quick Command Map
 
-| User Intent                                         | Command       | Core Syntax Example                                                               |
-| --------------------------------------------------- | ------------- | --------------------------------------------------------------------------------- |
-| "What do my notes say about X?"                     | `search`      | `notebrain search "topic" --context-window 1 --limit 5 --include-text`            |
-| "Read full note Y (Use sparingly; prefer context)"  | `get`         | `notebrain get "<slug-or-path>"`                                                  |
-| "What links directly to this note?"                 | `backlinks`   | `notebrain backlinks "<slug>" --jsonpath="$.results[*].note_slug"`                |
-| "What is structurally nearby in the graph?"         | `connections` | `notebrain connections "<slug>" --hops 2 --format tsv`                            |
-| "What is related in meaning but NOT linked?"        | `hidden`      | `notebrain hidden "<slug>" --context-window 1 --limit 5 --include-text`           |
-| "Find concepts related to X centered around note Y" | `boosted`     | `notebrain boosted --seed="<slug>" "query" --context-window 1 --limit 5`          |
-| "What notes share tags with X?"                     | `tags`        | `notebrain tags "<slug>" --min-shared 1`                                          |
-| "Index / check database status"                     | `ingest` / `stats`| `notebrain ingest` / `notebrain stats --format=json`                              |
+| User Intent                                         | Command            | Core Syntax Example                                                      |
+| --------------------------------------------------- | ------------------ | ------------------------------------------------------------------------ |
+| "What do my notes say about X?"                     | `search`           | `notebrain search "topic" --context-window 1 --limit 5 --include-text`   |
+| "Read full note Y (Use sparingly; prefer context)"  | `get`              | `notebrain get "<slug-or-path>"`                                         |
+| "What links directly to this note?"                 | `backlinks`        | `notebrain backlinks "<slug>" --jsonpath="$.results[*].note_slug"`       |
+| "What is structurally nearby in the graph?"         | `connections`      | `notebrain connections "<slug>" --hops 2 --format tsv`                   |
+| "What is related in meaning but NOT linked?"        | `hidden`           | `notebrain hidden "<slug>" --context-window 1 --limit 5 --include-text`  |
+| "Find concepts related to X centered around note Y" | `boosted`          | `notebrain boosted --seed="<slug>" "query" --context-window 1 --limit 5` |
+| "What notes share tags with X?"                     | `tags`             | `notebrain tags "<slug>" --min-shared 1`                                 |
+| "Index / check database status"                     | `ingest` / `stats` | `notebrain ingest` / `notebrain stats --format=json`                     |
 
 > **Need specific flags or output schema?** Read [references/flags.md](file:///home/nimendra/Documents/Projects/obsidian-helper/.agents/skills/notebrain/references/flags.md) for full flag tables (filtering, top-k, context windows) and [references/schema.md](file:///home/nimendra/Documents/Projects/obsidian-helper/.agents/skills/notebrain/references/schema.md) for JSON envelope fields and TSV formatting.
 
@@ -34,7 +40,7 @@ NoteBrain indexes an Obsidian vault into local ChromaDB for semantic search, gra
    - Extract matching text snippets: `--jsonpath="$.results[*].text"`
    - Extract surrounding chunk context: `--jsonpath="$.results[*].context"`
    - Extract note slugs for graph mapping: `--jsonpath="$.results[*].note_slug"`
-   When scanning tabular lists without text, use `--format tsv` to drop repeating JSON key names.
+     When scanning tabular lists without text, use `--format tsv` to drop repeating JSON key names.
 4. **Non-Interactive Execution**: Always specify `--format json` (or `tsv`/`ndjson`/`--jsonpath`) on query commands to bypass the interactive TUI and receive structured data immediately.
 5. **Intelligent Query Splitting (`--split`)**: When researching compound questions, long queries, or orthogonal topics (e.g., comparing two technologies), split the query into distinct terms using positional arguments (`notebrain search "redis pubsub" "kafka brokers"`) or `--split` (`notebrain search "redis, kafka" --split`). **Why?** NoteBrain's multi-hit boosting automatically ranks bridging notes above single-topic matches. For simple lookups, keep the query intact.
 6. **CLI Syntax Rules**: In development environments, execute `./notebrain` if `notebrain` is not in PATH. Encapsulate queries and slugs in double quotes. Strictly use `--vault-path` and `--chroma-path` (never `--vault` or `--db`). For graph commands, pass exactly one positional argument: `<note>`.
@@ -54,6 +60,7 @@ To prevent excessive tool calls and context bloat, follow a tiered retrieval str
    - **Graph structure / nearby notes** → run `connections "<slug>" --hops 2 --jsonpath="$.results[*].note_slug"` (no `--include-text`).
    - **Incoming citations / what links here** → run `backlinks "<slug>" --format tsv`.
    - **Exploratory / conceptual bridges** → run `hidden "<slug>" --context-window 1 --limit 5 --include-text`.
+4. **Avoid Blanket Chaining**: Never run all four commands (`search → backlinks → connections → hidden`) unless the user explicitly requests a comprehensive vault-wide audit of a topic.
 
 ---
 
