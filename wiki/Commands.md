@@ -37,6 +37,7 @@ These flags can be applied to `notebrain` before any subcommand (e.g., `notebrai
 | `--log-level`        | `string`  | `info`                            | Minimum log severity to show: `info`, `debug`, `warn`, or `error`.                                                                         |
 | `--skip-attachments` | `boolean` | `true`                            | Exclude attachment and image links from graph edges.                                                                                       |
 | `--skip-phantom`     | `boolean` | `true`                            | Exclude uncreated notes (phantom links) from query results.                                                                                |
+| `--hide-tags`        | `boolean` | `true`                            | Hide tag names (`#Tag/Subtag`) in search and graph outputs.                                                                                |
 | `--version`          | `boolean` | `false`                           | Show version information.                                                                                                                  |
 
 ---
@@ -119,6 +120,8 @@ notebrain search [<query>] [flags]
 | `--has-tasks`   | `boolean` | `false`  | Only return chunks containing markdown task lists (`- [ ]`).                         |
 | `--has-code`    | `boolean` | `false`  | Only return chunks containing code blocks.                                           |
 | `--interactive` | `boolean` | `false`  | Launch a live interactive search TUI where you can type queries and preview results. |
+| `--split`       | `boolean` | `false`  | Split query string by delimiters (comma, pipe, semicolon) or execute multi-positional queries. |
+| `--split-by`    | `string`  | `,|;`    | Delimiters used to split query strings when `--split` is active.                     |
 
 #### Examples
 
@@ -129,9 +132,26 @@ notebrain search "reconciliation loop in kubernetes" --limit 5
 # Search specifically for tasks under the Kubernetes tag
 notebrain search "deploy service" --tag "Kubernetes" --has-tasks
 
+# Multi-query search (positional arguments)
+notebrain search "message brokers" "redis queue"
+
+# Multi-query search using delimiter splitting
+notebrain search "redis, streams, pubsub" --split
+
+# Multi-query search with tags hidden in output
+notebrain search "redis, streams" --split --hide-tags
+
 # Launch live-search interactive terminal
 notebrain search --interactive
 ```
+
+#### How Multi-Query Matching & Ranking Works
+When multiple queries are provided (either via multiple positional arguments or via `--split`):
+1. **Semantic Vector Matching**: NoteBrain embeds each query independently into a 384-dimensional vector using `MiniLM-L6-v2`. Matching is based **100% on semantic vector similarity** (cosine distance in ChromaDB), not exact keyword or substring matching. A note can match a query even if it uses completely different terminology or synonyms.
+2. **Multi-Hit Boosting**: When a note chunk is semantically relevant to multiple queries in your search, NoteBrain boosts its rank! Results are sorted using a two-tier strategy:
+   - **Primary Sort**: Descending order by the number of matched query topics (`len(MatchedQueries)`). Chunks bridging multiple concepts (e.g., matching both `"message brokers"` and `"redis queue"`) appear at the top.
+   - **Secondary Sort**: Descending order by maximum cosine similarity score within each match-count tier.
+3. **Hit Attribution**: In terminal text mode, multi-hit chunks display attribution tags indicating which query vectors retrieved them (e.g., `[hits: "message brokers", "redis queue"]`). In structured JSON outputs, each item includes a `matched_queries` array.
 
 ---
 
