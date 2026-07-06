@@ -33,6 +33,7 @@ func hyperlink(useLinks bool, uri, text string) string {
 type jsonEnvelope struct {
 	Command string         `json:"command"`
 	Query   string         `json:"query"`
+	Queries []string       `json:"queries,omitempty"`
 	Total   int            `json:"total"`
 	Results []store.Result `json:"results"`
 }
@@ -48,6 +49,9 @@ func printResultsFormatted(commandName string, query string, results []store.Res
 		if globals.SkipPhantom && r.IsPhantom {
 			continue
 		}
+		if globals.HideTags {
+			r.Tags = nil
+		}
 		filtered = append(filtered, r)
 	}
 
@@ -55,6 +59,7 @@ func printResultsFormatted(commandName string, query string, results []store.Res
 		env := jsonEnvelope{
 			Command: commandName,
 			Query:   query,
+			Queries: globals.Queries,
 			Total:   len(filtered),
 			Results: filtered,
 		}
@@ -70,6 +75,7 @@ func printResultsFormatted(commandName string, query string, results []store.Res
 		env := jsonEnvelope{
 			Command: commandName,
 			Query:   query,
+			Queries: globals.Queries,
 			Total:   len(filtered),
 			Results: filtered,
 		}
@@ -143,6 +149,9 @@ func printResultsFormatted(commandName string, query string, results []store.Res
 					formattedTags = append(formattedTags, "#"+t)
 				}
 				line += "  " + extraStyle.Render("["+strings.Join(formattedTags, " ")+"]")
+			}
+			if len(r.MatchedQueries) > 0 && len(globals.Queries) > 1 {
+				line += "  " + extraStyle.Render(`[hits: "`+strings.Join(r.MatchedQueries, `", "`)+`"]`)
 			}
 			if r.Extra != "" {
 				line += "  " + extraStyle.Render("["+r.Extra+"]")

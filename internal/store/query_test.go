@@ -542,3 +542,68 @@ func TestBacklinks_Attachment(t *testing.T) {
 		t.Errorf("Expected 1 backlink when SkipAttachments=false, got %v", resNoSkip)
 	}
 }
+
+func TestMultiSemanticSearch(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatalf("Open failed: %v", err)
+	}
+	defer func() { _ = st.Close() }()
+
+	chunks := []store.ChunkRecord{
+		{
+			ID:         "note-a:0",
+			NoteSlug:   "note-a",
+			Title:      "Note A",
+			FilePath:   "Note A.md",
+			ChunkIndex: 0,
+			Text:       "redis text",
+			Embedding:  []float32{1.0, 0.0, 0.0},
+		},
+		{
+			ID:         "note-b:0",
+			NoteSlug:   "note-b",
+			Title:      "Note B",
+			FilePath:   "Note B.md",
+			ChunkIndex: 0,
+			Text:       "broker text",
+			Embedding:  []float32{0.0, 1.0, 0.0},
+		},
+		{
+			ID:         "note-c:0",
+			NoteSlug:   "note-c",
+			Title:      "Note C",
+			FilePath:   "Note C.md",
+			ChunkIndex: 0,
+			Text:       "redis and broker text",
+			Embedding:  []float32{0.707, 0.707, 0.0},
+		},
+	}
+	if err := st.UpsertChunks(ctx, chunks); err != nil {
+		t.Fatalf("UpsertChunks failed: %v", err)
+	}
+
+	queryVecs := [][]float32{
+		{1.0, 0.0, 0.0},
+		{0.0, 1.0, 0.0},
+	}
+	queries := []string{"redis", "broker"}
+
+	res, err := st.MultiSemanticSearch(ctx, queryVecs, queries, 10, 3, nil, false)
+	if err != nil {
+		t.Fatalf("MultiSemanticSearch failed: %v", err)
+	}
+
+	if len(res) < 3 {
+		t.Fatalf("Expected at least 3 results, got %d", len(res))
+	}
+
+	// Chunk C should be ranked first because it matched both queries
+	if res[0].NoteSlug != "note-c" {
+		t.Errorf("Expected note-c first (multi-hit boost), got %s", res[0].NoteSlug)
+	}
+	if len(res[0].MatchedQueries) != 2 {
+		t.Errorf("Expected 2 matched queries for note-c, got %v", res[0].MatchedQueries)
+	}
+}

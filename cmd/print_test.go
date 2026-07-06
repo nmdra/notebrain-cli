@@ -132,3 +132,79 @@ func TestPrintResultsFormatted_Truncation(t *testing.T) {
 		}
 	}
 }
+
+func TestPrintResultsFormatted_MultiQuery(t *testing.T) {
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	results := []store.Result{
+		{
+			NoteSlug:       "openchoreo",
+			Title:          "OpenChoreo",
+			Score:          0.8540,
+			MatchedQueries: []string{"redis", "broker"},
+		},
+	}
+	globals := &Globals{
+		Format:  "text",
+		Queries: []string{"redis", "broker"},
+	}
+
+	printResultsFormatted("search", "redis | broker", results, globals)
+	_ = w.Close()
+	os.Stdout = oldStdout
+
+	var buf bytes.Buffer
+	_, _ = buf.ReadFrom(r)
+	out := buf.String()
+
+	if !strings.Contains(out, `[hits: "redis", "broker"]`) {
+		t.Errorf("Expected matched queries attribution in output, got %q", out)
+	}
+}
+
+func TestPrintResultsFormatted_HideTags(t *testing.T) {
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	results := []store.Result{
+		{NoteSlug: "redis-note", Title: "Redis Note", Score: 0.9, Tags: []string{"Database/Redis", "Backend"}},
+	}
+	globals := &Globals{
+		Format:   "text",
+		HideTags: true,
+	}
+
+	printResultsFormatted("test", "query", results, globals)
+	_ = w.Close()
+	os.Stdout = oldStdout
+
+	var buf bytes.Buffer
+	_, _ = buf.ReadFrom(r)
+	out := buf.String()
+
+	if strings.Contains(out, "#Database/Redis") || strings.Contains(out, "#Backend") {
+		t.Errorf("Did not expect tags in output when HideTags=true, got %q", out)
+	}
+	if !strings.Contains(out, "Redis Note") {
+		t.Errorf("Expected note title in output, got %q", out)
+	}
+
+	// Now test HideTags = false
+	r2, w2, _ := os.Pipe()
+	os.Stdout = w2
+	globals.HideTags = false
+	printResultsFormatted("test", "query", results, globals)
+	_ = w2.Close()
+	os.Stdout = oldStdout
+
+	buf.Reset()
+	_, _ = buf.ReadFrom(r2)
+	out2 := buf.String()
+
+	if !strings.Contains(out2, "#Database/Redis") || !strings.Contains(out2, "#Backend") {
+		t.Errorf("Expected tags in output when HideTags=false, got %q", out2)
+	}
+}

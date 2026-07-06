@@ -13,17 +13,18 @@ import (
 
 // Result is one row returned by any query.
 type Result struct {
-	NoteSlug    string   `json:"note_slug"`
-	Title       string   `json:"title"`
-	FilePath    string   `json:"file_path"`
-	Score       float64  `json:"score"`
-	IsPhantom   bool     `json:"is_phantom,omitempty"`
-	ChunkIndex  int      `json:"chunk_index,omitempty"`
-	Tags        []string `json:"tags,omitempty"`
-	Extra       string   `json:"extra,omitempty"` // e.g. shared tags, hop count
-	HeadingPath string   `json:"heading_path,omitempty"`
-	Text        string   `json:"text,omitempty"`    // populated only when include-text is requested
-	Context     []string `json:"context,omitempty"` // adjacent chunks when windowing is enabled
+	NoteSlug       string   `json:"note_slug"`
+	Title          string   `json:"title"`
+	FilePath       string   `json:"file_path"`
+	Score          float64  `json:"score"`
+	IsPhantom      bool     `json:"is_phantom,omitempty"`
+	ChunkIndex     int      `json:"chunk_index,omitempty"`
+	Tags           []string `json:"tags,omitempty"`
+	Extra          string   `json:"extra,omitempty"` // e.g. shared tags, hop count
+	HeadingPath    string   `json:"heading_path,omitempty"`
+	Text           string   `json:"text,omitempty"`    // populated only when include-text is requested
+	Context        []string `json:"context,omitempty"` // adjacent chunks when windowing is enabled
+	MatchedQueries []string `json:"matched_queries,omitempty"`
 }
 
 // NoteContent represents the complete reconstructed text and metadata of a note.
@@ -69,6 +70,107 @@ func (s *Store) semanticSearch(ctx context.Context, queryVec []float32, limit in
 		return nil, fmt.Errorf("semantic search: %w", err)
 	}
 	return deduplicateByNote(res, limit, topKPerNote), nil
+}
+
+// MultiSemanticSearch executes semantic searches across multiple query vectors, merging results
+// and boosting chunks that match multiple queries.
+func (s *Store) MultiSemanticSearch(ctx context.Context, queryVecs [][]float32, queries []string, limit int, topKPerNote int, whereFilter chroma.WhereFilter, includeText bool) ([]Result, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if len(queryVecs) == 0 {
+		return nil, nil
+	}
+	if len(queryVecs) == 1 {
+		res, err := s.semanticSearch(ctx, queryVecs[0], limit, topKPerNote, whereFilter, includeText)
+		if err != nil {
+			return nil, err
+		}
+		if len(queries) > 0 && queries[0] != "" {
+			for i := range res {
+				res[i].MatchedQueries = []string{queries[0]}
+			}
+		}
+		return res, nil
+	}
+
+	fetchLimit := max(limit*2, 20)
+	fetchTopK := max(topKPerNote*2, 6)
+
+	type mergedChunk struct {
+		res     Result
+		queries map[string]struct{}
+		order   []string
+	}
+	chunkMap := make(map[string]*mergedChunk)
+
+	for i, vec := range queryVecs {
+		qStr := fmt.Sprintf("query_%d", i+1)
+		if i < len(queries) && queries[i] != "" {
+			qStr = queries[i]
+		}
+		subRes, err := s.semanticSearch(ctx, vec, fetchLimit, fetchTopK, whereFilter, includeText)
+		if err != nil {
+			return nil, fmt.Errorf("semantic search for query %q: %w", qStr, err)
+		}
+		for _, r := range subRes {
+			if r.Score <= 0.0 {
+				continue
+			}
+			key := fmt.Sprintf("%s:%d", r.NoteSlug, r.ChunkIndex)
+			existing, ok := chunkMap[key]
+			if !ok {
+				chunkMap[key] = &mergedChunk{
+					res:     r,
+					queries: map[string]struct{}{qStr: {}},
+					order:   []string{qStr},
+				}
+			} else {
+				if _, seen := existing.queries[qStr]; !seen {
+					existing.queries[qStr] = struct{}{}
+					existing.order = append(existing.order, qStr)
+				}
+				if r.Score > existing.res.Score {
+					existing.res.Score = r.Score
+				}
+			}
+		}
+	}
+
+	merged := make([]Result, 0, len(chunkMap))
+	for _, mc := range chunkMap {
+		mc.res.MatchedQueries = mc.order
+		merged = append(merged, mc.res)
+	}
+
+	sort.Slice(merged, func(i, j int) bool {
+		if len(merged[i].MatchedQueries) != len(merged[j].MatchedQueries) {
+			return len(merged[i].MatchedQueries) > len(merged[j].MatchedQueries)
+		}
+		return merged[i].Score > merged[j].Score
+	})
+
+	return deduplicateResultsByNote(merged, limit, topKPerNote), nil
+}
+
+func deduplicateResultsByNote(results []Result, limit int, topKPerNote int) []Result {
+	if topKPerNote <= 0 {
+		topKPerNote = 3
+	}
+	noteCounts := make(map[string]int)
+	var out []Result
+
+	for _, r := range results {
+		if noteCounts[r.NoteSlug] >= topKPerNote {
+			continue
+		}
+		noteCounts[r.NoteSlug]++
+		out = append(out, r)
+		if limit > 0 && len(out) >= limit {
+			break
+		}
+	}
+	return out
 }
 
 // ─── Metadata Queries ────────────────────────────────────────────
