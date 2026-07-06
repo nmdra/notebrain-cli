@@ -54,7 +54,6 @@ To prevent excessive tool calls and context bloat, follow a tiered retrieval str
    - **Graph structure / nearby notes** → run `connections "<slug>" --hops 2 --jsonpath="$.results[*].note_slug"` (no `--include-text`).
    - **Incoming citations / what links here** → run `backlinks "<slug>" --format tsv`.
    - **Exploratory / conceptual bridges** → run `hidden "<slug>" --context-window 1 --limit 5 --include-text`.
-4. **Avoid Blanket Chaining**: Never run all four commands (`search → backlinks → connections → hidden`) unless the user explicitly requests a comprehensive vault-wide audit of a topic.
 
 ---
 
