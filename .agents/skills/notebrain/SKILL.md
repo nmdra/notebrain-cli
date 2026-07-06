@@ -20,6 +20,7 @@ To operate efficiently and prevent wasted tokens or hung sessions, follow these 
 5. **Retrieve Content for Synthesis (`--include-text`)**: By default, query commands return lightweight metadata envelopes. Whenever your task requires summarizing or reasoning about chunk content directly from search results, append `--include-text`.
 6. **CLI Syntax Rules**: In development environments, execute `./notebrain` if `notebrain` is not in PATH. Always encapsulate note titles, tags, and queries in double quotes. Strictly use `--vault-path` and `--chroma-path` (never `--vault` or `--db`). For graph and note commands (`backlinks`, `connections`, `hidden`, `tags`, `get`), pass exactly one positional argument: `<note>`. For `boosted` search, specify `--seed=<slug>`. For resets, pipe confirmation (`echo yes | notebrain reset`).
 7. **Graph & Link Filtering (`--skip-attachments`, `--skip-phantom`)**: By default, NoteBrain excludes image/attachment links (`.webp`, `.png`, `.pdf`, `.canvas`) from graph edges (`--skip-attachments=true`), and excludes uncreated "phantom" notes (wikilinks without a `.md` file on disk) from results (`--skip-phantom=true`). To explore missing notes or broken links, pass `--skip-phantom=false` (marked with `"is_phantom": true` in JSON or `[phantom]` in text).
+8. **Intelligent Query Splitting (`--split`)**: When researching compound questions, long queries, or orthogonal topics (e.g., comparing two technologies or looking for intersections between domains), do not issue multiple separate search commands. Instead, intelligently split the query into distinct conceptual terms using positional arguments (`notebrain search "redis pubsub" "kafka message brokers"`) or delimiter splitting (`notebrain search "redis pubsub, kafka message brokers" --split`). **Why?** NoteBrain uses multi-hit score boosting: chunks that match multiple query topics are automatically ranked above single-topic matches, instantly surfacing synthesizing notes that bridge those domains. For simple, single-concept lookups, keep the query intact without splitting.
 
 ---
 
@@ -57,7 +58,14 @@ Select the specialized command tailored to the user's analytical goal:
 ### Semantic Search & Tag Filtering (`search`)
 
 ```bash
+# Basic single-topic semantic search
 notebrain search "kubernetes reconciliation" --tag="Kubernetes" --limit 5 --include-text
+
+# Multi-topic search across orthogonal concepts (surfaces bridging notes via multi-hit boosting)
+notebrain search "message brokers" "redis queue" --limit 5 --include-text
+
+# Delimiter-based query splitting for compound research questions
+notebrain search "redis, streams, pubsub" --split --limit 5 --include-text
 ```
 
 #### Key search flags
@@ -66,12 +74,15 @@ notebrain search "kubernetes reconciliation" --tag="Kubernetes" --limit 5 --incl
 | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
 | `--top-k N`          | Maximum chunks to retain **per note**. Prevents one long note from dominating results while preserving depth.                                      | `3`     |
 | `--context-window N` | Fetches ±N adjacent chunks around each match into `context`. Use for lightweight multi-result context; use `get` only when you need the full note. | `0`     |
+| `--split`            | Split query string by delimiters (comma, pipe, semicolon) or execute multi-positional queries. Highly recommended for multi-topic research queries. | off     |
+| `--split-by "CHARS"` | Delimiter characters used to tokenize query strings when `--split` is active.                                                                      | `",|;"`  |
 | `--has-tasks`        | Only return chunks that contain task lists (checkboxes).                                                                                           | off     |
 | `--has-code`         | Only return chunks that contain fenced code blocks.                                                                                                | off     |
 | `--section`          | Filter results to chunks under a specific heading path (e.g., `"Architecture > Components"`).                                                      | —       |
 | `--limit N`          | Maximum total results to return.                                                                                                                   | `10`    |
 | `--tag "TagName"`    | Filter or search by tag name.                                                                                                                      | —       |
 | `--min-score F`      | Suppress results below this similarity score (0–1).                                                                                                | `0.4`   |
+| `--hide-tags`        | Hide tag names (`#Tag/Subtag`) in search and graph outputs.                                                                                        | `true`  |
 
 ### Complete Note Retrieval (`get`)
 
@@ -127,8 +138,9 @@ Every query command wraps results in a JSON envelope. Understanding the field sp
 | `heading_path` | When chunk is under a heading   | Breadcrumb path like `"Section > Subsection"`.                                             |
 | `text`         | When `--include-text` is passed | The matched chunk's full markdown text, with code blocks preserved.                        |
 | `context`      | When `--context-window N` > 0   | Array of ±N adjacent chunk texts, ordered by chunk index.                                  |
-| `extra`        | Connections, tags, boosted      | Command-specific info (e.g., `"2 hop(s)"`, `"graph-boosted"`).                             |
-| `is_phantom`   | When `--skip-phantom=false`     | Boolean (`true`) if the note is an uncreated phantom link without a markdown file on disk. |
+| `extra`           | Connections, tags, boosted      | Command-specific info (e.g., `"2 hop(s)"`, `"graph-boosted"`).                             |
+| `is_phantom`      | When `--skip-phantom=false`     | Boolean (`true`) if the note is an uncreated phantom link without a markdown file on disk. |
+| `matched_queries` | When results match queries      | Array of query strings that matched this chunk (multi-hit attribution).                    |
 
 ---
 
@@ -136,7 +148,7 @@ Every query command wraps results in a JSON envelope. Understanding the field sp
 
 To prevent excessive tool calls and context bloat, follow a progressive, conditional retrieval strategy:
 
-1. **Start Lean**: Always start with `search --context-window 1 --top-k 2 --include-text --limit 5`.
+1. **Start Lean**: Always start with a lean search: `notebrain search "topic" --context-window 1 --top-k 2 --include-text --limit 5`. For compound or multi-topic questions, intelligently split into distinct concepts: `notebrain search "topic A" "topic B" --context-window 1 --top-k 2 --include-text --limit 5`.
 2. **Check Score & Sufficiency**: Check the top result's `score`. If `score ≥ 0.75` and the returned context fully answers the question, **stop here** — do not run further commands.
 3. **Escalate Conditionally**: Only escalate if the question or initial findings require it:
    - Ask is about **connections/related notes** → also run `connections --hops 2` (no `--include-text`; slugs/titles are enough for a graph map).
