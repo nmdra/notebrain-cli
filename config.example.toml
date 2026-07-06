@@ -92,6 +92,11 @@ skip-attachments = true
 # Defaults to 10
 limit = 10
 
+# Maximum number of chunks to return per note in semantic search.
+# Can be lowered (e.g., to 1 or 2) to increase result diversity across different notes.
+# Defaults to 3
+top-k = 3
+
 # Skip uncreated "phantom" notes (notes linked via wikilinks that do not exist as markdown files on disk).
 # If true, phantom notes are excluded from graph results (backlinks, connections, tags).
 # Defaults to true

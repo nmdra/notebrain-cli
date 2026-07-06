@@ -8,8 +8,18 @@ import (
 
 	"charm.land/lipgloss/v2"
 	"github.com/PaesslerAG/jsonpath"
+	"github.com/charmbracelet/x/ansi"
+	"github.com/charmbracelet/x/term"
 	"github.com/nmdra/notebrain-cli/v2/internal/store"
 )
+
+var getTerminalWidth = func() int {
+	w, _, err := term.GetSize(uintptr(os.Stdout.Fd()))
+	if err != nil || w <= 0 {
+		return 0
+	}
+	return w
+}
 
 // hyperlink wraps visible text in an OSC 8 terminal hyperlink.
 func hyperlink(useLinks bool, uri, text string) string {
@@ -90,11 +100,33 @@ func printResultsFormatted(commandName string, query string, results []store.Res
 		}
 
 		useLinks := hyperlinkSupported(globals)
+		termWidth := getTerminalWidth()
 
 		for i, r := range filtered {
 			rank := rankStyle.Render(fmt.Sprintf("%d.", i+1))
 
-			paddedTitle := lipgloss.NewStyle().Width(42).Render(r.Title)
+			displayTitle := r.Title
+			if r.HeadingPath != "" {
+				displayTitle = fmt.Sprintf("%s (§ %s)", displayTitle, r.HeadingPath)
+			} else if len(filtered) > 1 {
+				sameNoteCount := 0
+				for _, other := range filtered {
+					if other.NoteSlug == r.NoteSlug {
+						sameNoteCount++
+					}
+				}
+				if sameNoteCount > 1 {
+					displayTitle = fmt.Sprintf("%s (chunk #%d)", displayTitle, r.ChunkIndex+1)
+				}
+			}
+
+			titleWidth := 42
+			if termWidth > 0 {
+				titleWidth = max(min(termWidth-40, 80), 20)
+				displayTitle = ansi.Truncate(displayTitle, titleWidth, "…")
+			}
+
+			paddedTitle := lipgloss.NewStyle().Width(titleWidth).Render(displayTitle)
 			title := paddedTitle
 
 			if useLinks && r.FilePath != "" {
@@ -118,12 +150,18 @@ func printResultsFormatted(commandName string, query string, results []store.Res
 			if r.IsPhantom {
 				line += "  " + extraStyle.Render("[phantom]")
 			}
+
+			if termWidth > 0 && ansi.StringWidth(line) > termWidth {
+				line = ansi.Truncate(line, termWidth, "…")
+			}
+
 			fmt.Println(line)
 		}
 
 		if useLinks {
-			fmt.Println("\n  " + extraStyle.Render("(Ctrl+click or Cmd+click a title to open in Obsidian)"))
+			fmt.Println("\n  " + extraStyle.Render("(Ctrl+click / Cmd+click a title to open in Obsidian)"))
 		}
+		fmt.Println("  " + extraStyle.Render("Note: Results are matching text chunks; Repeated titles represent different relevant sections."))
 		fmt.Println()
 	}
 }

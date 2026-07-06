@@ -171,3 +171,38 @@ skip_phantom = false
 		t.Errorf("Expected SkipPhantom false, got %v", cli.SkipPhantom)
 	}
 }
+
+type SearchGlobals struct {
+	TopKPerNote int `name:"top-k" default:"3"`
+	Limit       int `name:"limit" default:"10"`
+}
+
+func TestTOMLResolver_TopK(t *testing.T) {
+	tomlData := []byte(`
+top-k = 1
+limit = 5
+`)
+
+	resolver, err := TOMLResolver(bytes.NewReader(tomlData))
+	if err != nil {
+		t.Fatalf("TOMLResolver failed: %v", err)
+	}
+
+	var cli SearchGlobals
+	parser, err := kong.New(&cli, kong.Resolvers(resolver))
+	if err != nil {
+		t.Fatalf("kong.New failed: %v", err)
+	}
+
+	_, err = parser.Parse([]string{})
+	if err != nil {
+		t.Fatalf("parser.Parse failed: %v", err)
+	}
+
+	if cli.TopKPerNote != 1 {
+		t.Errorf("Expected TopKPerNote 1, got %d", cli.TopKPerNote)
+	}
+	if cli.Limit != 5 {
+		t.Errorf("Expected Limit 5, got %d", cli.Limit)
+	}
+}
