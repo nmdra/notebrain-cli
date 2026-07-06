@@ -99,6 +99,11 @@ func TestDefault_Fields(t *testing.T) {
 			got:  func(c *Config) any { return c.SkipPhantom },
 			want: true,
 		},
+		{
+			name: "HideTags is true",
+			got:  func(c *Config) any { return c.HideTags },
+			want: true,
+		},
 	}
 
 	cfg := Default()

@@ -94,6 +94,7 @@ type CoreGlobals struct {
 	LogLevel        string  `name:"log-level" default:"info"`
 	SkipAttachments bool    `name:"skip-attachments" default:"true"`
 	SkipPhantom     bool    `name:"skip-phantom" default:"true"`
+	HideTags        bool    `name:"hide-tags" default:"true"`
 }
 
 func TestTOMLResolver_StrictNoHTTP(t *testing.T) {
@@ -204,5 +205,31 @@ limit = 5
 	}
 	if cli.Limit != 5 {
 		t.Errorf("Expected Limit 5, got %d", cli.Limit)
+	}
+}
+
+func TestTOMLResolver_HideTags(t *testing.T) {
+	tomlData := []byte(`
+hide-tags = false
+`)
+
+	resolver, err := TOMLResolver(bytes.NewReader(tomlData))
+	if err != nil {
+		t.Fatalf("TOMLResolver failed: %v", err)
+	}
+
+	var cli CoreGlobals
+	parser, err := kong.New(&cli, kong.Resolvers(resolver))
+	if err != nil {
+		t.Fatalf("kong.New failed: %v", err)
+	}
+
+	_, err = parser.Parse([]string{})
+	if err != nil {
+		t.Fatalf("parser.Parse failed: %v", err)
+	}
+
+	if cli.HideTags != false {
+		t.Errorf("Expected HideTags false when overridden in TOML, got %v", cli.HideTags)
 	}
 }

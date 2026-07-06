@@ -101,3 +101,7 @@ top-k = 3
 # If true, phantom notes are excluded from graph results (backlinks, connections, tags).
 # Defaults to true
 skip-phantom = true
+
+# Hide tag names (#Tag/Subtag) in search and graph outputs.
+# Defaults to true
+hide-tags = true

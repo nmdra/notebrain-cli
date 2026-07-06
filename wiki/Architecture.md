@@ -171,7 +171,7 @@ Stores directed edges representing wikilinks and Markdown links between notes (`
 
 ## 6. AI Agent Integration & Optimization
 
-NoteBrain is architected to serve as a fast, local knowledge retriever for autonomous AI agents. The following three query flags are designed specifically to optimize agent efficiency, token usage, and search accuracy:
+NoteBrain is architected to serve as a fast, local knowledge retriever for autonomous AI agents. The following four query features are designed specifically to optimize agent efficiency, token usage, and search accuracy:
 
 ### 1. `--context-window` (Sliding Semantic Context)
 
@@ -193,3 +193,13 @@ A common failure mode of vector search on large files is that a single note cont
 
 - **How it works**: The `--top-k` (or `TopKPerNote`) flag specifies the maximum number of chunks that can be returned _from the same note_ for a given query.
 - By setting `--top-k` (e.g., to `1` or `2`), the agent is guaranteed to receive a diverse set of search results spanning multiple different notes, preventing the LLM from getting trapped in a single document's context and ensuring a broader, more balanced view of the overall knowledge base.
+
+### 4. `--split` (Multi-Query Splitting & Multi-Hit Boosting)
+
+When AI agents research complex or orthogonal topics, running multiple separate search commands incurs overhead and fails to highlight bridging concepts across those topics.
+
+- **How it works**: Passing `--split` (or providing multiple positional query arguments) instructs NoteBrain to tokenize the query string by delimiters (comma, pipe, or semicolon via `--split-by`) and embed all query terms simultaneously using `emb.EmbedBatch`. Candidates are retrieved independently for each query vector across ChromaDB using semantic vector similarity (cosine distance).
+- **Multi-Hit Boosting**: Results are merged and sorted using a two-tier ranking strategy:
+  1. **Primary Sort (Hit Count)**: Chunks matching **multiple** query topics (`len(MatchedQueries)` descending) are boosted to the top of the rankings over single-topic matches, even if a single-topic match has a higher raw similarity score. This automatically surfaces synthesizing concepts that bridge orthogonal domains.
+  2. **Secondary Sort (Score)**: Within each hit-count tier, results are ordered by their maximum cosine similarity score descending.
+- **Hit Attribution**: In structured outputs (JSON/TSV/NDJSON), each item includes a `matched_queries` array attributing the exact query vectors that retrieved it. In text mode, hit tags (e.g., `[hits: "redis", "message broker"]`) are displayed.

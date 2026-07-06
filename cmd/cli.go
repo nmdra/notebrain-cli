@@ -31,11 +31,13 @@ type Globals struct {
 	LogLevel        string           `name:"log-level" help:"minimum log severity (info, debug, warn, error)" default:"info"`
 	SkipAttachments bool             `name:"skip-attachments" help:"Exclude attachment and image links from graph edges" default:"true"`
 	SkipPhantom     bool             `name:"skip-phantom" help:"Exclude uncreated notes (phantom links) from results" default:"true"`
+	HideTags        bool             `name:"hide-tags" help:"Hide tag names in search and graph outputs" default:"true"`
 	Version         kong.VersionFlag `name:"version" help:"Show version information"`
 
 	// Internal fields, not exposed as flags
 	Ctx           context.Context `kong:"-"`
 	VersionString string          `kong:"-"`
+	Queries       []string        `kong:"-"`
 
 	Config kong.ConfigFlag `help:"Path to config file" default:"~/.notebrain/config/config.toml"`
 }
@@ -79,22 +81,22 @@ func ParseAndRun(ctx context.Context, version, commit, date string) error {
 		kong.Name("notebrain"),
 		kong.Description(`Index and search your Obsidian vault with semantic intelligence.
 
-NoteBrain uses local LLM embeddings to index your Markdown notes into ChromaDB, 
+NoteBrain uses local LLM embeddings to index your Markdown notes into ChromaDB,
 enabling powerful semantic search, hidden graph connections, and AI-friendly automation workflows.
 
 Examples:
   # Ingest your entire vault into ChromaDB
   notebrain ingest --vault-path "/path/to/Obsidian"
-  
+
   # Perform a semantic search across your notes
   notebrain search "how to configure neovim" --limit 5
-  
+
   # Graph-boosted search (combines semantic similarity + wikilink connections)
   notebrain boosted "docker setup"
 
   # Find hidden connections between notes that are not explicitly linked
   notebrain hidden "project alpha"
-  
+
   # Automate CLI output for AI agents (Claude, Gemini, etc.)
   notebrain search "rust error handling" --format json --include-text`),
 		kong.UsageOnError(),

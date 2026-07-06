@@ -41,6 +41,7 @@ type Config struct {
 	LogLevel        string
 	SkipAttachments bool
 	SkipPhantom     bool
+	HideTags        bool
 }
 
 // Default returns a Config with sensible defaults.
@@ -61,5 +62,6 @@ func Default() *Config {
 		LogLevel:        "info",
 		SkipAttachments: true,
 		SkipPhantom:     true,
+		HideTags:        true,
 	}
 }

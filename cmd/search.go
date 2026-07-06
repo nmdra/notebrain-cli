@@ -25,6 +25,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	tea "charm.land/bubbletea/v2"
 	chroma "github.com/amikos-tech/chroma-go/pkg/api/v2"
@@ -35,20 +36,57 @@ import (
 )
 
 type SearchCmd struct {
-	Query       string `arg:"" optional:"" help:"Search query (omit when using --interactive or --tag)"`
-	Limit       int    `help:"maximum number of results to return" default:"10"`
-	TopKPerNote int    `name:"top-k" help:"maximum number of chunks to return per note" default:"3"`
-	Section     string `help:"filter by heading path"`
-	Tag         string `help:"filter or search by tag name"`
-	HasTasks    bool   `help:"only return chunks that contain task lists"`
-	HasCode     bool   `help:"only return chunks that contain code blocks"`
-	Interactive bool   `help:"launch live interactive search TUI"`
+	Queries     []string `arg:"" optional:"" name:"query" help:"Search query or multiple queries (when using --split or multiple args)"`
+	Split       bool     `help:"Split query string by delimiters (comma, pipe, semicolon) or execute independent searches for each positional query argument"`
+	SplitBy     string   `name:"split-by" help:"Delimiters used to split query strings when --split is active" default:",|;"`
+	Limit       int      `help:"maximum number of results to return" default:"10"`
+	TopKPerNote int      `name:"top-k" help:"maximum number of chunks to return per note" default:"3"`
+	Section     string   `help:"filter by heading path"`
+	Tag         string   `help:"filter or search by tag name"`
+	HasTasks    bool     `help:"only return chunks that contain task lists"`
+	HasCode     bool     `help:"only return chunks that contain code blocks"`
+	Interactive bool     `help:"launch live interactive search TUI"`
+}
+
+func resolveQueries(queries []string, split bool, splitBy string) []string {
+	if len(queries) == 0 {
+		return nil
+	}
+	var rawList []string
+	if split {
+		f := func(c rune) bool {
+			return strings.ContainsRune(splitBy, c)
+		}
+		for _, q := range queries {
+			rawList = append(rawList, strings.FieldsFunc(q, f)...)
+		}
+	} else {
+		rawList = queries
+	}
+
+	seen := make(map[string]struct{})
+	out := []string{}
+	for _, q := range rawList {
+		cleaned := strings.TrimSpace(q)
+		if cleaned == "" {
+			continue
+		}
+		if _, ok := seen[cleaned]; !ok {
+			seen[cleaned] = struct{}{}
+			out = append(out, cleaned)
+		}
+	}
+	return out
 }
 
 func (c *SearchCmd) Run(globals *Globals) error {
-
-	if !c.Interactive && c.Query == "" && c.Tag == "" {
+	resolved := resolveQueries(c.Queries, c.Split, c.SplitBy)
+	if !c.Interactive && len(resolved) == 0 && c.Tag == "" {
 		return fmt.Errorf("query or --tag is required (or use --interactive for live search)")
+	}
+	queryStr := strings.Join(resolved, " | ")
+	if len(resolved) > 1 {
+		globals.Queries = resolved
 	}
 
 	chromaPath := globals.ChromaPath
@@ -98,13 +136,24 @@ func (c *SearchCmd) Run(globals *Globals) error {
 			var results []store.Result
 			var err error
 			tui.SuppressOutputs(func() {
-				var qVec []float32
-				qVec, err = emb.Embed(ctx, query)
-				if err != nil {
-					err = fmt.Errorf("embed query: %w", err)
-					return
+				resQueries := resolveQueries([]string{query}, c.Split, c.SplitBy)
+				if len(resQueries) > 1 {
+					var qVecs [][]float32
+					qVecs, err = emb.EmbedBatch(ctx, resQueries)
+					if err != nil {
+						err = fmt.Errorf("embed queries: %w", err)
+						return
+					}
+					results, err = st.MultiSemanticSearch(ctx, qVecs, resQueries, limit, topK, whereFilter, false)
+				} else {
+					var qVec []float32
+					qVec, err = emb.Embed(ctx, query)
+					if err != nil {
+						err = fmt.Errorf("embed query: %w", err)
+						return
+					}
+					results, err = st.SemanticSearch(ctx, qVec, limit, topK, whereFilter, false)
 				}
-				results, err = st.SemanticSearch(ctx, qVec, limit, topK, whereFilter, false)
 				if err == nil {
 					st.PopulateContext(ctx, results, globals.ContextWindow)
 				}
@@ -112,7 +161,7 @@ func (c *SearchCmd) Run(globals *Globals) error {
 			return results, err
 		}
 
-		model := tui.NewLiveSearch(searchFn, globals.VaultPath, limit, c.Query, globals.UseEditor)
+		model := tui.NewLiveSearch(searchFn, globals.VaultPath, limit, queryStr, globals.UseEditor)
 		p := tea.NewProgram(model)
 		var runErr error
 		// Suppress ChromaDB/hnswlib integrity-check noise from polluting the TUI.
@@ -133,7 +182,7 @@ func (c *SearchCmd) Run(globals *Globals) error {
 	if c.HasCode {
 		filters = append(filters, chroma.EqBool("has_code", true))
 	}
-	if c.Tag != "" && c.Query != "" {
+	if c.Tag != "" && len(resolved) > 0 {
 		filters = append(filters, store.TagWhereClause(c.Tag))
 	}
 	var whereFilter chroma.WhereFilter
@@ -143,7 +192,7 @@ func (c *SearchCmd) Run(globals *Globals) error {
 		whereFilter = chroma.And(filters...)
 	}
 
-	if c.Query == "" {
+	if len(resolved) == 0 {
 		results, err := st.TagSearch(ctx, c.Tag, c.Limit, whereFilter, globals.IncludeText)
 		if err != nil {
 			return err
@@ -153,7 +202,27 @@ func (c *SearchCmd) Run(globals *Globals) error {
 		return nil
 	}
 
-	qVec, err := emb.Embed(ctx, c.Query)
+	if len(resolved) > 1 {
+		qVecs, err := emb.EmbedBatch(ctx, resolved)
+		if err != nil {
+			return err
+		}
+		results, err := st.MultiSemanticSearch(ctx, qVecs, resolved, c.Limit, c.TopKPerNote, whereFilter, globals.IncludeText)
+		if err != nil {
+			return err
+		}
+		st.PopulateContext(ctx, results, globals.ContextWindow)
+
+		var quoted []string
+		for _, q := range resolved {
+			quoted = append(quoted, fmt.Sprintf("%q", q))
+		}
+		header := fmt.Sprintf("Semantic Search (%d split queries): %s", len(resolved), strings.Join(quoted, " | "))
+		printResultsFormatted("search", header, results, globals)
+		return nil
+	}
+
+	qVec, err := emb.Embed(ctx, resolved[0])
 	if err != nil {
 		return err
 	}
@@ -164,6 +233,6 @@ func (c *SearchCmd) Run(globals *Globals) error {
 	}
 	st.PopulateContext(ctx, results, globals.ContextWindow)
 
-	printResultsFormatted("search", fmt.Sprintf("Semantic Search: %q", c.Query), results, globals)
+	printResultsFormatted("search", fmt.Sprintf("Semantic Search: %q", resolved[0]), results, globals)
 	return nil
 }
