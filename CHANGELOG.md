@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.2.0] - 2026-07-07
+
+### Added
+- **Multi-Query Split Search**: Query inputs can now be split (by delimiters like commas, semicolons, or pipes) into multiple sub-queries. The search results from all sub-queries are merged, de-duplicated, and boosted based on the number of matching queries, with hit attribution (`[hits: ...]`) shown in text output (`feat(search)`).
+- **Tag Suppression Configuration**: Added a `--hide-tags` CLI flag and `hide-tags` TOML configuration key (defaulting to `true`) to suppress tag lists from search output to conserve terminal space and token limits (`feat(config)`).
+
+### Fixed
+- **ChromaDB FFI 1 MiB Payload Protection**: Reverted local vendor modifications to keep external dependencies clean, and implemented a local error wrapper (`wrapChromaErr`) to intercept ChromaDB JSON decoding truncation errors (1 MiB FFI limit) with clear mitigation advice. Added an immediate warning in the search CLI when `--top-k >= 4` is specified (`fix(store,cli)`).
+
+### Changed
+- **Search Output UX Enhancements**: Improved the formatting and layout of semantic search results, including updated configuration examples (`feat(cmd)`).
+- **AI Agent Skill Refactoring**: Extensively restructured the built-in AI assistant skill (`SKILL.md` and `references/`) for progressive disclosure to dramatically reduce token consumption. Documented chunk-based architectures, introduced JSON output schemas, and prohibited blind note fetching in favor of precise context windowing and `--jsonpath` extraction (`docs(skill)`).
+- **Documentation Updates**: Updated the command reference, architecture guides, and README to include feature overviews and visual screenshot assets (`docs(wiki,readme)`).
+
 ## [v2.1.1] - 2026-07-05
 
 ### Added
