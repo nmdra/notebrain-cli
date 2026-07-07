@@ -28,6 +28,27 @@ Ships with a built-in [AI agent skill](wiki/Skill_Usage.md) for integration with
 - **~33 MB disk** for the ONNX embedding model (auto-downloaded on first run)
 - Linux (macOS and Windows binaries are untested)
 
+## Features
+
+- **Semantic Search** — Find notes by meaning, not just keywords. Uses the [`all-MiniLM-L6-v2`](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) ONNX model for fully offline, on-device inference.
+- **Graph Traversal** — Walk your Obsidian wikilink graph (`[[Note]]`) via BFS: `backlinks`, `connections` (multi-hop), `tags` (shared tag neighbors).
+- **Hidden Connections** — Discover notes that are semantically similar but not explicitly linked.
+- **Graph-Boosted Search** — Combine semantic similarity scores with structural graph proximity for richer results.
+- **Interactive TUI** — Navigate search results with fuzzy-finding, arrow keys, and live ingestion progress. Powered by [Bubble Tea](https://github.com/charmbracelet/bubbletea).
+- **Advanced Filtering** — Narrow searches by `--section`, `--has-code`, `--has-tasks`, or `--tag`.
+- **Full Note Retrieval** — Reconstruct complete note content on the fly from indexed chunks (`notebrain get`).
+- **Machine-Readable Output** — Structured JSON, TSV via `--format` flags, plus built-in `--jsonpath` extraction (no `jq` needed).
+- **OSC 8 Hyperlinks** — Clickable `obsidian://open` links directly in your terminal. Works in [alacritty](https://github.com/alacritty/alacritty), [WezTerm](https://wezfurlong.org/wezterm/), [kitty](https://sw.kovidgoyal.net/kitty/) and others supporting the [OSC 8 spec](https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda).
+- **Editor Integration** — Open matched notes in `$EDITOR` or Obsidian directly from the TUI.
+- **Obsidian-Aware Ingestion** — Honors `userIgnoreFilters` and `attachmentFolderPath` from your Obsidian config. Optionally skip phantom links and attachment references.
+
+### Under the Hood
+
+- **Goldmark AST-Aware Chunking** — Splits markdown by header hierarchy rather than arbitrary character offsets, preserving code blocks and structural metadata.
+- **Embedded ChromaDB** — Stores vectors directly on disk via [`chroma-go`](https://github.com/amikos-tech/chroma-go) v0.4.x (no external database server required).
+- **Incremental Ingestion** — SHA-256 content hashing skips unmodified notes in milliseconds on re-runs.
+- **AI Agent Skill** — Ships with a built-in AI agent skill (`.agents/skills/notebrain/`) for autonomous knowledge retrieval (see [AI Agent Skill Usage](wiki/Skill_Usage.md)).
+
 ## Installation
 
 Download a pre-built binary from the [GitHub Releases](https://github.com/nmdra/notebrain-cli/releases) page, or build from source:
@@ -52,56 +73,25 @@ notebrain ingest --vault-path "/path/to/your/Obsidian Vault"
 **2. Search your notes by meaning:**
 
 ```bash
-notebrain search "how do message brokers work?" --limit 5
+notebrain search "how do message brokers work?" --limit 5 --top-k 2
 ```
 
-```
-Semantic Search: "how do message brokers work?"
-
-─────────────────────────────
- 1. Redis Queue                          score=0.8234  [#Redis #Queue]
- 2. Apache Kafka                         score=0.7891  [#Kafka #Messaging]
- 3. RabbitMQ                             score=0.7645  [#RabbitMQ #AMQP]
- 4. Event Driven Architecture            score=0.7412  [#Architecture]
- 5. Microservices Communication          score=0.7103  [#Microservices]
-
-  (Ctrl+click or Cmd+click a title to open in Obsidian)
-```
+<p align="center">
+  <img src="assets/search.png" alt="Notebrain search" width="100%">
+</p>
 
 **3. Get structured output for scripts and AI agents:**
 
 ```bash
-notebrain search "kubernetes" --limit 2 --format json
+notebrain search "how do message brokers work?" --limit 2 --top-k 1 --format=json | jq
 ```
 
 <details>
 <summary>Example JSON output</summary>
 
-```json
-{
-  "command": "search",
-  "query": "Semantic Search: \"kubernetes\"",
-  "total": 2,
-  "results": [
-    {
-      "note_slug": "02areaskubernetesk8s-primerkubernetes-introduction",
-      "title": "Kubernetes Introduction",
-      "file_path": "02.Areas/Kubernetes/K8s-Primer/Kubernetes Introduction.md",
-      "score": 0.7377,
-      "tags": ["Kubernetes", "Kubernetes/Primer", "CNCF"],
-      "heading_path": "What is Kubernetes"
-    },
-    {
-      "note_slug": "02areaskubernetesk8s-primerk8s-principles",
-      "title": "K8s Principles",
-      "file_path": "02.Areas/Kubernetes/K8s-Primer/K8s Principles.md",
-      "score": 0.7294,
-      "tags": ["Kubernetes/Networking", "Kubernetes/Primer", "Kubernetes"],
-      "heading_path": "Pods"
-    }
-  ]
-}
-```
+<p align="center">
+  <img src="assets/search-json.png" alt="Notebrain search JSON" width="100%">
+</p>
 
 </details>
 
@@ -116,27 +106,6 @@ notebrain get "$SLUG" --jsonpath="$.text"
 ```
 
 **5. Automate indexing** with a cron job or systemd timer so your index stays fresh (see [Scheduled Ingestion](wiki/Scheduled_Ingestion.md)).
-
-## Features
-
-- **Semantic Search** — Find notes by meaning, not just keywords. Uses the [`all-MiniLM-L6-v2`](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) ONNX model for fully offline, on-device inference.
-- **Graph Traversal** — Walk your Obsidian wikilink graph (`[[Note]]`) via BFS: `backlinks`, `connections` (multi-hop), `tags` (shared tag neighbors).
-- **Hidden Connections** — Discover notes that are semantically similar but not explicitly linked.
-- **Graph-Boosted Search** — Combine semantic similarity scores with structural graph proximity for richer results.
-- **Interactive TUI** — Navigate search results with fuzzy-finding, arrow keys, and live ingestion progress. Powered by [Bubble Tea](https://github.com/charmbracelet/bubbletea).
-- **Advanced Filtering** — Narrow searches by `--section`, `--has-code`, `--has-tasks`, or `--tag`.
-- **Full Note Retrieval** — Reconstruct complete note content on the fly from indexed chunks (`notebrain get`).
-- **Machine-Readable Output** — Structured JSON, TSV via `--format` flags, plus built-in `--jsonpath` extraction (no `jq` needed).
-- **OSC 8 Hyperlinks** — Clickable `obsidian://open` links directly in your terminal. Works in [alacritty](https://github.com/alacritty/alacritty), [WezTerm](https://wezfurlong.org/wezterm/), [kitty](https://sw.kovidgoyal.net/kitty/) and others supporting the [OSC 8 spec](https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda).
-- **Editor Integration** — Open matched notes in `$EDITOR` or Obsidian directly from the TUI.
-- **Obsidian-Aware Ingestion** — Honors `userIgnoreFilters` and `attachmentFolderPath` from your Obsidian config. Optionally skip phantom links and attachment references.
-
-### Under the Hood
-
-- **Goldmark AST-Aware Chunking** — Splits markdown by header hierarchy rather than arbitrary character offsets, preserving code blocks and structural metadata.
-- **Embedded ChromaDB** — Stores vectors directly on disk via [`chroma-go`](https://github.com/amikos-tech/chroma-go) v0.4.x (no external database server required).
-- **Incremental Ingestion** — SHA-256 content hashing skips unmodified notes in milliseconds on re-runs.
-- **AI Agent Skill** — Ships with a built-in AI agent skill (`.agents/skills/notebrain/`) for autonomous knowledge retrieval (see [AI Agent Skill Usage](wiki/Skill_Usage.md)).
 
 ## Configuration
 
