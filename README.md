@@ -1,7 +1,8 @@
 # NoteBrain CLI
 
-A Go CLI tool that turns your [Obsidian](https://obsidian.md/) vault into a fully offline knowledge backend for **AI coding agents**. NoteBrain indexes markdown notes into a local **[ChromaDB](https://www.trychroma.com/)** vector database and exposes semantic search, wikilink graph traversal, and hidden connection discovery through structured JSON output — designed to be chained directly by autonomous agents, shell pipelines, and LLM tool-use workflows.  
-Ships with a built-in [AI agent skill](wiki/Skill_Usage.md) for integration with assistants like [Google Antigravity](https://antigravity.google/) and [Pi agent](https://pi.dev).
+A Go CLI tool that turns your [Obsidian](https://obsidian.md/) vault into a fully offline knowledge backend for **AI coding agents**. NoteBrain indexes markdown notes into a local **[ChromaDB](https://www.trychroma.com/)** vector database and exposes semantic search, wikilink graph traversal, and hidden connection discovery through structured output — designed to be chained directly by autonomous agents, shell pipelines, and LLM tool-use workflows.
+
+Ships with an [AI agent skill](wiki/Skill_Usage.md) for integration with Agents like [Google Antigravity](https://antigravity.google/), [Pi agent](https://pi.dev) and Claude Code.This skill is specially optimized to reduce token usage and latency.
 
 [![Release](https://github.com/nmdra/notebrain-cli/actions/workflows/release.yml/badge.svg)](https://github.com/nmdra/notebrain-cli/actions/workflows/release.yml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/nmdra/notebrain-cli.svg)](https://pkg.go.dev/github.com/nmdra/notebrain-cli)
@@ -23,31 +24,35 @@ Ships with a built-in [AI agent skill](wiki/Skill_Usage.md) for integration with
 
 ## Prerequisites
 
-- **Go 1.26.4+** (for building from source)
-- **CGO-enabled toolchain** — GCC or Clang on Linux/macOS (the embedded vector store uses C/C++ bindings via SQLite and HNSW)
-- **~33 MB disk** for the ONNX embedding model (auto-downloaded on first run)
+- **Go 1.26.4+**
+- **CGO-enabled toolchain**
 - Linux (macOS and Windows binaries are untested)
 
 ## Features
 
-- **Semantic Search** — Find notes by meaning, not just keywords. Uses the [`all-MiniLM-L6-v2`](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) ONNX model for fully offline, on-device inference.
+- **Semantic Search** — Find notes by meaning, not just keywords. Uses the [`all-MiniLM-L6-v2`](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) ONNX model for fully offline inference.
+- **Multi-Query Support** — Search using multiple queries. This enables AI agents to search more accurately by separating searches that contain distinct topics.
 - **Graph Traversal** — Walk your Obsidian wikilink graph (`[[Note]]`) via BFS: `backlinks`, `connections` (multi-hop), `tags` (shared tag neighbors).
 - **Hidden Connections** — Discover notes that are semantically similar but not explicitly linked.
 - **Graph-Boosted Search** — Combine semantic similarity scores with structural graph proximity for richer results.
-- **Interactive TUI** — Navigate search results with fuzzy-finding, arrow keys, and live ingestion progress. Powered by [Bubble Tea](https://github.com/charmbracelet/bubbletea).
+- **Interactive TUI** — Navigate search results with fuzzy-finding. Powered by [Bubble Tea](https://github.com/charmbracelet/bubbletea).
 - **Advanced Filtering** — Narrow searches by `--section`, `--has-code`, `--has-tasks`, or `--tag`.
 - **Full Note Retrieval** — Reconstruct complete note content on the fly from indexed chunks (`notebrain get`).
 - **Machine-Readable Output** — Structured JSON, TSV via `--format` flags, plus built-in `--jsonpath` extraction (no `jq` needed).
+- **AI Agent Skill** — Ships with a built-in AI agent skill (`.agents/skills/notebrain/`) for autonomous knowledge retrieval (see [AI Agent Skill Usage](wiki/Skill_Usage.md)).
 - **OSC 8 Hyperlinks** — Clickable `obsidian://open` links directly in your terminal. Works in [alacritty](https://github.com/alacritty/alacritty), [WezTerm](https://wezfurlong.org/wezterm/), [kitty](https://sw.kovidgoyal.net/kitty/) and others supporting the [OSC 8 spec](https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda).
 - **Editor Integration** — Open matched notes in `$EDITOR` or Obsidian directly from the TUI.
 - **Obsidian-Aware Ingestion** — Honors `userIgnoreFilters` and `attachmentFolderPath` from your Obsidian config. Optionally skip phantom links and attachment references.
+
+> _Note: Currently, this tool focuses on Markdown text only and does not support PDF or image OCR._
 
 ### Under the Hood
 
 - **Goldmark AST-Aware Chunking** — Splits markdown by header hierarchy rather than arbitrary character offsets, preserving code blocks and structural metadata.
 - **Embedded ChromaDB** — Stores vectors directly on disk via [`chroma-go`](https://github.com/amikos-tech/chroma-go) v0.4.x (no external database server required).
 - **Incremental Ingestion** — SHA-256 content hashing skips unmodified notes in milliseconds on re-runs.
-- **AI Agent Skill** — Ships with a built-in AI agent skill (`.agents/skills/notebrain/`) for autonomous knowledge retrieval (see [AI Agent Skill Usage](wiki/Skill_Usage.md)).
+
+> _See the [Architecture](wiki/Architecture.md) guide for more details._
 
 ## Installation
 
@@ -69,6 +74,8 @@ See the full [Installation Guide](wiki/Installation.md) for details.
 ```bash
 notebrain ingest --vault-path "/path/to/your/Obsidian Vault"
 ```
+
+> _Note: First-time indexing may take several minutes depending on your vault size._
 
 **2. Search your notes by meaning:**
 
