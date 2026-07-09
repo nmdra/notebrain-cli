@@ -25,7 +25,6 @@ import (
 	"fmt"
 
 	"github.com/nmdra/notebrain-cli/v2/internal/embedder"
-	"github.com/nmdra/notebrain-cli/v2/internal/parser"
 	"github.com/nmdra/notebrain-cli/v2/internal/store"
 )
 
@@ -38,7 +37,6 @@ type HiddenCmd struct {
 
 func (c *HiddenCmd) Run(globals *Globals) error {
 	targetNote := c.Note
-	targetSlug := parser.Slugify(targetNote)
 	limit := c.Limit
 
 	chromaPath := globals.ChromaPath
@@ -49,6 +47,11 @@ func (c *HiddenCmd) Run(globals *Globals) error {
 	}
 	defer func() { _ = st.Close() }()
 	st.SkipAttachments = globals.SkipAttachments
+
+	targetSlug, err := st.ResolveNoteSlug(ctx, targetNote)
+	if err != nil {
+		return err
+	}
 
 	if c.Deep {
 		results, seedChunks, err := st.HiddenConnectionsDeep(ctx, targetSlug, limit, c.TopK, globals.IncludeText)

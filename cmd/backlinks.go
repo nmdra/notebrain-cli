@@ -24,7 +24,6 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/nmdra/notebrain-cli/v2/internal/parser"
 	"github.com/nmdra/notebrain-cli/v2/internal/store"
 )
 
@@ -34,7 +33,6 @@ type BacklinksCmd struct {
 
 func (c *BacklinksCmd) Run(globals *Globals) error {
 	targetNote := c.Note
-	targetSlug := parser.Slugify(targetNote)
 
 	chromaPath := globals.ChromaPath
 	ctx := globals.Ctx
@@ -44,6 +42,11 @@ func (c *BacklinksCmd) Run(globals *Globals) error {
 	}
 	defer func() { _ = st.Close() }()
 	st.SkipAttachments = globals.SkipAttachments
+
+	targetSlug, err := st.ResolveNoteSlug(ctx, targetNote)
+	if err != nil {
+		return err
+	}
 
 	links, err := st.Backlinks(ctx, targetSlug)
 	if err != nil {

@@ -24,7 +24,6 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/nmdra/notebrain-cli/v2/internal/parser"
 	"github.com/nmdra/notebrain-cli/v2/internal/store"
 )
 
@@ -35,7 +34,6 @@ type ConnectionsCmd struct {
 
 func (c *ConnectionsCmd) Run(globals *Globals) error {
 	targetNote := c.Note
-	targetSlug := parser.Slugify(targetNote)
 	hops := c.Hops
 
 	chromaPath := globals.ChromaPath
@@ -46,6 +44,11 @@ func (c *ConnectionsCmd) Run(globals *Globals) error {
 	}
 	defer func() { _ = st.Close() }()
 	st.SkipAttachments = globals.SkipAttachments
+
+	targetSlug, err := st.ResolveNoteSlug(ctx, targetNote)
+	if err != nil {
+		return err
+	}
 
 	nodes, err := st.Connections(ctx, targetSlug, hops)
 	if err != nil {

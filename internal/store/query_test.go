@@ -196,6 +196,21 @@ func TestQueries(t *testing.T) {
 			t.Errorf("Expected note-b in boosted results")
 		}
 	})
+
+	t.Run("ResolveNoteSlug", func(t *testing.T) {
+		got, err := st.ResolveNoteSlug(ctx, "Note A")
+		if err != nil {
+			t.Fatalf("ResolveNoteSlug failed: %v", err)
+		}
+		if got != "note-a" {
+			t.Errorf("Expected note-a, got %s", got)
+		}
+
+		got, err = st.ResolveNoteSlug(ctx, "Note A.md")
+		if err != nil || got != "note-a" {
+			t.Errorf("Expected note-a from filename, got %s (err: %v)", got, err)
+		}
+	})
 }
 
 func TestGetNoteHashes(t *testing.T) {

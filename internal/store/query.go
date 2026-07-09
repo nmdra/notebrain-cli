@@ -99,10 +99,10 @@ func (s *Store) MultiSemanticSearch(ctx context.Context, queryVecs [][]float32, 
 
 	type mergedChunk struct {
 		res     Result
-		queries map[string]struct{}
-		order   []string
+		queries map[string]float32
 	}
 	chunkMap := make(map[string]*mergedChunk)
+	noteQueryScores := make(map[string]map[string]float32)
 
 	for i, vec := range queryVecs {
 		qStr := fmt.Sprintf("query_%d", i+1)
@@ -117,18 +117,25 @@ func (s *Store) MultiSemanticSearch(ctx context.Context, queryVecs [][]float32, 
 			if r.Score <= 0.0 {
 				continue
 			}
+			qs, ok := noteQueryScores[r.NoteSlug]
+			if !ok {
+				qs = make(map[string]float32)
+				noteQueryScores[r.NoteSlug] = qs
+			}
+			if float32(r.Score) > qs[qStr] {
+				qs[qStr] = float32(r.Score)
+			}
+
 			key := fmt.Sprintf("%s:%d", r.NoteSlug, r.ChunkIndex)
 			existing, ok := chunkMap[key]
 			if !ok {
 				chunkMap[key] = &mergedChunk{
 					res:     r,
-					queries: map[string]struct{}{qStr: {}},
-					order:   []string{qStr},
+					queries: map[string]float32{qStr: float32(r.Score)},
 				}
 			} else {
-				if _, seen := existing.queries[qStr]; !seen {
-					existing.queries[qStr] = struct{}{}
-					existing.order = append(existing.order, qStr)
+				if oldScore, seen := existing.queries[qStr]; !seen || float32(r.Score) > oldScore {
+					existing.queries[qStr] = float32(r.Score)
 				}
 				if r.Score > existing.res.Score {
 					existing.res.Score = r.Score
@@ -139,18 +146,42 @@ func (s *Store) MultiSemanticSearch(ctx context.Context, queryVecs [][]float32, 
 
 	merged := make([]Result, 0, len(chunkMap))
 	for _, mc := range chunkMap {
-		mc.res.MatchedQueries = mc.order
 		merged = append(merged, mc.res)
 	}
 
 	sort.Slice(merged, func(i, j int) bool {
-		if len(merged[i].MatchedQueries) != len(merged[j].MatchedQueries) {
-			return len(merged[i].MatchedQueries) > len(merged[j].MatchedQueries)
+		qi := len(noteQueryScores[merged[i].NoteSlug])
+		qj := len(noteQueryScores[merged[j].NoteSlug])
+		if qi != qj {
+			return qi > qj
 		}
 		return merged[i].Score > merged[j].Score
 	})
 
 	out := deduplicateResultsByNote(merged, limit, topKPerNote)
+
+	type queryScore struct {
+		query string
+		score float32
+	}
+	for i := range out {
+		qsMap := noteQueryScores[out[i].NoteSlug]
+		if len(qsMap) > 0 {
+			qsList := make([]queryScore, 0, len(qsMap))
+			for q, score := range qsMap {
+				qsList = append(qsList, queryScore{query: q, score: score})
+			}
+			sort.Slice(qsList, func(a, b int) bool {
+				return qsList[a].score > qsList[b].score
+			})
+			sortedQueries := make([]string, len(qsList))
+			for j, item := range qsList {
+				sortedQueries[j] = item.query
+			}
+			out[i].MatchedQueries = sortedQueries
+		}
+	}
+
 	if includeText && len(out) > 0 {
 		s.populateTextLocked(ctx, out)
 	}
@@ -375,6 +406,12 @@ func (s *Store) HiddenConnections(ctx context.Context, queryVec []float32, seedS
 // HiddenConnectionsDeep runs chunk-by-chunk semantic comparison between all chunks of seedSlug
 // and all other chunks in the vault. Returns deduplicated results and the labels of the seed chunks analyzed.
 func (s *Store) HiddenConnectionsDeep(ctx context.Context, seedSlug string, limit int, topKPerNote int, includeText bool) ([]Result, []string, error) {
+	resolved, err := s.ResolveNoteSlug(ctx, seedSlug)
+	if err != nil {
+		return nil, nil, err
+	}
+	seedSlug = resolved
+
 	s.mu.RLock()
 	// 1. Collect all slugs already linked to/from seed
 	linked := s.linkedSlugs(ctx, seedSlug)
@@ -822,13 +859,121 @@ func decodeTags(m chroma.DocumentMetadata) []string {
 	return tags
 }
 
+// ResolveNoteSlug resolves a user-provided input (exact slug, title, filename, or partial path)
+// to its exact indexed note_slug in ChromaDB.
+func (s *Store) ResolveNoteSlug(ctx context.Context, input string) (string, error) {
+	cleanInput := strings.TrimSpace(input)
+	if cleanInput == "" {
+		return "", nil
+	}
+
+	slug := parser.Slugify(cleanInput)
+	s.mu.RLock()
+	res, err := s.chunks.Get(ctx,
+		chroma.WithWhere(chroma.Or(
+			chroma.EqString("note_slug", slug),
+			chroma.EqString("note_slug", cleanInput),
+			chroma.EqString("file_path", cleanInput),
+		)),
+		chroma.WithLimit(1),
+	)
+	s.mu.RUnlock()
+	if err == nil && len(res.GetIDs()) > 0 && len(res.GetMetadatas()) > 0 {
+		mSlug := metaString(res.GetMetadatas()[0], "note_slug")
+		if mSlug != "" {
+			return mSlug, nil
+		}
+	}
+
+	s.mu.RLock()
+	res, err = s.chunks.Get(ctx,
+		chroma.WithWhere(chroma.EqInt("chunk_index", 0)),
+		chroma.WithInclude(chroma.IncludeMetadatas),
+	)
+	s.mu.RUnlock()
+	if err != nil {
+		return slug, nil
+	}
+
+	var titleMatches []string
+	var pathMatches []string
+	var suffixMatches []string
+
+	for _, m := range res.GetMetadatas() {
+		mSlug := metaString(m, "note_slug")
+		mTitle := metaString(m, "title")
+		mPath := metaString(m, "file_path")
+		if mSlug == "" {
+			continue
+		}
+
+		if strings.EqualFold(mTitle, cleanInput) {
+			titleMatches = append(titleMatches, mSlug)
+			continue
+		}
+
+		if strings.EqualFold(mPath, cleanInput) || strings.EqualFold(mPath, cleanInput+".md") {
+			pathMatches = append(pathMatches, mSlug)
+			continue
+		}
+		if strings.HasSuffix(strings.ToLower(mPath), "/"+strings.ToLower(cleanInput)) ||
+			strings.HasSuffix(strings.ToLower(mPath), "/"+strings.ToLower(cleanInput+".md")) {
+			pathMatches = append(pathMatches, mSlug)
+			continue
+		}
+
+		if slug != "" && strings.HasSuffix(mSlug, slug) {
+			suffixMatches = append(suffixMatches, mSlug)
+		}
+	}
+
+	if len(pathMatches) == 1 {
+		return pathMatches[0], nil
+	}
+	if len(titleMatches) == 1 {
+		return titleMatches[0], nil
+	}
+	if len(suffixMatches) == 1 {
+		return suffixMatches[0], nil
+	}
+
+	allMatches := make(map[string]struct{})
+	for _, s := range pathMatches {
+		allMatches[s] = struct{}{}
+	}
+	for _, s := range titleMatches {
+		allMatches[s] = struct{}{}
+	}
+	for _, s := range suffixMatches {
+		allMatches[s] = struct{}{}
+	}
+	if len(allMatches) == 1 {
+		for s := range allMatches {
+			return s, nil
+		}
+	} else if len(allMatches) > 1 {
+		matchesList := make([]string, 0, len(allMatches))
+		for s := range allMatches {
+			matchesList = append(matchesList, s)
+		}
+		sort.Strings(matchesList)
+		return "", fmt.Errorf("note %q matches multiple indexed notes: %s (please specify the exact note slug or path)", input, strings.Join(matchesList, ", "))
+	}
+
+	return slug, nil
+}
+
 // GetNote retrieves all chunks of a note and reconstructs its complete content.
 func (s *Store) GetNote(ctx context.Context, slugOrPath string) (*NoteContent, error) {
+	resolved, err := s.ResolveNoteSlug(ctx, slugOrPath)
+	if err != nil {
+		return nil, err
+	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	res, err := s.chunks.Get(ctx,
 		chroma.WithWhere(chroma.Or(
-			chroma.EqString("note_slug", slugOrPath),
+			chroma.EqString("note_slug", resolved),
 			chroma.EqString("file_path", slugOrPath),
 		)),
 		chroma.WithInclude(chroma.IncludeMetadatas, chroma.IncludeDocuments),
