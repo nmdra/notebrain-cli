@@ -55,6 +55,19 @@ For query-based commands (`search`, `backlinks`, `connections`, `hidden`, `boost
 
 ---
 
+## Note Resolution (`<note>` argument)
+
+Commands targeting a specific note (`backlinks`, `connections`, `hidden`, `tags`, `boosted --seed=<note>`, `get`) accept any of the following formats for the `<note>` parameter:
+
+1. **Exact Note Slug**: The normalized stored identifier (e.g., `00fleeting-noteskubernetes-networking-toolsspiffe`).
+2. **Note Title**: Case-insensitive note title (e.g., `"SPIFFE"` or `"Rust Programming"`).
+3. **Filename**: Exact case-insensitive file name (e.g., `"SPIFFE.md"`).
+4. **Partial Path / Suffix**: End of the relative path inside your vault (e.g., `"tools/SPIFFE.md"`).
+
+If multiple notes in your vault share the exact same title or filename across different directories, NoteBrain will return an ambiguity error listing the exact candidate slugs so you can specify the exact path or slug.
+
+---
+
 ## Command Reference
 
 ### `ingest`
@@ -235,7 +248,7 @@ notebrain connections "Redis" --hops 2
 
 ### `hidden`
 
-Discovers "hidden" semantic connections: notes that are semantically similar but do not have direct Wikilinks in Obsidian.
+Discovers "hidden" semantic connections: notes that are semantically similar but do not have direct Wikilinks in Obsidian. Supports granular `--deep` chunk-by-chunk analysis to identify exact matching sections between notes without requiring whole-note embedding comparisons.
 
 #### Usage
 
@@ -245,19 +258,24 @@ notebrain hidden <note> [flags]
 
 #### Arguments
 
-- `<note>` _(required)_: The target note slug or title.
+- `<note>` _(required)_: The target note title, filename, or slug (e.g., `"SPIFFE"` or `"Rust Programming"`).
 
 #### Command-Specific Flags
 
-| Flag      | Type      | Default | Description                                     |
-| :-------- | :-------- | :------ | :---------------------------------------------- |
-| `--limit` | `integer` | `10`    | Maximum number of hidden connections to return. |
+| Flag      | Type      | Default | Description                                                                                    |
+| :-------- | :-------- | :------ | :--------------------------------------------------------------------------------------------- |
+| `--deep`  | `boolean` | `false` | Perform granular chunk-by-chunk analysis across individual note sections using stored vectors. |
+| `--top-k` | `integer` | `3`     | Maximum matching target sections to evaluate and display per candidate note (in `--deep` mode).  |
+| `--limit` | `integer` | `10`    | Maximum number of hidden connections to return.                                                |
 
 #### Examples
 
 ```bash
 # Discover 5 closest semantic notes to "Redis" that are not linked
 notebrain hidden "Redis" --limit 5
+
+# Perform deep chunk-by-chunk hidden connection discovery across sections of "SPIFFE"
+notebrain hidden "SPIFFE" --deep --limit 3
 ```
 
 ---

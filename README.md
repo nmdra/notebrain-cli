@@ -33,7 +33,7 @@ Ships with an [AI agent skill](wiki/Skill_Usage.md) for integration with Agents 
 - **Semantic Search** — Find notes by meaning, not just keywords. Uses the [`all-MiniLM-L6-v2`](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) ONNX model for fully offline inference.
 - **Multi-Query Support** — Search using multiple queries. This enables AI agents to search more accurately by separating searches that contain distinct topics.
 - **Graph Traversal** — Walk your Obsidian wikilink graph (`[[Note]]`) via BFS: `backlinks`, `connections` (multi-hop), `tags` (shared tag neighbors).
-- **Hidden Connections** — Discover notes that are semantically similar but not explicitly linked.
+- **Hidden Connections** — Discover notes that are semantically similar but not explicitly linked. Supports `--deep` chunk-by-chunk analysis to match specific target sections and headings (`§ <Heading>`) across your vault.
 - **Graph-Boosted Search** — Combine semantic similarity scores with structural graph proximity for richer results.
 - **Interactive TUI** — Navigate search results with fuzzy-finding. Powered by [Bubble Tea](https://github.com/charmbracelet/bubbletea).
 - **Advanced Filtering** — Narrow searches by `--section`, `--has-code`, `--has-tasks`, or `--tag`.
