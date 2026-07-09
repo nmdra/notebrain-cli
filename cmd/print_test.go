@@ -295,3 +295,50 @@ func TestPrintResultsFormatted_Deep_SmartCapping(t *testing.T) {
 		t.Errorf("Expected all 5 queries when Verbose=true, got %q", out2)
 	}
 }
+
+func TestPrintJSONPathResult(t *testing.T) {
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	obj := map[string]any{
+		"title": "My Note",
+		"count": 42,
+		"valid": true,
+		"items": []string{"a", "b"},
+		"nested": map[string]any{
+			"key": "value",
+		},
+	}
+
+	if err := printJSONPathResult(obj, "{.title}"); err != nil {
+		t.Errorf("printJSONPathResult {.title} failed: %v", err)
+	}
+	if err := printJSONPathResult(obj, "$.count"); err != nil {
+		t.Errorf("printJSONPathResult $.count failed: %v", err)
+	}
+	if err := printJSONPathResult(obj, "valid"); err != nil {
+		t.Errorf("printJSONPathResult valid failed: %v", err)
+	}
+	if err := printJSONPathResult(obj, "items"); err != nil {
+		t.Errorf("printJSONPathResult items failed: %v", err)
+	}
+	if err := printJSONPathResult(obj, "nested"); err != nil {
+		t.Errorf("printJSONPathResult nested failed: %v", err)
+	}
+	_ = printJSONPathResult(obj, "$.nonexistent") // Verify non-existent key handling does not panic
+	if err := printJSONPathResult(obj, "invalid[syntax[["); err == nil {
+		t.Errorf("Expected error for invalid jsonpath syntax, got nil")
+	}
+
+	_ = w.Close()
+	os.Stdout = oldStdout
+
+	var buf bytes.Buffer
+	_, _ = buf.ReadFrom(r)
+	out := buf.String()
+
+	if !strings.Contains(out, "My Note") || !strings.Contains(out, "42") || !strings.Contains(out, "true") || !strings.Contains(out, "a\nb\n") || !strings.Contains(out, `"key":"value"`) {
+		t.Errorf("Expected jsonpath outputs in buffer, got %q", out)
+	}
+}

@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	chroma "github.com/amikos-tech/chroma-go/pkg/api/v2"
 	"github.com/nmdra/notebrain-cli/v2/internal/store"
 )
 
@@ -198,19 +199,122 @@ func TestQueries(t *testing.T) {
 	})
 
 	t.Run("ResolveNoteSlug", func(t *testing.T) {
-		got, err := st.ResolveNoteSlug(ctx, "Note A")
-		if err != nil {
-			t.Fatalf("ResolveNoteSlug failed: %v", err)
+		got, err := st.ResolveNoteSlug(ctx, "")
+		if err != nil || got != "" {
+			t.Errorf("Expected empty string for empty input, got %q (err: %v)", got, err)
 		}
-		if got != "note-a" {
-			t.Errorf("Expected note-a, got %s", got)
+
+		got, err = st.ResolveNoteSlug(ctx, "note-a")
+		if err != nil || got != "note-a" {
+			t.Errorf("Expected note-a exact match, got %s (err: %v)", got, err)
+		}
+
+		got, err = st.ResolveNoteSlug(ctx, "Note A")
+		if err != nil || got != "note-a" {
+			t.Errorf("Expected note-a from title, got %s (err: %v)", got, err)
 		}
 
 		got, err = st.ResolveNoteSlug(ctx, "Note A.md")
 		if err != nil || got != "note-a" {
 			t.Errorf("Expected note-a from filename, got %s (err: %v)", got, err)
 		}
+
+		got, err = st.ResolveNoteSlug(ctx, "e-a")
+		if err != nil || got != "note-a" {
+			t.Errorf("Expected note-a from suffix, got %s (err: %v)", got, err)
+		}
+
+		ambigChunks := []store.ChunkRecord{
+			{ID: "ambig-1:0", NoteSlug: "ambig-1", Title: "Ambig Note", FilePath: "dir1/Ambig Note.md", ChunkIndex: 0, Embedding: []float32{1.0, 0.0, 0.0}},
+			{ID: "ambig-2:0", NoteSlug: "ambig-2", Title: "Ambig Note", FilePath: "dir2/Ambig Note.md", ChunkIndex: 0, Embedding: []float32{1.0, 0.0, 0.0}},
+		}
+		_ = st.UpsertChunks(ctx, ambigChunks)
+
+		_, err = st.ResolveNoteSlug(ctx, "Ambig Note")
+		if err == nil || !strings.Contains(err.Error(), "matches multiple indexed notes") {
+			t.Errorf("Expected multiple match error for Ambig Note, got %v", err)
+		}
+
+		got, err = st.ResolveNoteSlug(ctx, "note-b")
+		if err != nil || got != "note-b" {
+			t.Errorf("Expected note-b, got %s (err: %v)", got, err)
+		}
 	})
+}
+
+func TestMultiSemanticSearch_WithText(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatalf("Open failed: %v", err)
+	}
+	defer func() { _ = st.Close() }()
+
+	chunks := []store.ChunkRecord{
+		{
+			ID:         "multi-text:0",
+			NoteSlug:   "multi-text",
+			Title:      "Multi Text Note",
+			FilePath:   "multi-text.md",
+			ChunkIndex: 0,
+			Text:       "this is the document text of multi-text chunk zero",
+			Embedding:  []float32{1.0, 0.0, 0.0},
+		},
+		{
+			ID:         "multi-text-2:0",
+			NoteSlug:   "multi-text-2",
+			Title:      "Multi Text Note 2",
+			FilePath:   "multi-text-2.md",
+			ChunkIndex: 0,
+			Text:       "this is the document text of multi-text-2 chunk zero",
+			Embedding:  []float32{0.9, 0.1, 0.0},
+		},
+	}
+	if err := st.UpsertChunks(ctx, chunks); err != nil {
+		t.Fatalf("UpsertChunks failed: %v", err)
+	}
+
+	queryVecs := [][]float32{
+		{1.0, 0.0, 0.0},
+		{0.9, 0.1, 0.0},
+	}
+	queries := []string{"query 1", "query 2"}
+
+	res, err := st.MultiSemanticSearch(ctx, queryVecs, queries, 10, 2, nil, true)
+	if err != nil {
+		t.Fatalf("MultiSemanticSearch with text failed: %v", err)
+	}
+	if len(res) == 0 {
+		t.Fatalf("Expected results, got none")
+	}
+	for _, r := range res {
+		if r.Text == "" {
+			t.Errorf("Expected populated Text for note %s, got empty", r.NoteSlug)
+		}
+	}
+}
+
+func TestCombineWhereFilters(t *testing.T) {
+	var nilFilter chroma.WhereFilter
+	wc1 := chroma.EqString("note_slug", "note-a")
+	wc2 := chroma.EqInt("chunk_index", 0)
+
+	if got := store.CombineWhereFilters(nilFilter, wc1); got != wc1 {
+		t.Errorf("Expected wc1 when f1 is nil")
+	}
+	if got := store.CombineWhereFilters(wc2, nilFilter); got != wc2 {
+		t.Errorf("Expected wc2 when f2 is nil")
+	}
+	if got := store.CombineWhereFilters(wc1, wc2); got == nil {
+		t.Errorf("Expected combined clause when both non-nil")
+	}
+}
+
+func TestTagWhereClause(t *testing.T) {
+	wc := store.TagWhereClause("golang")
+	if wc == nil {
+		t.Errorf("Expected non-nil WhereClause")
+	}
 }
 
 func TestGetNoteHashes(t *testing.T) {
