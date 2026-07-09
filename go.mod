@@ -16,7 +16,7 @@ require (
 	github.com/yuin/goldmark-meta v1.1.0
 	go.abhg.dev/goldmark/hashtag v0.4.0
 	go.abhg.dev/goldmark/wikilink v0.6.0
-	golang.org/x/sys v0.46.0
+	golang.org/x/sys v0.47.0
 )
 
 require (
