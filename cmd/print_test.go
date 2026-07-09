@@ -238,13 +238,60 @@ func TestPrintResultsFormatted_Deep(t *testing.T) {
 	_, _ = buf.ReadFrom(r)
 	out := buf.String()
 
-	if !strings.Contains(out, "├─ Matches target sections:") || !strings.Contains(out, "\"§ Ownership\", \"§ Lifetimes\"") {
+	if !strings.Contains(out, "├─ Matched target sections (2):") || !strings.Contains(out, "\"§ Ownership\", \"§ Lifetimes\"") {
 		t.Errorf("Expected tree branch with matched sections, got %q", out)
 	}
-	if !strings.Contains(out, "├─ Tags:") || !strings.Contains(out, "#rust #memory") {
+	if !strings.Contains(out, "└─ Tags:") || !strings.Contains(out, "#rust #memory") {
 		t.Errorf("Expected tree branch with tags, got %q", out)
 	}
-	if !strings.Contains(out, "└─ Text:") || !strings.Contains(out, "\"In safe Rust every reference must obey borrowing rules\"") {
-		t.Errorf("Expected tree branch with chunk text snippet, got %q", out)
+	if strings.Contains(out, "Text:") {
+		t.Errorf("Did not expect chunk text snippet in --deep output, got %q", out)
+	}
+}
+
+func TestPrintResultsFormatted_Deep_SmartCapping(t *testing.T) {
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	results := []store.Result{
+		{
+			NoteSlug:       "perf-book",
+			Title:          "System Performance Book",
+			Score:          0.9162,
+			MatchedQueries: []string{"§ Methodologies", "§ Latency", "§ Queueing", "§ Profiling", "§ Caching"},
+		},
+	}
+	globals := &Globals{
+		Format:  "text",
+		Verbose: false,
+	}
+
+	printResultsFormatted("hidden --deep", "query", results, globals)
+	_ = w.Close()
+	os.Stdout = oldStdout
+
+	var buf bytes.Buffer
+	_, _ = buf.ReadFrom(r)
+	out := buf.String()
+
+	if !strings.Contains(out, "└─ Matched target sections (5):") || !strings.Contains(out, "\"§ Methodologies\", \"§ Latency\", \"§ Queueing\"") || !strings.Contains(out, "(+2 more)") {
+		t.Errorf("Expected capped top-3 queries with (+2 more), got %q", out)
+	}
+
+	// Now verify --verbose shows all 5
+	r2, w2, _ := os.Pipe()
+	os.Stdout = w2
+	globals.Verbose = true
+	printResultsFormatted("hidden --deep", "query", results, globals)
+	_ = w2.Close()
+	os.Stdout = oldStdout
+
+	buf.Reset()
+	_, _ = buf.ReadFrom(r2)
+	out2 := buf.String()
+
+	if !strings.Contains(out2, "└─ Matched target sections (5):") || !strings.Contains(out2, "\"§ Methodologies\", \"§ Latency\", \"§ Queueing\", \"§ Profiling\", \"§ Caching\"") {
+		t.Errorf("Expected all 5 queries when Verbose=true, got %q", out2)
 	}
 }
