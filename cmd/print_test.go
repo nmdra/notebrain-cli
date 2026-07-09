@@ -208,3 +208,43 @@ func TestPrintResultsFormatted_HideTags(t *testing.T) {
 		t.Errorf("Expected tags in output when HideTags=false, got %q", out2)
 	}
 }
+
+func TestPrintResultsFormatted_Deep(t *testing.T) {
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	results := []store.Result{
+		{
+			NoteSlug:       "memory-safety",
+			Title:          "Memory Safety",
+			Score:          0.8812,
+			HeadingPath:    "Borrow Checker",
+			Tags:           []string{"rust", "memory"},
+			MatchedQueries: []string{"§ Ownership", "§ Lifetimes"},
+			Text:           "In safe Rust every reference must obey borrowing rules",
+		},
+	}
+	globals := &Globals{
+		Format:      "text",
+		IncludeText: true,
+	}
+
+	printResultsFormatted("hidden --deep", "query", results, globals)
+	_ = w.Close()
+	os.Stdout = oldStdout
+
+	var buf bytes.Buffer
+	_, _ = buf.ReadFrom(r)
+	out := buf.String()
+
+	if !strings.Contains(out, "├─ Matches target sections:") || !strings.Contains(out, "\"§ Ownership\", \"§ Lifetimes\"") {
+		t.Errorf("Expected tree branch with matched sections, got %q", out)
+	}
+	if !strings.Contains(out, "├─ Tags:") || !strings.Contains(out, "#rust #memory") {
+		t.Errorf("Expected tree branch with tags, got %q", out)
+	}
+	if !strings.Contains(out, "└─ Text:") || !strings.Contains(out, "\"In safe Rust every reference must obey borrowing rules\"") {
+		t.Errorf("Expected tree branch with chunk text snippet, got %q", out)
+	}
+}

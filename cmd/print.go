@@ -143,6 +143,54 @@ func printResultsFormatted(commandName string, query string, results []store.Res
 			score := scoreStyle.Render(fmt.Sprintf("score=%.4f", r.Score))
 			line := fmt.Sprintf("%s %s  %s", rank, title, score)
 
+			if strings.Contains(commandName, "deep") {
+				if r.Extra != "" {
+					line += "  " + extraStyle.Render("["+r.Extra+"]")
+				}
+				if r.IsPhantom {
+					line += "  " + extraStyle.Render("[phantom]")
+				}
+				if termWidth > 0 && ansi.StringWidth(line) > termWidth {
+					line = ansi.Truncate(line, termWidth, "…")
+				}
+				fmt.Println(line)
+
+				var details []string
+				if len(r.MatchedQueries) > 0 {
+					details = append(details, fmt.Sprintf("Matches target sections: %s", extraStyle.Render(`"`+strings.Join(r.MatchedQueries, `", "`)+`"`)))
+				}
+				if len(r.Tags) > 0 {
+					formattedTags := make([]string, 0, len(r.Tags))
+					for _, t := range r.Tags {
+						formattedTags = append(formattedTags, "#"+t)
+					}
+					details = append(details, fmt.Sprintf("Tags: %s", extraStyle.Render(strings.Join(formattedTags, " "))))
+				}
+				if globals.IncludeText && r.Text != "" {
+					cleanText := strings.ReplaceAll(strings.TrimSpace(r.Text), "\n", " ")
+					maxTextWidth := 80
+					if termWidth > 20 {
+						maxTextWidth = termWidth - 12
+					}
+					if ansi.StringWidth(cleanText) > maxTextWidth {
+						cleanText = ansi.Truncate(cleanText, maxTextWidth, "…")
+					}
+					details = append(details, fmt.Sprintf("Text: %s", extraStyle.Render(`"`+cleanText+`"`)))
+				}
+
+				for j, d := range details {
+					prefix := "   ├─ "
+					if j == len(details)-1 {
+						prefix = "   └─ "
+					}
+					fmt.Println(prefix + d)
+				}
+				if i < len(filtered)-1 && len(details) > 0 {
+					fmt.Println()
+				}
+				continue
+			}
+
 			if len(r.Tags) > 0 {
 				formattedTags := make([]string, 0, len(r.Tags))
 				for _, t := range r.Tags {

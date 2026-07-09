@@ -118,6 +118,45 @@ func TestQueries(t *testing.T) {
 		}
 	})
 
+	t.Run("HiddenConnectionsDeep", func(t *testing.T) {
+		chunks := []store.ChunkRecord{
+			{
+				ID:         "note-c:0",
+				NoteSlug:   "note-c",
+				Title:      "Note C",
+				FilePath:   "Note C.md",
+				ChunkIndex: 0,
+				Text:       "text about golang",
+				Tags:       []string{"go"},
+				HasLinks:   false,
+				Embedding:  []float32{0.9, 0.0, 0.0},
+			},
+		}
+		_ = st.UpsertChunks(ctx, chunks)
+
+		// note-a has 1 chunk with embedding [1.0, 0.0, 0.0].
+		// note-b is linked to note-a. note-c is unlinked with embedding [0.9, 0.0, 0.0].
+		hidden, seedChunks, err := st.HiddenConnectionsDeep(ctx, "note-a", 10, 3, false)
+		if err != nil {
+			t.Fatalf("HiddenConnectionsDeep failed: %v", err)
+		}
+		if len(hidden) == 0 || hidden[0].NoteSlug != "note-c" {
+			t.Errorf("Expected note-c to be deep hidden connection to note-a, got %v", hidden)
+		}
+		if len(seedChunks) == 0 {
+			t.Errorf("Expected non-empty seedChunks, got %v", seedChunks)
+		}
+		if len(hidden) > 0 && len(hidden[0].MatchedQueries) == 0 {
+			t.Errorf("Expected MatchedQueries to be populated on result, got %v", hidden[0].MatchedQueries)
+		}
+
+		// Verify error when querying a non-existent seed note
+		_, _, err = st.HiddenConnectionsDeep(ctx, "non-existent-note", 10, 3, false)
+		if err == nil {
+			t.Errorf("Expected error for non-existent note in deep hidden check, got nil")
+		}
+	})
+
 	t.Run("SharedTags", func(t *testing.T) {
 		res, err := st.SharedTags(ctx, "note-a", 1)
 		if err != nil {

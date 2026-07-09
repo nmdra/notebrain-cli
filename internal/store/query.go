@@ -109,7 +109,7 @@ func (s *Store) MultiSemanticSearch(ctx context.Context, queryVecs [][]float32, 
 		if i < len(queries) && queries[i] != "" {
 			qStr = queries[i]
 		}
-		subRes, err := s.semanticSearch(ctx, vec, fetchLimit, fetchTopK, whereFilter, includeText)
+		subRes, err := s.semanticSearch(ctx, vec, fetchLimit, fetchTopK, whereFilter, false)
 		if err != nil {
 			return nil, fmt.Errorf("semantic search for query %q: %w", qStr, wrapChromaErr(err))
 		}
@@ -150,7 +150,37 @@ func (s *Store) MultiSemanticSearch(ctx context.Context, queryVecs [][]float32, 
 		return merged[i].Score > merged[j].Score
 	})
 
-	return deduplicateResultsByNote(merged, limit, topKPerNote), nil
+	out := deduplicateResultsByNote(merged, limit, topKPerNote)
+	if includeText && len(out) > 0 {
+		s.populateTextLocked(ctx, out)
+	}
+	return out, nil
+}
+
+func (s *Store) populateTextLocked(ctx context.Context, results []Result) {
+	ids := make([]chroma.DocumentID, len(results))
+	idToIndex := make(map[string]int, len(results))
+	for i := range results {
+		idStr := fmt.Sprintf("%s:%d", results[i].NoteSlug, results[i].ChunkIndex)
+		ids[i] = chroma.DocumentID(idStr)
+		idToIndex[idStr] = i
+	}
+	res, err := s.chunks.Get(ctx,
+		chroma.WithIDs(ids...),
+		chroma.WithInclude(chroma.IncludeDocuments),
+	)
+	if err != nil || len(res.GetDocuments()) == 0 {
+		return
+	}
+	resIDs := res.GetIDs()
+	resDocs := res.GetDocuments()
+	for j, id := range resIDs {
+		if j < len(resDocs) && resDocs[j] != nil {
+			if idx, ok := idToIndex[string(id)]; ok {
+				results[idx].Text = resDocs[j].ContentString()
+			}
+		}
+	}
 }
 
 func deduplicateResultsByNote(results []Result, limit int, topKPerNote int) []Result {
@@ -340,6 +370,93 @@ func (s *Store) HiddenConnections(ctx context.Context, queryVec []float32, seedS
 		}
 	}
 	return out, nil
+}
+
+// HiddenConnectionsDeep runs chunk-by-chunk semantic comparison between all chunks of seedSlug
+// and all other chunks in the vault. Returns deduplicated results and the labels of the seed chunks analyzed.
+func (s *Store) HiddenConnectionsDeep(ctx context.Context, seedSlug string, limit int, topKPerNote int, includeText bool) ([]Result, []string, error) {
+	s.mu.RLock()
+	// 1. Collect all slugs already linked to/from seed
+	linked := s.linkedSlugs(ctx, seedSlug)
+	linked[seedSlug] = true
+
+	// 2. Fetch all stored chunks and embeddings for the seed note
+	res, err := s.chunks.Get(ctx,
+		chroma.WithWhere(chroma.EqString("note_slug", seedSlug)),
+		chroma.WithInclude(chroma.IncludeMetadatas, chroma.IncludeEmbeddings),
+	)
+	s.mu.RUnlock()
+
+	if err != nil {
+		return nil, nil, fmt.Errorf("hidden connections deep: get seed chunks: %w", wrapChromaErr(err))
+	}
+
+	embs := res.GetEmbeddings()
+	metas := res.GetMetadatas()
+	if len(embs) == 0 || len(metas) == 0 {
+		return nil, nil, fmt.Errorf("note %q has no indexed chunks (required for --deep chunk analysis); run 'notebrain ingest' first", seedSlug)
+	}
+
+	type seedChunkInfo struct {
+		index int
+		vec   []float32
+		label string
+	}
+	var seedInfo []seedChunkInfo
+	for i, m := range metas {
+		if i >= len(embs) || embs[i] == nil || !embs[i].IsDefined() {
+			continue
+		}
+		vec := embs[i].ContentAsFloat32()
+		idx := metaInt(m, "chunk_index")
+		hp := metaString(m, "heading_path")
+		label := ""
+		if hp != "" {
+			label = "§ " + hp
+		} else if idx == 0 {
+			title := metaString(m, "title")
+			if title != "" {
+				label = "§ " + title
+			} else {
+				label = "§ (intro)"
+			}
+		} else {
+			label = fmt.Sprintf("chunk #%d", idx+1)
+		}
+		seedInfo = append(seedInfo, seedChunkInfo{index: idx, vec: vec, label: label})
+	}
+
+	if len(seedInfo) == 0 {
+		return nil, nil, fmt.Errorf("note %q has no defined chunk vectors", seedSlug)
+	}
+
+	sort.Slice(seedInfo, func(i, j int) bool { return seedInfo[i].index < seedInfo[j].index })
+
+	queryVecs := make([][]float32, len(seedInfo))
+	seedLabels := make([]string, len(seedInfo))
+	for i, info := range seedInfo {
+		queryVecs[i] = info.vec
+		seedLabels[i] = info.label
+	}
+
+	// 3. Wide multi-query semantic search across all vault chunks
+	candidates, err := s.MultiSemanticSearch(ctx, queryVecs, seedLabels, max(limit*2, 15), topKPerNote, nil, includeText)
+	if err != nil {
+		return nil, nil, fmt.Errorf("hidden connections deep: %w", err)
+	}
+
+	// 4. Filter out already-linked notes
+	var out []Result
+	for _, r := range candidates {
+		if linked[r.NoteSlug] {
+			continue
+		}
+		out = append(out, r)
+		if len(out) >= limit {
+			break
+		}
+	}
+	return out, seedLabels, nil
 }
 
 // ─── Shared Tags ──────────────────────────────────────────────────
