@@ -164,12 +164,36 @@ func (s *Store) MultiSemanticSearch(ctx context.Context, queryVecs [][]float32, 
 		query string
 		score float32
 	}
+	const (
+		minAbsoluteMatchScore = float32(0.70)
+		relativeMatchMargin   = float32(0.85)
+		fallbackDelta         = float32(0.05)
+	)
+
 	for i := range out {
 		qsMap := noteQueryScores[out[i].NoteSlug]
 		if len(qsMap) > 0 {
 			qsList := make([]queryScore, 0, len(qsMap))
+			bestNoteScore := float32(out[i].Score)
 			for q, score := range qsMap {
-				qsList = append(qsList, queryScore{query: q, score: score})
+				isHighRelevance := score >= minAbsoluteMatchScore && score >= bestNoteScore*relativeMatchMargin
+				isFallbackBest := bestNoteScore < minAbsoluteMatchScore && score >= bestNoteScore-fallbackDelta
+				if isHighRelevance || isFallbackBest {
+					qsList = append(qsList, queryScore{query: q, score: score})
+				}
+			}
+			if len(qsList) == 0 {
+				var bestQ string
+				var maxS float32
+				for q, score := range qsMap {
+					if bestQ == "" || score > maxS {
+						bestQ = q
+						maxS = score
+					}
+				}
+				if bestQ != "" {
+					qsList = append(qsList, queryScore{query: bestQ, score: maxS})
+				}
 			}
 			sort.Slice(qsList, func(a, b int) bool {
 				return qsList[a].score > qsList[b].score

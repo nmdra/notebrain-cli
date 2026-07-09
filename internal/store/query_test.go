@@ -158,6 +158,54 @@ func TestQueries(t *testing.T) {
 		}
 	})
 
+	t.Run("MultiSemanticSearch_ThresholdFiltering", func(t *testing.T) {
+		// Test two-tier filtering: a candidate note with one strong match (>= 0.70) should not include weak noise matches (< 0.70 / < 85% peak)
+		chunks := []store.ChunkRecord{
+			{
+				ID:         "note-x:0",
+				NoteSlug:   "note-x",
+				Title:      "Note X",
+				FilePath:   "Note X.md",
+				ChunkIndex: 0,
+				Text:       "target vector alignment",
+				Embedding:  []float32{1.0, 0.0, 0.0},
+			},
+		}
+		_ = st.UpsertChunks(ctx, chunks)
+
+		queryVecs := [][]float32{
+			{1.0, 0.0, 0.0},    // exact match -> cosine similarity ~ 1.0 (StrongMatch)
+			{0.4, 0.9165, 0.0}, // orthogonal/weak match -> cosine similarity ~ 0.40 (WeakMatch)
+		}
+		queries := []string{"§ StrongMatch", "§ WeakMatch"}
+
+		res, err := st.MultiSemanticSearch(ctx, queryVecs, queries, 10, 3, nil, false)
+		if err != nil {
+			t.Fatalf("MultiSemanticSearch failed: %v", err)
+		}
+		if len(res) == 0 {
+			t.Fatalf("Expected results from MultiSemanticSearch, got 0")
+		}
+		for _, r := range res {
+			if r.NoteSlug == "note-x" {
+				for _, mq := range r.MatchedQueries {
+					if mq == "§ WeakMatch" {
+						t.Errorf("Expected § WeakMatch to be filtered out by threshold, but got MatchedQueries=%v", r.MatchedQueries)
+					}
+				}
+				foundStrong := false
+				for _, mq := range r.MatchedQueries {
+					if mq == "§ StrongMatch" {
+						foundStrong = true
+					}
+				}
+				if !foundStrong {
+					t.Errorf("Expected § StrongMatch in MatchedQueries, got %v", r.MatchedQueries)
+				}
+			}
+		}
+	})
+
 	t.Run("SharedTags", func(t *testing.T) {
 		res, err := st.SharedTags(ctx, "note-a", 1)
 		if err != nil {
