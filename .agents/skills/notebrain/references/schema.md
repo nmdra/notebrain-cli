@@ -24,7 +24,7 @@ When `--format=json` is used, each item in the `results` array conforms to the f
 | `context`         | When `--context-window N` > 0   | Array of ±N adjacent chunk texts around the match, ordered chronologically by index.         |
 | `extra`           | Connections, tags, boosted      | Command-specific metadata string (e.g., `"2 hop(s)"`, `"graph-boosted"`).                    |
 | `is_phantom`      | When `--skip-phantom=false`     | Boolean (`true`) if the note is an uncreated phantom link without a `.md` file on disk.      |
-| `matched_queries` | When results match queries      | Array of query strings that matched this chunk (multi-hit attribution).                      |
+| `matched_queries` | When results match queries      | Array of queries or initial note section headings (`§ <HeadingPath>`) that matched this candidate note (`hidden --deep` attribution). |
 
 ## Example JSON Output Schemas
 
