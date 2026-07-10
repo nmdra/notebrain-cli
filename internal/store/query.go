@@ -1139,10 +1139,7 @@ func (s *Store) getChunkWindow(ctx context.Context, noteSlug string, chunkIndex 
 		return nil, nil
 	}
 
-	minIdx := chunkIndex - windowSize
-	if minIdx < 0 {
-		minIdx = 0
-	}
+	minIdx := max(0, chunkIndex-windowSize)
 	maxIdx := chunkIndex + windowSize
 
 	res, err := s.chunks.Get(ctx,
@@ -1203,21 +1200,14 @@ func (s *Store) PopulateContext(ctx context.Context, results []Result, windowSiz
 		if r.NoteSlug == "" {
 			continue
 		}
-		minI := r.ChunkIndex - windowSize
-		if minI < 0 {
-			minI = 0
-		}
+		minI := max(0, r.ChunkIndex-windowSize)
 		maxI := r.ChunkIndex + windowSize
 		nr, exists := noteRanges[r.NoteSlug]
 		if !exists {
 			noteRanges[r.NoteSlug] = noteRange{minIdx: minI, maxIdx: maxI}
 		} else {
-			if minI < nr.minIdx {
-				nr.minIdx = minI
-			}
-			if maxI > nr.maxIdx {
-				nr.maxIdx = maxI
-			}
+			nr.minIdx = min(nr.minIdx, minI)
+			nr.maxIdx = max(nr.maxIdx, maxI)
 			noteRanges[r.NoteSlug] = nr
 		}
 	}

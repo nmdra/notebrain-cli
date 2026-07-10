@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"fmt"
+	"maps"
 	"sync"
 
 	chroma "github.com/amikos-tech/chroma-go/pkg/api/v2"
@@ -28,9 +29,7 @@ var defaultLinksMeta = map[string]any{
 
 func cloneMetaMap(m map[string]any) map[string]any {
 	c := make(map[string]any, len(m))
-	for k, v := range m {
-		c[k] = v
-	}
+	maps.Copy(c, m)
 	return c
 }
 
