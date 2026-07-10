@@ -25,7 +25,6 @@ import (
 	"fmt"
 
 	"github.com/nmdra/notebrain-cli/v2/internal/embedder"
-	"github.com/nmdra/notebrain-cli/v2/internal/parser"
 	"github.com/nmdra/notebrain-cli/v2/internal/store"
 )
 
@@ -39,7 +38,6 @@ type BoostedCmd struct {
 func (c *BoostedCmd) Run(globals *Globals) error {
 	query := c.Query
 	seed := c.Seed
-	seedSlug := parser.Slugify(seed)
 	boost := c.Boost
 	limit := c.Limit
 
@@ -51,6 +49,11 @@ func (c *BoostedCmd) Run(globals *Globals) error {
 	}
 	defer func() { _ = st.Close() }()
 	st.SkipAttachments = globals.SkipAttachments
+
+	seedSlug, err := st.ResolveNoteSlug(ctx, seed)
+	if err != nil {
+		return err
+	}
 
 	emb, err := embedder.NewLocalEmbedder()
 	if err != nil {

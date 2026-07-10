@@ -25,18 +25,18 @@ import (
 	"fmt"
 
 	"github.com/nmdra/notebrain-cli/v2/internal/embedder"
-	"github.com/nmdra/notebrain-cli/v2/internal/parser"
 	"github.com/nmdra/notebrain-cli/v2/internal/store"
 )
 
 type HiddenCmd struct {
 	Note  string `arg:"" help:"Note slug"`
 	Limit int    `help:"maximum number of hidden connections to return" default:"10"`
+	Deep  bool   `help:"use chunk-by-chunk deep analysis against all target note chunks"`
+	TopK  int    `name:"top-k" help:"maximum number of chunks to return per note when --deep is used" default:"3"`
 }
 
 func (c *HiddenCmd) Run(globals *Globals) error {
 	targetNote := c.Note
-	targetSlug := parser.Slugify(targetNote)
 	limit := c.Limit
 
 	chromaPath := globals.ChromaPath
@@ -47,6 +47,22 @@ func (c *HiddenCmd) Run(globals *Globals) error {
 	}
 	defer func() { _ = st.Close() }()
 	st.SkipAttachments = globals.SkipAttachments
+
+	targetSlug, err := st.ResolveNoteSlug(ctx, targetNote)
+	if err != nil {
+		return err
+	}
+
+	if c.Deep {
+		results, seedChunks, err := st.HiddenConnectionsDeep(ctx, targetSlug, limit, c.TopK, globals.IncludeText)
+		if err != nil {
+			return err
+		}
+		st.PopulateContext(ctx, results, globals.ContextWindow)
+		globals.Queries = seedChunks
+		printResultsFormatted("hidden --deep", fmt.Sprintf("Deep chunk-by-chunk hidden connections for: %q (slug: %s) [%d target chunks analyzed]", targetNote, targetSlug, len(seedChunks)), results, globals)
+		return nil
+	}
 
 	emb, err := embedder.NewLocalEmbedder()
 	if err != nil {

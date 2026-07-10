@@ -143,6 +143,57 @@ func printResultsFormatted(commandName string, query string, results []store.Res
 			score := scoreStyle.Render(fmt.Sprintf("score=%.4f", r.Score))
 			line := fmt.Sprintf("%s %s  %s", rank, title, score)
 
+			if strings.Contains(commandName, "deep") {
+				if r.Extra != "" {
+					line += "  " + extraStyle.Render("["+r.Extra+"]")
+				}
+				if r.IsPhantom {
+					line += "  " + extraStyle.Render("[phantom]")
+				}
+				if termWidth > 0 && ansi.StringWidth(line) > termWidth {
+					line = ansi.Truncate(line, termWidth, "…")
+				}
+				fmt.Println(line)
+
+				var details []string
+				if len(r.MatchedQueries) > 0 {
+					if globals.Verbose || len(r.MatchedQueries) <= 3 {
+						details = append(details, fmt.Sprintf("Matched target sections (%d): %s", len(r.MatchedQueries), extraStyle.Render(`"`+strings.Join(r.MatchedQueries, `", "`)+`"`)))
+					} else {
+						topQueries := r.MatchedQueries[:3]
+						moreCount := len(r.MatchedQueries) - 3
+						details = append(details, fmt.Sprintf("Matched target sections (%d): %s (+%d more)", len(r.MatchedQueries), extraStyle.Render(`"`+strings.Join(topQueries, `", "`)+`"`), moreCount))
+					}
+				}
+				if len(r.Tags) > 0 {
+					formattedTags := make([]string, 0, len(r.Tags))
+					for _, t := range r.Tags {
+						formattedTags = append(formattedTags, "#"+t)
+					}
+					details = append(details, fmt.Sprintf("Tags: %s", extraStyle.Render(strings.Join(formattedTags, " "))))
+				}
+
+				maxLineLen := termWidth
+				if maxLineLen <= 0 {
+					maxLineLen = 140
+				}
+				for j, d := range details {
+					prefix := "   ├─ "
+					if j == len(details)-1 {
+						prefix = "   └─ "
+					}
+					dLine := prefix + d
+					if !globals.Verbose && ansi.StringWidth(dLine) > maxLineLen {
+						dLine = ansi.Truncate(dLine, maxLineLen, "…")
+					}
+					fmt.Println(dLine)
+				}
+				if i < len(filtered)-1 && len(details) > 0 {
+					fmt.Println()
+				}
+				continue
+			}
+
 			if len(r.Tags) > 0 {
 				formattedTags := make([]string, 0, len(r.Tags))
 				for _, t := range r.Tags {

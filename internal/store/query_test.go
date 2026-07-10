@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	chroma "github.com/amikos-tech/chroma-go/pkg/api/v2"
 	"github.com/nmdra/notebrain-cli/v2/internal/store"
 )
 
@@ -118,6 +119,93 @@ func TestQueries(t *testing.T) {
 		}
 	})
 
+	t.Run("HiddenConnectionsDeep", func(t *testing.T) {
+		chunks := []store.ChunkRecord{
+			{
+				ID:         "note-c:0",
+				NoteSlug:   "note-c",
+				Title:      "Note C",
+				FilePath:   "Note C.md",
+				ChunkIndex: 0,
+				Text:       "text about golang",
+				Tags:       []string{"go"},
+				HasLinks:   false,
+				Embedding:  []float32{0.9, 0.0, 0.0},
+			},
+		}
+		_ = st.UpsertChunks(ctx, chunks)
+
+		// note-a has 1 chunk with embedding [1.0, 0.0, 0.0].
+		// note-b is linked to note-a. note-c is unlinked with embedding [0.9, 0.0, 0.0].
+		hidden, seedChunks, err := st.HiddenConnectionsDeep(ctx, "note-a", 10, 3, false)
+		if err != nil {
+			t.Fatalf("HiddenConnectionsDeep failed: %v", err)
+		}
+		if len(hidden) == 0 || hidden[0].NoteSlug != "note-c" {
+			t.Errorf("Expected note-c to be deep hidden connection to note-a, got %v", hidden)
+		}
+		if len(seedChunks) == 0 {
+			t.Errorf("Expected non-empty seedChunks, got %v", seedChunks)
+		}
+		if len(hidden) > 0 && len(hidden[0].MatchedQueries) == 0 {
+			t.Errorf("Expected MatchedQueries to be populated on result, got %v", hidden[0].MatchedQueries)
+		}
+
+		// Verify error when querying a non-existent seed note
+		_, _, err = st.HiddenConnectionsDeep(ctx, "non-existent-note", 10, 3, false)
+		if err == nil {
+			t.Errorf("Expected error for non-existent note in deep hidden check, got nil")
+		}
+	})
+
+	t.Run("MultiSemanticSearch_ThresholdFiltering", func(t *testing.T) {
+		// Test two-tier filtering: a candidate note with one strong match (>= 0.70) should not include weak noise matches (< 0.70 / < 85% peak)
+		chunks := []store.ChunkRecord{
+			{
+				ID:         "note-x:0",
+				NoteSlug:   "note-x",
+				Title:      "Note X",
+				FilePath:   "Note X.md",
+				ChunkIndex: 0,
+				Text:       "target vector alignment",
+				Embedding:  []float32{1.0, 0.0, 0.0},
+			},
+		}
+		_ = st.UpsertChunks(ctx, chunks)
+
+		queryVecs := [][]float32{
+			{1.0, 0.0, 0.0},    // exact match -> cosine similarity ~ 1.0 (StrongMatch)
+			{0.4, 0.9165, 0.0}, // orthogonal/weak match -> cosine similarity ~ 0.40 (WeakMatch)
+		}
+		queries := []string{"§ StrongMatch", "§ WeakMatch"}
+
+		res, err := st.MultiSemanticSearch(ctx, queryVecs, queries, 10, 3, nil, false)
+		if err != nil {
+			t.Fatalf("MultiSemanticSearch failed: %v", err)
+		}
+		if len(res) == 0 {
+			t.Fatalf("Expected results from MultiSemanticSearch, got 0")
+		}
+		for _, r := range res {
+			if r.NoteSlug == "note-x" {
+				for _, mq := range r.MatchedQueries {
+					if mq == "§ WeakMatch" {
+						t.Errorf("Expected § WeakMatch to be filtered out by threshold, but got MatchedQueries=%v", r.MatchedQueries)
+					}
+				}
+				foundStrong := false
+				for _, mq := range r.MatchedQueries {
+					if mq == "§ StrongMatch" {
+						foundStrong = true
+					}
+				}
+				if !foundStrong {
+					t.Errorf("Expected § StrongMatch in MatchedQueries, got %v", r.MatchedQueries)
+				}
+			}
+		}
+	})
+
 	t.Run("SharedTags", func(t *testing.T) {
 		res, err := st.SharedTags(ctx, "note-a", 1)
 		if err != nil {
@@ -157,6 +245,124 @@ func TestQueries(t *testing.T) {
 			t.Errorf("Expected note-b in boosted results")
 		}
 	})
+
+	t.Run("ResolveNoteSlug", func(t *testing.T) {
+		got, err := st.ResolveNoteSlug(ctx, "")
+		if err != nil || got != "" {
+			t.Errorf("Expected empty string for empty input, got %q (err: %v)", got, err)
+		}
+
+		got, err = st.ResolveNoteSlug(ctx, "note-a")
+		if err != nil || got != "note-a" {
+			t.Errorf("Expected note-a exact match, got %s (err: %v)", got, err)
+		}
+
+		got, err = st.ResolveNoteSlug(ctx, "Note A")
+		if err != nil || got != "note-a" {
+			t.Errorf("Expected note-a from title, got %s (err: %v)", got, err)
+		}
+
+		got, err = st.ResolveNoteSlug(ctx, "Note A.md")
+		if err != nil || got != "note-a" {
+			t.Errorf("Expected note-a from filename, got %s (err: %v)", got, err)
+		}
+
+		got, err = st.ResolveNoteSlug(ctx, "e-a")
+		if err != nil || got != "note-a" {
+			t.Errorf("Expected note-a from suffix, got %s (err: %v)", got, err)
+		}
+
+		ambigChunks := []store.ChunkRecord{
+			{ID: "ambig-1:0", NoteSlug: "ambig-1", Title: "Ambig Note", FilePath: "dir1/Ambig Note.md", ChunkIndex: 0, Embedding: []float32{1.0, 0.0, 0.0}},
+			{ID: "ambig-2:0", NoteSlug: "ambig-2", Title: "Ambig Note", FilePath: "dir2/Ambig Note.md", ChunkIndex: 0, Embedding: []float32{1.0, 0.0, 0.0}},
+		}
+		_ = st.UpsertChunks(ctx, ambigChunks)
+
+		_, err = st.ResolveNoteSlug(ctx, "Ambig Note")
+		if err == nil || !strings.Contains(err.Error(), "matches multiple indexed notes") {
+			t.Errorf("Expected multiple match error for Ambig Note, got %v", err)
+		}
+
+		got, err = st.ResolveNoteSlug(ctx, "note-b")
+		if err != nil || got != "note-b" {
+			t.Errorf("Expected note-b, got %s (err: %v)", got, err)
+		}
+	})
+}
+
+func TestMultiSemanticSearch_WithText(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatalf("Open failed: %v", err)
+	}
+	defer func() { _ = st.Close() }()
+
+	chunks := []store.ChunkRecord{
+		{
+			ID:         "multi-text:0",
+			NoteSlug:   "multi-text",
+			Title:      "Multi Text Note",
+			FilePath:   "multi-text.md",
+			ChunkIndex: 0,
+			Text:       "this is the document text of multi-text chunk zero",
+			Embedding:  []float32{1.0, 0.0, 0.0},
+		},
+		{
+			ID:         "multi-text-2:0",
+			NoteSlug:   "multi-text-2",
+			Title:      "Multi Text Note 2",
+			FilePath:   "multi-text-2.md",
+			ChunkIndex: 0,
+			Text:       "this is the document text of multi-text-2 chunk zero",
+			Embedding:  []float32{0.9, 0.1, 0.0},
+		},
+	}
+	if err := st.UpsertChunks(ctx, chunks); err != nil {
+		t.Fatalf("UpsertChunks failed: %v", err)
+	}
+
+	queryVecs := [][]float32{
+		{1.0, 0.0, 0.0},
+		{0.9, 0.1, 0.0},
+	}
+	queries := []string{"query 1", "query 2"}
+
+	res, err := st.MultiSemanticSearch(ctx, queryVecs, queries, 10, 2, nil, true)
+	if err != nil {
+		t.Fatalf("MultiSemanticSearch with text failed: %v", err)
+	}
+	if len(res) == 0 {
+		t.Fatalf("Expected results, got none")
+	}
+	for _, r := range res {
+		if r.Text == "" {
+			t.Errorf("Expected populated Text for note %s, got empty", r.NoteSlug)
+		}
+	}
+}
+
+func TestCombineWhereFilters(t *testing.T) {
+	var nilFilter chroma.WhereFilter
+	wc1 := chroma.EqString("note_slug", "note-a")
+	wc2 := chroma.EqInt("chunk_index", 0)
+
+	if got := store.CombineWhereFilters(nilFilter, wc1); got != wc1 {
+		t.Errorf("Expected wc1 when f1 is nil")
+	}
+	if got := store.CombineWhereFilters(wc2, nilFilter); got != wc2 {
+		t.Errorf("Expected wc2 when f2 is nil")
+	}
+	if got := store.CombineWhereFilters(wc1, wc2); got == nil {
+		t.Errorf("Expected combined clause when both non-nil")
+	}
+}
+
+func TestTagWhereClause(t *testing.T) {
+	wc := store.TagWhereClause("golang")
+	if wc == nil {
+		t.Errorf("Expected non-nil WhereClause")
+	}
 }
 
 func TestGetNoteHashes(t *testing.T) {
