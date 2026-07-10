@@ -155,166 +155,163 @@ func (m LiveSearchModel) Init() tea.Cmd {
 
 func (m LiveSearchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		m = m.recalcLayout()
+		return m.recalcLayout(), nil
 
 	case editorFinishedMsg:
 		return m, nil
 
 	case tea.KeyMsg:
-		switch msg.String() {
-
-		case "ctrl+c":
-			m.quitting = true
-			return m, tea.Quit
-
-		case "esc":
-			// If we're in list focus, escape returns to input focus
-			if m.focus == focusList {
-				m.focus = focusInput
-				m.input.Focus()
-				return m, textinput.Blink
-			}
-			// If we're in input focus, escape exits
-			m.quitting = true
-			return m, tea.Quit
-
-		case "tab":
-			m.focus = focusInput
-			m.input.Focus()
-			return m, textinput.Blink
-
-		case "down":
-			// Down from input moves focus to list
-			if m.focus == focusInput && len(m.list.Items()) > 0 {
-				m.focus = focusList
-				m.input.Blur()
-				return m, nil
-			}
-			if m.focus == focusList {
-				var listCmd tea.Cmd
-				m.list, listCmd = m.list.Update(msg)
-				return m, listCmd
-			}
-
-		case "up":
-			if m.focus == focusList {
-				// If at top of list, move focus back to input
-				if m.list.Index() == 0 {
-					m.focus = focusInput
-					m.input.Focus()
-					return m, textinput.Blink
-				}
-				var listCmd tea.Cmd
-				m.list, listCmd = m.list.Update(msg)
-				return m, listCmd
-			}
-
-		case "enter":
-			if m.focus == focusList {
-				if item, ok := m.list.SelectedItem().(resultItem); ok {
-					return m, openNote(m.vaultName, item.FilePath, m.useEditor)
-				}
-				return m, nil
-			}
-
-		case "o":
-			if m.focus == focusList {
-				if item, ok := m.list.SelectedItem().(resultItem); ok {
-					return m, openNote(m.vaultName, item.FilePath, false)
-				}
-				return m, nil
-			}
-			fallthrough
-
-		case "e":
-			if m.focus == focusList {
-				if item, ok := m.list.SelectedItem().(resultItem); ok {
-					return m, openNote(m.vaultName, item.FilePath, true)
-				}
-				return m, nil
-			}
-			fallthrough
-
-		default:
-			// All other keys go to textinput when it has focus
-			if m.focus == focusInput {
-				prevVal := m.input.Value()
-				var tiCmd tea.Cmd
-				m.input, tiCmd = m.input.Update(msg)
-				newVal := m.input.Value()
-
-				var debounceCmd tea.Cmd
-				if newVal != prevVal {
-					id := atomic.AddInt64(m.inflight, 1)
-					debounceCmd = m.triggerSearch(newVal, id)
-					m.loading = true
-					m.status = ""
-				}
-				return m, tea.Batch(tiCmd, debounceCmd)
-			}
-			// List focus: pass to list
-			if m.focus == focusList {
-				var listCmd tea.Cmd
-				m.list, listCmd = m.list.Update(msg)
-				return m, listCmd
-			}
-		}
+		return m.handleKeyMsg(msg)
 
 	case searchMsg:
-		// Only act if this ID is still current (guards against stale fires).
-		if msg.id != atomic.LoadInt64(m.inflight) {
-			return m, nil
-		}
-		if msg.query == "" {
-			m.loading = false
-			m.status = "start typing to search…"
-			m.list.SetItems(nil)
-			return m, nil
-		}
-		// Fire the actual search in a goroutine.
-		searchID := msg.id
-		searchFn := m.searchFn
-		query := msg.query
-		return m, func() tea.Msg {
-			results, err := searchFn(context.Background(), query)
-			return resultsMsg{id: searchID, results: results, err: err}
-		}
+		return m.handleSearchMsg(msg)
 
 	case resultsMsg:
-		// Discard results from superseded searches.
-		if msg.id != atomic.LoadInt64(m.inflight) {
-			return m, nil
-		}
-		m.loading = false
-		if msg.err != nil {
-			m.status = lsStatusStyle.Render("⚠  " + msg.err.Error())
-			return m, nil
-		}
-		items := make([]list.Item, len(msg.results))
-		for i, r := range msg.results {
-			items[i] = resultItem{r}
-		}
-		m.list.SetItems(items)
-		switch len(msg.results) {
-		case 0:
-			m.status = lsStatusStyle.Render("no results")
-		case 1:
-			m.status = lsStatusStyle.Render("1 result")
-		default:
-			m.status = lsStatusStyle.Render(fmt.Sprintf("%d results", len(msg.results)))
+		return m.handleResultsMsg(msg)
+
+	default:
+		if m.focus == focusInput {
+			var tiCmd tea.Cmd
+			m.input, tiCmd = m.input.Update(msg)
+			return m, tiCmd
 		}
 		return m, nil
 	}
+}
 
-	// Default: pass through to textinput (e.g. cursor blink).
-	if m.focus == focusInput {
+func (m LiveSearchModel) handleKeyMsg(msg tea.KeyMsg) (LiveSearchModel, tea.Cmd) {
+	if m.focus == focusList {
+		return m.handleListKey(msg)
+	}
+	return m.handleInputKey(msg)
+}
+
+func (m LiveSearchModel) handleInputKey(msg tea.KeyMsg) (LiveSearchModel, tea.Cmd) {
+	switch msg.String() {
+	case "ctrl+c", "esc":
+		m.quitting = true
+		return m, tea.Quit
+
+	case "tab":
+		m.input.Focus()
+		return m, textinput.Blink
+
+	case "down":
+		if len(m.list.Items()) > 0 {
+			m.focus = focusList
+			m.input.Blur()
+		}
+		return m, nil
+
+	default:
+		prevVal := m.input.Value()
 		var tiCmd tea.Cmd
 		m.input, tiCmd = m.input.Update(msg)
-		return m, tiCmd
+		newVal := m.input.Value()
+
+		var debounceCmd tea.Cmd
+		if newVal != prevVal {
+			id := atomic.AddInt64(m.inflight, 1)
+			debounceCmd = m.triggerSearch(newVal, id)
+			m.loading = true
+			m.status = ""
+		}
+		return m, tea.Batch(tiCmd, debounceCmd)
+	}
+}
+
+func (m LiveSearchModel) openSelectedNote(useEditor bool) (LiveSearchModel, tea.Cmd) {
+	if item, ok := m.list.SelectedItem().(resultItem); ok {
+		return m, openNote(m.vaultName, item.FilePath, useEditor)
+	}
+	return m, nil
+}
+
+func (m LiveSearchModel) handleListKey(msg tea.KeyMsg) (LiveSearchModel, tea.Cmd) {
+	switch msg.String() {
+	case "ctrl+c":
+		m.quitting = true
+		return m, tea.Quit
+
+	case "esc", "tab":
+		m.focus = focusInput
+		m.input.Focus()
+		return m, textinput.Blink
+
+	case "up":
+		if m.list.Index() == 0 {
+			m.focus = focusInput
+			m.input.Focus()
+			return m, textinput.Blink
+		}
+		var listCmd tea.Cmd
+		m.list, listCmd = m.list.Update(msg)
+		return m, listCmd
+
+	case "down":
+		var listCmd tea.Cmd
+		m.list, listCmd = m.list.Update(msg)
+		return m, listCmd
+
+	case "enter":
+		return m.openSelectedNote(m.useEditor)
+
+	case "o":
+		return m.openSelectedNote(false)
+
+	case "e":
+		return m.openSelectedNote(true)
+
+	default:
+		var listCmd tea.Cmd
+		m.list, listCmd = m.list.Update(msg)
+		return m, listCmd
+	}
+}
+
+func (m LiveSearchModel) handleSearchMsg(msg searchMsg) (LiveSearchModel, tea.Cmd) {
+	if msg.id != atomic.LoadInt64(m.inflight) {
+		return m, nil
+	}
+	if msg.query == "" {
+		m.loading = false
+		m.status = "start typing to search…"
+		m.list.SetItems(nil)
+		return m, nil
+	}
+	searchID := msg.id
+	searchFn := m.searchFn
+	query := msg.query
+	return m, func() tea.Msg {
+		results, err := searchFn(context.Background(), query)
+		return resultsMsg{id: searchID, results: results, err: err}
+	}
+}
+
+func (m LiveSearchModel) handleResultsMsg(msg resultsMsg) (LiveSearchModel, tea.Cmd) {
+	if msg.id != atomic.LoadInt64(m.inflight) {
+		return m, nil
+	}
+	m.loading = false
+	if msg.err != nil {
+		m.status = lsStatusStyle.Render("⚠  " + msg.err.Error())
+		return m, nil
+	}
+	items := make([]list.Item, len(msg.results))
+	for i, r := range msg.results {
+		items[i] = resultItem{r}
+	}
+	m.list.SetItems(items)
+	switch len(msg.results) {
+	case 0:
+		m.status = lsStatusStyle.Render("no results")
+	case 1:
+		m.status = lsStatusStyle.Render("1 result")
+	default:
+		m.status = lsStatusStyle.Render(fmt.Sprintf("%d results", len(msg.results)))
 	}
 	return m, nil
 }
