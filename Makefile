@@ -1,4 +1,4 @@
-.PHONY: build test test-cover lint clean
+.PHONY: build test test-cover test-pkg lint vendor clean
 
 # Build with embedded persistent client (requires CGO)
 build:
@@ -6,11 +6,11 @@ build:
 
 # Run all tests
 test:
-	go test ./...
+	go test -count=1 ./...
 
 # Run tests with coverage
 test-cover:
-	go test -coverprofile=coverage.out ./...
+	go test -count=1 -coverprofile=coverage.out ./...
 	go tool cover -html=coverage.out -o coverage.html
 
 # Run tests for a specific package (usage: make test-pkg PKG=./internal/parser)
@@ -26,6 +26,10 @@ lint:
 	else \
 		echo "No Go files changed."; \
 	fi
+
+# Update vendored dependencies
+vendor:
+	go mod vendor
 
 # Clean build artifacts
 clean:
