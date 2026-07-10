@@ -132,16 +132,67 @@ func (s *Store) Stats(ctx context.Context) (map[string]int64, error) {
 	}
 	var distinctNotes int64
 	if nc > 0 {
-		res, err := s.chunks.Get(ctx, chroma.WithInclude(chroma.IncludeMetadatas))
-		if err == nil && res != nil {
-			seen := make(map[string]struct{})
-			for _, m := range res.GetMetadatas() {
+		seen := make(map[string]struct{})
+		offset := 0
+		batchSize := 500
+		for {
+			res, err := s.chunks.Get(ctx,
+				chroma.WithWhere(chroma.EqInt("chunk_index", 0)),
+				chroma.WithLimit(batchSize),
+				chroma.WithOffset(offset),
+				chroma.WithInclude(chroma.IncludeMetadatas),
+			)
+			if err != nil || res == nil {
+				break
+			}
+			metas := res.GetMetadatas()
+			if len(metas) == 0 {
+				break
+			}
+			for _, m := range metas {
+				if m == nil {
+					continue
+				}
 				if slug, ok := m.GetString("note_slug"); ok && slug != "" {
 					seen[slug] = struct{}{}
 				}
 			}
-			distinctNotes = int64(len(seen))
+			if len(metas) < batchSize {
+				break
+			}
+			offset += batchSize
 		}
+		// Fallback in case chunk_index=0 filter didn't match anything (e.g. older index format)
+		if len(seen) == 0 {
+			offset = 0
+			for {
+				res, err := s.chunks.Get(ctx,
+					chroma.WithLimit(batchSize),
+					chroma.WithOffset(offset),
+					chroma.WithInclude(chroma.IncludeMetadatas),
+				)
+				if err != nil || res == nil {
+					break
+				}
+				metas := res.GetMetadatas()
+				if len(metas) == 0 {
+					break
+				}
+				for _, m := range metas {
+					if m == nil {
+						continue
+					}
+					if slug, ok := m.GetString("note_slug"); ok && slug != "" {
+						seen[slug] = struct{}{}
+					}
+				}
+				if len(metas) < batchSize {
+					break
+				}
+				offset += batchSize
+			}
+		}
+		distinctNotes = int64(len(seen))
 	}
 	return map[string]int64{
 		"chunks": int64(nc),
