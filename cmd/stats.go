@@ -27,7 +27,6 @@ import (
 	"os"
 
 	"charm.land/lipgloss/v2"
-	"github.com/nmdra/notebrain-cli/v2/internal/store"
 )
 
 type StatsCmd struct {
@@ -35,9 +34,8 @@ type StatsCmd struct {
 
 func (c *StatsCmd) Run(globals *Globals) error {
 
-	chromaPath := globals.ChromaPath
 	ctx := globals.Ctx
-	st, err := store.Open(ctx, chromaPath)
+	st, err := openStore(ctx, globals)
 	if err != nil {
 		return err
 	}
@@ -58,6 +56,7 @@ func (c *StatsCmd) Run(globals *Globals) error {
 		return enc.Encode(stats)
 	}
 
+	initStyles()
 	rows := fmt.Sprintf(
 		"%s  %d\n%s  %d",
 		lipgloss.NewStyle().Bold(true).Render("Chunks"), stats["chunks"],

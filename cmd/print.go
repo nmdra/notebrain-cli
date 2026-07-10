@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -40,7 +41,40 @@ type jsonEnvelope struct {
 
 // printResultsFormatted renders a list of results to stdout based on the requested format.
 func printResultsFormatted(commandName string, query string, results []store.Result, globals *Globals) {
-	// 1. Filter by min score and phantom links
+	printResultsFormattedToWriter(os.Stdout, commandName, query, results, globals)
+}
+
+func printResultsFormattedToWriter(w io.Writer, commandName string, query string, results []store.Result, globals *Globals) {
+	initStyles()
+	filtered := filterResults(results, globals)
+
+	if globals.JSONPath != "" {
+		env := jsonEnvelope{
+			Command: commandName,
+			Query:   query,
+			Queries: globals.Queries,
+			Total:   len(filtered),
+			Results: filtered,
+		}
+		if err := printJSONPathResultToWriter(w, env, globals.JSONPath); err != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		}
+		return
+	}
+
+	switch globals.Format {
+	case "json":
+		printJSONResults(w, commandName, query, filtered, globals)
+	case "ndjson":
+		printNDJSONResults(w, filtered)
+	case "tsv":
+		printTSVResults(w, filtered)
+	default: // "text"
+		printTextResults(w, commandName, query, filtered, globals)
+	}
+}
+
+func filterResults(results []store.Result, globals *Globals) []store.Result {
 	filtered := make([]store.Result, 0, len(results))
 	for _, r := range results {
 		if r.Score < globals.MinScore {
@@ -54,178 +88,164 @@ func printResultsFormatted(commandName string, query string, results []store.Res
 		}
 		filtered = append(filtered, r)
 	}
+	return filtered
+}
 
-	if globals.JSONPath != "" {
-		env := jsonEnvelope{
-			Command: commandName,
-			Query:   query,
-			Queries: globals.Queries,
-			Total:   len(filtered),
-			Results: filtered,
-		}
-		if err := printJSONPathResult(env, globals.JSONPath); err != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		}
+func printJSONResults(w io.Writer, commandName, query string, filtered []store.Result, globals *Globals) {
+	env := jsonEnvelope{
+		Command: commandName,
+		Query:   query,
+		Queries: globals.Queries,
+		Total:   len(filtered),
+		Results: filtered,
+	}
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	_ = enc.Encode(env)
+}
+
+func printNDJSONResults(w io.Writer, filtered []store.Result) {
+	enc := json.NewEncoder(w)
+	for _, r := range filtered {
+		_ = enc.Encode(r)
+	}
+}
+
+func printTSVResults(w io.Writer, filtered []store.Result) {
+	_, _ = fmt.Fprintln(w, "slug\ttitle\tfile_path\tscore\ttags\textra\theading_path\ttext")
+	for _, r := range filtered {
+		tagsStr := formatTags(r.Tags)
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%f\t%s\t%s\t%s\t%s\n",
+			r.NoteSlug, r.Title, r.FilePath, r.Score, tagsStr, r.Extra, r.HeadingPath, r.Text)
+	}
+}
+
+func printTextResults(w io.Writer, commandName, query string, filtered []store.Result, globals *Globals) {
+	_, _ = fmt.Fprintln(w, headerStyle.Render(query))
+
+	if len(filtered) == 0 {
+		_, _ = fmt.Fprintln(w, extraStyle.Render("  (no results)"))
 		return
 	}
 
-	// 2. Route by format
-	switch globals.Format {
-	case "json":
-		env := jsonEnvelope{
-			Command: commandName,
-			Query:   query,
-			Queries: globals.Queries,
-			Total:   len(filtered),
-			Results: filtered,
-		}
-		enc := json.NewEncoder(os.Stdout)
-		enc.SetIndent("", "  ")
-		_ = enc.Encode(env)
+	useLinks := hyperlinkSupported(globals)
+	termWidth := getTerminalWidth()
 
-	case "ndjson":
-		enc := json.NewEncoder(os.Stdout)
-		for _, r := range filtered {
-			_ = enc.Encode(r)
+	noteCounts := make(map[string]int, len(filtered))
+	for _, r := range filtered {
+		noteCounts[r.NoteSlug]++
+	}
+
+	for i, r := range filtered {
+		rank := rankStyle.Render(fmt.Sprintf("%d.", i+1))
+
+		displayTitle := r.Title
+		if r.HeadingPath != "" {
+			displayTitle = fmt.Sprintf("%s (§ %s)", displayTitle, r.HeadingPath)
+		} else if noteCounts[r.NoteSlug] > 1 {
+			displayTitle = fmt.Sprintf("%s (chunk #%d)", displayTitle, r.ChunkIndex+1)
 		}
 
-	case "tsv":
-		fmt.Println("slug\ttitle\tfile_path\tscore\ttags\textra\theading_path\ttext")
-		for _, r := range filtered {
-			tagsStr := strings.Join(r.Tags, ",")
-			fmt.Printf("%s\t%s\t%s\t%f\t%s\t%s\t%s\t%s\n",
-				r.NoteSlug, r.Title, r.FilePath, r.Score, tagsStr, r.Extra, r.HeadingPath, r.Text)
+		titleWidth := 42
+		if termWidth > 0 {
+			titleWidth = max(min(termWidth-40, 80), 20)
+			displayTitle = ansi.Truncate(displayTitle, titleWidth, "…")
 		}
 
-	default: // "text"
-		fmt.Println(headerStyle.Render(query))
+		paddedTitle := lipgloss.NewStyle().Width(titleWidth).Render(displayTitle)
+		title := paddedTitle
 
-		if len(filtered) == 0 {
-			fmt.Println(extraStyle.Render("  (no results)"))
-			return
+		if useLinks && r.FilePath != "" {
+			uri := store.ObsidianURI(globals.VaultName, r.FilePath)
+			title = hyperlink(true, uri, paddedTitle)
 		}
 
-		useLinks := hyperlinkSupported(globals)
-		termWidth := getTerminalWidth()
+		scoreStr := fmt.Sprintf("score=%.4f", r.Score)
+		score := scoreStyleFor(r.Score).Render(scoreStr)
+		line := fmt.Sprintf("%s %s  %s", rank, title, score)
 
-		noteCounts := make(map[string]int, len(filtered))
-		for _, r := range filtered {
-			noteCounts[r.NoteSlug]++
+		if r.Extra != "" {
+			line += "  " + extraStyle.Render("["+r.Extra+"]")
+		}
+		if r.IsPhantom {
+			line += "  " + extraStyle.Render("[phantom]")
 		}
 
-		for i, r := range filtered {
-			rank := rankStyle.Render(fmt.Sprintf("%d.", i+1))
-
-			displayTitle := r.Title
-			if r.HeadingPath != "" {
-				displayTitle = fmt.Sprintf("%s (§ %s)", displayTitle, r.HeadingPath)
-			} else if noteCounts[r.NoteSlug] > 1 {
-				displayTitle = fmt.Sprintf("%s (chunk #%d)", displayTitle, r.ChunkIndex+1)
-			}
-
-			titleWidth := 42
-			if termWidth > 0 {
-				titleWidth = max(min(termWidth-40, 80), 20)
-				displayTitle = ansi.Truncate(displayTitle, titleWidth, "…")
-			}
-
-			paddedTitle := lipgloss.NewStyle().Width(titleWidth).Render(displayTitle)
-			title := paddedTitle
-
-			if useLinks && r.FilePath != "" {
-				uri := store.ObsidianURI(globals.VaultName, r.FilePath)
-				title = hyperlink(true, uri, paddedTitle)
-			}
-
-			score := scoreStyle.Render(fmt.Sprintf("score=%.4f", r.Score))
-			line := fmt.Sprintf("%s %s  %s", rank, title, score)
-
-			if strings.Contains(commandName, "deep") {
-				if r.Extra != "" {
-					line += "  " + extraStyle.Render("["+r.Extra+"]")
-				}
-				if r.IsPhantom {
-					line += "  " + extraStyle.Render("[phantom]")
-				}
-				if termWidth > 0 && ansi.StringWidth(line) > termWidth {
-					line = ansi.Truncate(line, termWidth, "…")
-				}
-				fmt.Println(line)
-
-				var details []string
-				if len(r.MatchedQueries) > 0 {
-					if globals.Verbose || len(r.MatchedQueries) <= 3 {
-						details = append(details, fmt.Sprintf("Matched target sections (%d): %s", len(r.MatchedQueries), extraStyle.Render(`"`+strings.Join(r.MatchedQueries, `", "`)+`"`)))
-					} else {
-						topQueries := r.MatchedQueries[:3]
-						moreCount := len(r.MatchedQueries) - 3
-						details = append(details, fmt.Sprintf("Matched target sections (%d): %s (+%d more)", len(r.MatchedQueries), extraStyle.Render(`"`+strings.Join(topQueries, `", "`)+`"`), moreCount))
-					}
-				}
-				if len(r.Tags) > 0 {
-					formattedTags := make([]string, 0, len(r.Tags))
-					for _, t := range r.Tags {
-						formattedTags = append(formattedTags, "#"+t)
-					}
-					details = append(details, fmt.Sprintf("Tags: %s", extraStyle.Render(strings.Join(formattedTags, " "))))
-				}
-
-				maxLineLen := termWidth
-				if maxLineLen <= 0 {
-					maxLineLen = 140
-				}
-				for j, d := range details {
-					prefix := "   ├─ "
-					if j == len(details)-1 {
-						prefix = "   └─ "
-					}
-					dLine := prefix + d
-					if !globals.Verbose && ansi.StringWidth(dLine) > maxLineLen {
-						dLine = ansi.Truncate(dLine, maxLineLen, "…")
-					}
-					fmt.Println(dLine)
-				}
-				if i < len(filtered)-1 && len(details) > 0 {
-					fmt.Println()
-				}
-				continue
-			}
-
-			if len(r.Tags) > 0 {
-				formattedTags := make([]string, 0, len(r.Tags))
-				for _, t := range r.Tags {
-					formattedTags = append(formattedTags, "#"+t)
-				}
-				line += "  " + extraStyle.Render("["+strings.Join(formattedTags, " ")+"]")
-			}
-			if len(r.MatchedQueries) > 0 && len(globals.Queries) > 1 {
-				line += "  " + extraStyle.Render(`[hits: "`+strings.Join(r.MatchedQueries, `", "`)+`"]`)
-			}
-			if r.Extra != "" {
-				line += "  " + extraStyle.Render("["+r.Extra+"]")
-			}
-			if r.IsPhantom {
-				line += "  " + extraStyle.Render("[phantom]")
-			}
-
+		if strings.Contains(commandName, "deep") {
 			if termWidth > 0 && ansi.StringWidth(line) > termWidth {
 				line = ansi.Truncate(line, termWidth, "…")
 			}
-
-			fmt.Println(line)
+			_, _ = fmt.Fprintln(w, line)
+			printDeepDetails(w, r, termWidth, globals)
+			if i < len(filtered)-1 {
+				_, _ = fmt.Fprintln(w)
+			}
+			continue
 		}
 
-		if useLinks {
-			fmt.Println("\n  " + extraStyle.Render("(Ctrl+click / Cmd+click a title to open in Obsidian)"))
+		if len(r.Tags) > 0 {
+			formattedTags := make([]string, 0, len(r.Tags))
+			for _, t := range r.Tags {
+				formattedTags = append(formattedTags, "#"+t)
+			}
+			line += "  " + extraStyle.Render("["+strings.Join(formattedTags, " ")+"]")
 		}
-		fmt.Println("  " + extraStyle.Render("Note: Results are matching text chunks; Repeated titles represent different relevant sections."))
-		fmt.Println()
+		if len(r.MatchedQueries) > 0 && len(globals.Queries) > 1 {
+			line += "  " + extraStyle.Render(`[hits: "`+strings.Join(r.MatchedQueries, `", "`)+`"]`)
+		}
+
+		if termWidth > 0 && ansi.StringWidth(line) > termWidth {
+			line = ansi.Truncate(line, termWidth, "…")
+		}
+
+		_, _ = fmt.Fprintln(w, line)
+	}
+
+	if useLinks {
+		_, _ = fmt.Fprintln(w, "\n  "+extraStyle.Render("(Ctrl+click / Cmd+click a title to open in Obsidian)"))
+	}
+	_, _ = fmt.Fprintln(w, "  "+extraStyle.Render("Note: Results are matching text chunks; Repeated titles represent different relevant sections."))
+	_, _ = fmt.Fprintln(w)
+}
+
+func printDeepDetails(w io.Writer, r store.Result, termWidth int, globals *Globals) {
+	var details []string
+	if len(r.MatchedQueries) > 0 {
+		if globals.Verbose || len(r.MatchedQueries) <= 3 {
+			details = append(details, fmt.Sprintf("Matched target sections (%d): %s", len(r.MatchedQueries), extraStyle.Render(`"`+strings.Join(r.MatchedQueries, `", "`)+`"`)))
+		} else {
+			topQueries := r.MatchedQueries[:3]
+			moreCount := len(r.MatchedQueries) - 3
+			details = append(details, fmt.Sprintf("Matched target sections (%d): %s (+%d more)", len(r.MatchedQueries), extraStyle.Render(`"`+strings.Join(topQueries, `", "`)+`"`), moreCount))
+		}
+	}
+	if len(r.Tags) > 0 {
+		formattedTags := make([]string, 0, len(r.Tags))
+		for _, t := range r.Tags {
+			formattedTags = append(formattedTags, "#"+t)
+		}
+		details = append(details, fmt.Sprintf("Tags: %s", extraStyle.Render(strings.Join(formattedTags, " "))))
+	}
+
+	maxLineLen := termWidth
+	if maxLineLen <= 0 {
+		maxLineLen = 140
+	}
+	for j, d := range details {
+		prefix := "   ├─ "
+		if j == len(details)-1 {
+			prefix = "   └─ "
+		}
+		dLine := prefix + d
+		if !globals.Verbose && ansi.StringWidth(dLine) > maxLineLen {
+			dLine = ansi.Truncate(dLine, maxLineLen, "…")
+		}
+		_, _ = fmt.Fprintln(w, dLine)
 	}
 }
 
 func normalizeJSONPath(jp string) string {
 	jp = strings.TrimSpace(jp)
-	// If kubectl style {.items[0]} or {$.items[0]}
 	if strings.HasPrefix(jp, "{") && strings.HasSuffix(jp, "}") {
 		jp = strings.TrimPrefix(jp, "{")
 		jp = strings.TrimSuffix(jp, "}")
@@ -240,6 +260,10 @@ func normalizeJSONPath(jp string) string {
 }
 
 func printJSONPathResult(obj any, jp string) error {
+	return printJSONPathResultToWriter(os.Stdout, obj, jp)
+}
+
+func printJSONPathResultToWriter(w io.Writer, obj any, jp string) error {
 	data, err := json.Marshal(obj)
 	if err != nil {
 		return fmt.Errorf("jsonpath marshal: %w", err)
@@ -262,22 +286,22 @@ func printJSONPathResult(obj any, jp string) error {
 	switch val := res.(type) {
 	case []any:
 		for _, item := range val {
-			printSingleJSONPathValue(item)
+			printSingleJSONPathValue(w, item)
 		}
 	default:
-		printSingleJSONPathValue(val)
+		printSingleJSONPathValue(w, val)
 	}
 	return nil
 }
 
-func printSingleJSONPathValue(val any) {
+func printSingleJSONPathValue(w io.Writer, val any) {
 	switch v := val.(type) {
 	case string:
-		fmt.Println(v)
+		_, _ = fmt.Fprintln(w, v)
 	case float64, float32, int, int64, bool:
-		fmt.Printf("%v\n", v)
+		_, _ = fmt.Fprintf(w, "%v\n", v)
 	default:
-		enc := json.NewEncoder(os.Stdout)
+		enc := json.NewEncoder(w)
 		_ = enc.Encode(v)
 	}
 }
