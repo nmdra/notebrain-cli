@@ -19,7 +19,7 @@ test-pkg:
 
 # Lint changed packages only
 lint:
-	@changed=$$(git diff --name-only --diff-filter=ACMR HEAD | grep '\.go$$' | xargs -I{} dirname {} | sort -u); \
+	@changed=$$(git diff --name-only --diff-filter=ACMR HEAD | grep '\.go$$' | xargs -I{} dirname {} | sort -u | sed 's|^|./|'); \
 	if [ -n "$$changed" ]; then \
 		echo "Linting: $$changed"; \
 		go vet $$changed; \

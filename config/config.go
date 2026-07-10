@@ -6,6 +6,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -46,7 +47,10 @@ type Config struct {
 
 // Default returns a Config with sensible defaults.
 func Default() *Config {
-	home, _ := os.UserHomeDir()
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		home = "."
+	}
 	return &Config{
 		ChromaPath:      filepath.Join(home, ".notebrain", "chroma"),
 		Embedder:        "minilm",
@@ -64,4 +68,24 @@ func Default() *Config {
 		SkipPhantom:     true,
 		HideTags:        true,
 	}
+}
+
+// Validate checks configuration settings for invalid or inconsistent values.
+func (c *Config) Validate() error {
+	if c.ChunkSize <= 0 {
+		return fmt.Errorf("chunk size must be positive, got %d", c.ChunkSize)
+	}
+	if c.ChunkOverlap < 0 {
+		return fmt.Errorf("chunk overlap cannot be negative, got %d", c.ChunkOverlap)
+	}
+	if c.ChunkOverlap >= c.ChunkSize {
+		return fmt.Errorf("chunk overlap (%d) must be less than chunk size (%d)", c.ChunkOverlap, c.ChunkSize)
+	}
+	if c.Limit <= 0 {
+		return fmt.Errorf("limit must be positive, got %d", c.Limit)
+	}
+	if c.TopKPerNote <= 0 {
+		return fmt.Errorf("top-k per note must be positive, got %d", c.TopKPerNote)
+	}
+	return nil
 }
