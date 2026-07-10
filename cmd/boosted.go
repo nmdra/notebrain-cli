@@ -28,10 +28,10 @@ import (
 )
 
 type BoostedCmd struct {
-	Query string  `arg:"" help:"Search query"`
-	Limit int     `help:"maximum number of results to return" default:"10"`
-	Seed  string  `help:"seed note for graph-based score boosting" required:"true"`
-	Boost float64 `help:"multiplier applied to graph-connected results" default:"1.5"`
+	Query string  `arg:"" help:"search query text"`
+	Limit int     `help:"maximum number of results" default:"10"`
+	Seed  string  `help:"seed note (slug, title, or path) whose graph neighbors get score boost" required:"true"`
+	Boost float64 `help:"score multiplier for graph-connected results (e.g. 1.5 = 50% boost)" default:"1.5"`
 }
 
 func (c *BoostedCmd) Run(globals *Globals) error {

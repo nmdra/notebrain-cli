@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"image/color"
 	"os"
 	"sync"
 
@@ -9,6 +10,10 @@ import (
 
 var (
 	stylesOnce     sync.Once
+	colorAccent    color.Color
+	colorMuted     color.Color
+	colorGood      color.Color
+	colorWarn      color.Color
 	headerStyle    lipgloss.Style
 	scoreStyle     lipgloss.Style
 	warnScoreStyle lipgloss.Style
@@ -22,10 +27,10 @@ func initStyles() {
 		hasDarkBG := lipgloss.HasDarkBackground(os.Stdin, os.Stdout)
 		lightDark := lipgloss.LightDark(hasDarkBG)
 
-		colorAccent := lightDark(lipgloss.Color("#534AB7"), lipgloss.Color("#AFA9EC")) // purple
-		colorMuted := lightDark(lipgloss.Color("#888780"), lipgloss.Color("#B4B2A9"))  // gray
-		colorGood := lightDark(lipgloss.Color("#0F6E56"), lipgloss.Color("#5DCAA5"))   // teal
-		colorWarn := lightDark(lipgloss.Color("#BA751B"), lipgloss.Color("#EF9E34"))   // amber/orange
+		colorAccent = lightDark(lipgloss.Color("#534AB7"), lipgloss.Color("#AFA9EC")) // purple
+		colorMuted = lightDark(lipgloss.Color("#888780"), lipgloss.Color("#B4B2A9"))  // gray
+		colorGood = lightDark(lipgloss.Color("#0F6E56"), lipgloss.Color("#5DCAA5"))   // teal
+		colorWarn = lightDark(lipgloss.Color("#C4841D"), lipgloss.Color("#F5A623"))   // amber/orange
 
 		headerStyle = lipgloss.NewStyle().
 			Border(lipgloss.NormalBorder(), false, false, true, false).
@@ -58,8 +63,12 @@ func initStyles() {
 
 func scoreStyleFor(score float64) lipgloss.Style {
 	initStyles()
-	if score < 0.55 {
-		return warnScoreStyle
+	switch {
+	case score >= 0.75:
+		return scoreStyle // teal — strong match
+	case score >= 0.50:
+		return warnScoreStyle // amber — moderate match
+	default:
+		return extraStyle // gray — weak match
 	}
-	return scoreStyle
 }

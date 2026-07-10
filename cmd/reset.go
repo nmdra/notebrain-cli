@@ -26,24 +26,31 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"charm.land/lipgloss/v2"
 )
 
 type ResetCmd struct {
+	Yes bool `short:"y" help:"skip confirmation prompt (use in scripts and automation)"`
 }
 
 func (c *ResetCmd) Run(globals *Globals) error {
-	fmt.Println("WARNING: This will delete ALL indexed data (nb_chunks and nb_links).")
-	fmt.Print("Type 'yes' to confirm: ")
+	if !c.Yes {
+		initStyles()
+		warnStyle := lipgloss.NewStyle().Bold(true).Foreground(colorWarn)
+		fmt.Println(warnStyle.Render(fmt.Sprintf("WARNING: This will delete ALL indexed data inside %s", globals.ChromaPath)))
+		fmt.Print("Type 'yes' to confirm: ")
 
-	reader := bufio.NewReader(os.Stdin)
-	answer, err := reader.ReadString('\n')
-	if err != nil {
-		return fmt.Errorf("reading confirmation: %w", err)
-	}
+		reader := bufio.NewReader(os.Stdin)
+		answer, err := reader.ReadString('\n')
+		if err != nil {
+			return fmt.Errorf("reading confirmation: %w", err)
+		}
 
-	if strings.TrimSpace(answer) != "yes" {
-		fmt.Println("Reset cancelled.")
-		return nil
+		if strings.TrimSpace(answer) != "yes" {
+			fmt.Println("Reset cancelled.")
+			return nil
+		}
 	}
 
 	ctx := globals.Ctx

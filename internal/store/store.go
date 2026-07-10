@@ -136,7 +136,7 @@ func (s *Store) Reset(ctx context.Context) error {
 	return nil
 }
 
-// Stats returns document counts for both collections.
+// Stats returns document counts for collections and distinct notes.
 func (s *Store) Stats(ctx context.Context) (map[string]int64, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -148,8 +148,73 @@ func (s *Store) Stats(ctx context.Context) (map[string]int64, error) {
 	if err != nil {
 		return nil, fmt.Errorf("stats links count: %w", err)
 	}
+	var distinctNotes int64
+	if nc > 0 {
+		seen := make(map[string]struct{})
+		offset := 0
+		batchSize := 500
+		for {
+			res, err := s.chunks.Get(ctx,
+				chroma.WithWhere(chroma.EqInt("chunk_index", 0)),
+				chroma.WithLimit(batchSize),
+				chroma.WithOffset(offset),
+				chroma.WithInclude(chroma.IncludeMetadatas),
+			)
+			if err != nil || res == nil {
+				break
+			}
+			metas := res.GetMetadatas()
+			if len(metas) == 0 {
+				break
+			}
+			for _, m := range metas {
+				if m == nil {
+					continue
+				}
+				if slug, ok := m.GetString("note_slug"); ok && slug != "" {
+					seen[slug] = struct{}{}
+				}
+			}
+			if len(metas) < batchSize {
+				break
+			}
+			offset += batchSize
+		}
+		// Fallback in case chunk_index=0 filter didn't match anything (e.g. older index format)
+		if len(seen) == 0 {
+			offset = 0
+			for {
+				res, err := s.chunks.Get(ctx,
+					chroma.WithLimit(batchSize),
+					chroma.WithOffset(offset),
+					chroma.WithInclude(chroma.IncludeMetadatas),
+				)
+				if err != nil || res == nil {
+					break
+				}
+				metas := res.GetMetadatas()
+				if len(metas) == 0 {
+					break
+				}
+				for _, m := range metas {
+					if m == nil {
+						continue
+					}
+					if slug, ok := m.GetString("note_slug"); ok && slug != "" {
+						seen[slug] = struct{}{}
+					}
+				}
+				if len(metas) < batchSize {
+					break
+				}
+				offset += batchSize
+			}
+		}
+		distinctNotes = int64(len(seen))
+	}
 	return map[string]int64{
 		"chunks": int64(nc),
 		"links":  int64(nl),
+		"notes":  distinctNotes,
 	}, nil
 }

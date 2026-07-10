@@ -27,6 +27,61 @@ func TestStoreOpenClose(t *testing.T) {
 	if stats["links"] != 0 {
 		t.Errorf("Expected 0 links, got %d", stats["links"])
 	}
+	if stats["notes"] != 0 {
+		t.Errorf("Expected 0 notes, got %d", stats["notes"])
+	}
+}
+
+func TestStats_UniqueNotesCount(t *testing.T) {
+	ctx := context.Background()
+	st, err := Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatalf("Open failed: %v", err)
+	}
+	defer func() { _ = st.Close() }()
+
+	chunks := []ChunkRecord{
+		{
+			ID:         "note-a:0",
+			NoteSlug:   "note-a",
+			Title:      "Note A",
+			ChunkIndex: 0,
+			Text:       "First chunk of A",
+			Embedding:  []float32{0.1, 0.2, 0.3},
+		},
+		{
+			ID:         "note-a:1",
+			NoteSlug:   "note-a",
+			Title:      "Note A",
+			ChunkIndex: 1,
+			Text:       "Second chunk of A",
+			Embedding:  []float32{0.2, 0.3, 0.4},
+		},
+		{
+			ID:         "note-b:0",
+			NoteSlug:   "note-b",
+			Title:      "Note B",
+			ChunkIndex: 0,
+			Text:       "First chunk of B",
+			Embedding:  []float32{0.3, 0.4, 0.5},
+		},
+	}
+
+	if err := st.UpsertChunks(ctx, chunks); err != nil {
+		t.Fatalf("UpsertChunks failed: %v", err)
+	}
+
+	stats, err := st.Stats(ctx)
+	if err != nil {
+		t.Fatalf("Stats failed: %v", err)
+	}
+
+	if stats["chunks"] != 3 {
+		t.Errorf("Expected 3 chunks, got %d", stats["chunks"])
+	}
+	if stats["notes"] != 2 {
+		t.Errorf("Expected 2 distinct notes, got %d", stats["notes"])
+	}
 }
 
 func TestStoreReset(t *testing.T) {

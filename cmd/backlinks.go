@@ -26,7 +26,7 @@ import (
 )
 
 type BacklinksCmd struct {
-	Note string `arg:"" help:"Note slug"`
+	Note string `arg:"" help:"note slug, title, or file path (auto-resolved)"`
 }
 
 func (c *BacklinksCmd) Run(globals *Globals) error {

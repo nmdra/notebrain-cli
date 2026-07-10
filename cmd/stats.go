@@ -58,7 +58,8 @@ func (c *StatsCmd) Run(globals *Globals) error {
 
 	initStyles()
 	rows := fmt.Sprintf(
-		"%s  %d\n%s  %d",
+		"%s  %d\n%s  %d\n%s  %d",
+		lipgloss.NewStyle().Bold(true).Render("Notes "), stats["notes"],
 		lipgloss.NewStyle().Bold(true).Render("Chunks"), stats["chunks"],
 		lipgloss.NewStyle().Bold(true).Render("Links "), stats["links"],
 	)
