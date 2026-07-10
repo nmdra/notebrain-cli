@@ -13,6 +13,27 @@ const (
 	CollectionLinks  = "nb_links"
 )
 
+var defaultChunksMeta = map[string]any{
+	"hnsw:space":           "cosine",
+	"hnsw:search_ef":       50, // Lower value improves query speed
+	"hnsw:num_threads":     1,  // Prevent hnswlib background thread crash
+	"hnsw:M":               32, // Prevent isolated nodes and HNSW integrity check assertion crashes
+	"hnsw:construction_ef": 200,
+}
+
+var defaultLinksMeta = map[string]any{
+	"hnsw:space":       "l2",
+	"hnsw:num_threads": 1,
+}
+
+func cloneMetaMap(m map[string]any) map[string]any {
+	c := make(map[string]any, len(m))
+	for k, v := range m {
+		c[k] = v
+	}
+	return c
+}
+
 // Store wraps two ChromaDB collections.
 type Store struct {
 	client          chroma.Client
@@ -43,13 +64,7 @@ func Open(ctx context.Context, path string) (*Store, error) {
 	}
 
 	// Tune HNSW index for chunks (MiniLM embeddings are cosine-optimized)
-	chunksMeta := map[string]any{
-		"hnsw:space":           "cosine",
-		"hnsw:search_ef":       50, // Lower value improves query speed
-		"hnsw:num_threads":     1,  // Prevent hnswlib background thread crash
-		"hnsw:M":               32, // Prevent isolated nodes and HNSW integrity check assertion crashes
-		"hnsw:construction_ef": 200,
-	}
+	chunksMeta := cloneMetaMap(defaultChunksMeta)
 
 	suppressOutputs(func() {
 		chunks, err = client.GetOrCreateCollection(ctx, CollectionChunks, chroma.WithCollectionMetadataMapCreateStrict(chunksMeta))
@@ -63,10 +78,7 @@ func Open(ctx context.Context, path string) (*Store, error) {
 	}
 
 	// Tune HNSW index for links (uses dummy embeddings, L2 distance avoids cosine degeneracy)
-	linksMeta := map[string]any{
-		"hnsw:space":       "l2",
-		"hnsw:num_threads": 1,
-	}
+	linksMeta := cloneMetaMap(defaultLinksMeta)
 
 	suppressOutputs(func() {
 		links, err = client.GetOrCreateCollection(ctx, CollectionLinks, chroma.WithCollectionMetadataMapCreateStrict(linksMeta))
@@ -97,25 +109,17 @@ func (s *Store) Reset(ctx context.Context) error {
 		}
 	}
 
-	chunksMeta := map[string]any{
-		"hnsw:space":           "cosine",
-		"hnsw:search_ef":       50,
-		"hnsw:num_threads":     1,
-		"hnsw:M":               32, // Prevent isolated nodes and HNSW integrity check assertion crashes
-		"hnsw:construction_ef": 200,
-	}
 	var err error
-	s.chunks, err = s.client.GetOrCreateCollection(ctx, CollectionChunks, chroma.WithCollectionMetadataMapCreateStrict(chunksMeta))
+	s.chunks, err = s.client.GetOrCreateCollection(ctx, CollectionChunks, chroma.WithCollectionMetadataMapCreateStrict(cloneMetaMap(defaultChunksMeta)))
 	if err != nil {
-		return err
+		return fmt.Errorf("recreate chunks collection: %w", err)
 	}
 
-	linksMeta := map[string]any{
-		"hnsw:space":       "l2",
-		"hnsw:num_threads": 1,
+	s.links, err = s.client.GetOrCreateCollection(ctx, CollectionLinks, chroma.WithCollectionMetadataMapCreateStrict(cloneMetaMap(defaultLinksMeta)))
+	if err != nil {
+		return fmt.Errorf("recreate links collection: %w", err)
 	}
-	s.links, err = s.client.GetOrCreateCollection(ctx, CollectionLinks, chroma.WithCollectionMetadataMapCreateStrict(linksMeta))
-	return err
+	return nil
 }
 
 // Stats returns document counts for both collections.
@@ -124,11 +128,11 @@ func (s *Store) Stats(ctx context.Context) (map[string]int64, error) {
 	defer s.mu.RUnlock()
 	nc, err := s.chunks.Count(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("stats chunks count: %w", err)
 	}
 	nl, err := s.links.Count(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("stats links count: %w", err)
 	}
 	return map[string]int64{
 		"chunks": int64(nc),

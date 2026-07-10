@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sort"
 	"strings"
 
@@ -337,10 +338,13 @@ func (s *Store) Connections(ctx context.Context, seedSlug string, maxHops int) (
 		var next []string
 		for _, src := range frontier {
 			// Outgoing links
-			out, _ := s.links.Get(ctx,
+			out, err := s.links.Get(ctx,
 				chroma.WithWhere(chroma.EqString("source_slug", src)),
 				chroma.WithInclude(chroma.IncludeMetadatas),
 			)
+			if err != nil {
+				return nil, fmt.Errorf("connections out: %w", wrapChromaErr(err))
+			}
 			if out != nil {
 				for _, meta := range out.GetMetadatas() {
 					if s.SkipAttachments && (parser.IsAttachmentLink(metaString(meta, "target_path")) || parser.IsAttachmentLink(metaString(meta, "display_text"))) {
@@ -354,10 +358,13 @@ func (s *Store) Connections(ctx context.Context, seedSlug string, maxHops int) (
 				}
 			}
 			// Incoming links (bidirectional)
-			in, _ := s.links.Get(ctx,
+			in, err := s.links.Get(ctx,
 				chroma.WithWhere(chroma.EqString("target_slug", src)),
 				chroma.WithInclude(chroma.IncludeMetadatas),
 			)
+			if err != nil {
+				return nil, fmt.Errorf("connections in: %w", wrapChromaErr(err))
+			}
 			if in != nil {
 				for _, meta := range in.GetMetadatas() {
 					if s.SkipAttachments && (parser.IsAttachmentLink(metaString(meta, "target_path")) || parser.IsAttachmentLink(metaString(meta, "display_text"))) {
@@ -404,7 +411,10 @@ func (s *Store) HiddenConnections(ctx context.Context, queryVec []float32, seedS
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	// 1. Collect all slugs already linked to/from seed
-	linked := s.linkedSlugs(ctx, seedSlug)
+	linked, err := s.linkedSlugs(ctx, seedSlug)
+	if err != nil {
+		return nil, err
+	}
 	linked[seedSlug] = true
 
 	// 2. Wide semantic search
@@ -438,7 +448,11 @@ func (s *Store) HiddenConnectionsDeep(ctx context.Context, seedSlug string, limi
 
 	s.mu.RLock()
 	// 1. Collect all slugs already linked to/from seed
-	linked := s.linkedSlugs(ctx, seedSlug)
+	linked, err := s.linkedSlugs(ctx, seedSlug)
+	if err != nil {
+		s.mu.RUnlock()
+		return nil, nil, err
+	}
 	linked[seedSlug] = true
 
 	// 2. Fetch all stored chunks and embeddings for the seed note
@@ -582,6 +596,7 @@ func CombineWhereFilters(f1, f2 chroma.WhereFilter) chroma.WhereFilter {
 	if ok1 && ok2 {
 		return chroma.And(wc1, wc2)
 	}
+	slog.Warn("CombineWhereFilters: could not combine filters, using first only")
 	return f1
 }
 
@@ -623,7 +638,10 @@ func (s *Store) TagSearch(ctx context.Context, tag string, limit int, whereFilte
 func (s *Store) GraphBoostedSearch(ctx context.Context, queryVec []float32, seedSlug string, boost float64, limit int, includeText bool) ([]Result, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	linked := s.linkedSlugs(ctx, seedSlug)
+	linked, err := s.linkedSlugs(ctx, seedSlug)
+	if err != nil {
+		return nil, err
+	}
 
 	candidates, err := s.semanticSearch(ctx, queryVec, limit*3, 1, nil, includeText)
 	if err != nil {
@@ -695,6 +713,7 @@ func deduplicateByNote(res chroma.QueryResult, limit int, topKPerNote int) []Res
 			Title:       metaString(meta, "title"),
 			FilePath:    metaString(meta, "file_path"),
 			Score:       float64(1 - dist), // convert distance → similarity
+			ChunkIndex:  metaInt(meta, "chunk_index"),
 			HeadingPath: metaString(meta, "heading_path"),
 			Text:        txt,
 			Tags:        decodeTags(meta),
@@ -718,6 +737,7 @@ func getResultToResults(res chroma.GetResult, limit int) []Result {
 	type best struct {
 		title       string
 		filePath    string
+		chunkIndex  int
 		headingPath string
 		text        string
 		tags        []string
@@ -737,6 +757,7 @@ func getResultToResults(res chroma.GetResult, limit int) []Result {
 			seen[slug] = &best{
 				title:       metaString(meta, "title"),
 				filePath:    metaString(meta, "file_path"),
+				chunkIndex:  metaInt(meta, "chunk_index"),
 				headingPath: metaString(meta, "heading_path"),
 				text:        txt,
 				tags:        decodeTags(meta),
@@ -751,6 +772,7 @@ func getResultToResults(res chroma.GetResult, limit int) []Result {
 			Title:       b.title,
 			FilePath:    b.filePath,
 			Score:       1.0,
+			ChunkIndex:  b.chunkIndex,
 			HeadingPath: b.headingPath,
 			Text:        b.text,
 			Tags:        b.tags,
@@ -764,12 +786,15 @@ func getResultToResults(res chroma.GetResult, limit int) []Result {
 }
 
 // linkedSlugs returns a set of note slugs linked to/from slug.
-func (s *Store) linkedSlugs(ctx context.Context, slug string) map[string]bool {
+func (s *Store) linkedSlugs(ctx context.Context, slug string) (map[string]bool, error) {
 	set := map[string]bool{}
-	out, _ := s.links.Get(ctx,
+	out, err := s.links.Get(ctx,
 		chroma.WithWhere(chroma.EqString("source_slug", slug)),
 		chroma.WithInclude(chroma.IncludeMetadatas),
 	)
+	if err != nil {
+		return nil, fmt.Errorf("linkedSlugs out: %w", wrapChromaErr(err))
+	}
 	if out != nil {
 		for _, m := range out.GetMetadatas() {
 			if t := metaString(m, "target_slug"); t != "" {
@@ -777,10 +802,13 @@ func (s *Store) linkedSlugs(ctx context.Context, slug string) map[string]bool {
 			}
 		}
 	}
-	in, _ := s.links.Get(ctx,
+	in, err := s.links.Get(ctx,
 		chroma.WithWhere(chroma.EqString("target_slug", slug)),
 		chroma.WithInclude(chroma.IncludeMetadatas),
 	)
+	if err != nil {
+		return nil, fmt.Errorf("linkedSlugs in: %w", wrapChromaErr(err))
+	}
 	if in != nil {
 		for _, m := range in.GetMetadatas() {
 			if src := metaString(m, "source_slug"); src != "" {
@@ -788,7 +816,7 @@ func (s *Store) linkedSlugs(ctx context.Context, slug string) map[string]bool {
 			}
 		}
 	}
-	return set
+	return set, nil
 }
 
 // tagsForNote fetches the tags of the first chunk of noteSlug.
@@ -808,13 +836,8 @@ func (s *Store) tagsForNote(ctx context.Context, noteSlug string) []string {
 
 // notesWithTag returns distinct note slugs that have the given tag.
 func (s *Store) notesWithTag(ctx context.Context, tag string) []string {
-	// Query all chunks for each possible tag_N position (up to 20 tags)
-	var filters []chroma.WhereClause
-	for n := range 20 {
-		filters = append(filters, chroma.EqString(fmt.Sprintf("tag_%d", n), tag))
-	}
 	res, err := s.chunks.Get(ctx,
-		chroma.WithWhere(chroma.Or(filters...)),
+		chroma.WithWhere(TagWhereClause(tag)),
 		chroma.WithInclude(chroma.IncludeMetadatas),
 	)
 	if err != nil || len(res.GetMetadatas()) == 0 {

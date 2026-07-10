@@ -180,7 +180,11 @@ func extractSections(doc ast.Node, src []byte) []section {
 			lang := ""
 			if node.Info != nil {
 				lang = string(node.Info.Segment.Value(src))
-				lang = strings.Fields(lang)[0] // strip trailing options
+				if fields := strings.Fields(lang); len(fields) > 0 {
+					lang = fields[0] // strip trailing options
+				} else {
+					lang = ""
+				}
 			}
 			var code strings.Builder
 			for i := 0; i < node.Lines().Len(); i++ {

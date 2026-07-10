@@ -356,7 +356,7 @@ func buildChunkMeta(c ChunkRecord) map[string]any {
 		"has_task":      c.HasTask,
 		"code_blocks":   c.CodeBlocks,
 		"has_code":      c.CodeBlocks > 0,
-		"modified_ms":   int(c.ModifiedMs),
+		"modified_ms":   c.ModifiedMs,
 		"content_hash":  c.ContentHash,
 		"tag_count":     len(c.Tags),
 	}
