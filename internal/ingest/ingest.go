@@ -3,6 +3,7 @@ package ingest
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"io/fs"
@@ -73,7 +74,10 @@ func (p *Pipeline) Run(ctx context.Context, vaultPath string, glob string, stdin
 		return nil
 	}
 
-	hashes, _ := p.store.GetNoteHashes(ctx)
+	hashes, err := p.store.GetNoteHashes(ctx)
+	if err != nil {
+		slog.Warn("could not fetch existing note hashes, proceeding with full check", "err", err)
+	}
 	if hashes == nil {
 		hashes = make(map[string]string)
 	}
@@ -256,7 +260,8 @@ func (p *Pipeline) processFile(ctx context.Context, vaultPath string, filePath s
 
 	slug := parser.Slugify(relPath)
 
-	hash := fmt.Sprintf("%x", sha256.Sum256(content))
+	sum := sha256.Sum256(content)
+	hash := hex.EncodeToString(sum[:])
 	if knownHashes[slug] == hash {
 		return nil, nil
 	}

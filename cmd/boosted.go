@@ -25,7 +25,6 @@ import (
 	"fmt"
 
 	"github.com/nmdra/notebrain-cli/v2/internal/embedder"
-	"github.com/nmdra/notebrain-cli/v2/internal/store"
 )
 
 type BoostedCmd struct {
@@ -41,14 +40,12 @@ func (c *BoostedCmd) Run(globals *Globals) error {
 	boost := c.Boost
 	limit := c.Limit
 
-	chromaPath := globals.ChromaPath
 	ctx := globals.Ctx
-	st, err := store.Open(ctx, chromaPath)
+	st, err := openStore(ctx, globals)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = st.Close() }()
-	st.SkipAttachments = globals.SkipAttachments
 
 	seedSlug, err := st.ResolveNoteSlug(ctx, seed)
 	if err != nil {

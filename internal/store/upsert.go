@@ -77,17 +77,7 @@ func (s *Store) BatchIngest(ctx context.Context, data []BatchIngestData, staleSl
 			end := min(i+batchSize, len(slugsToClean))
 			batchSlugs := slugsToClean[i:end]
 
-			filters := make([]chroma.WhereClause, 0, len(batchSlugs))
-			for _, slug := range batchSlugs {
-				filters = append(filters, chroma.EqString("note_slug", slug))
-			}
-
-			var whereFilter chroma.WhereFilter
-			if len(filters) == 1 {
-				whereFilter = filters[0]
-			} else {
-				whereFilter = chroma.Or(filters...)
-			}
+			whereFilter := buildSlugFilter(batchSlugs, "note_slug")
 
 			// Fetch existing chunk IDs
 			resChunks, err := s.chunks.Get(ctx,
@@ -105,17 +95,7 @@ func (s *Store) BatchIngest(ctx context.Context, data []BatchIngestData, staleSl
 				}
 			}
 
-			// Fetch existing links IDs (links metadata uses source_slug instead of note_slug)
-			linksFilters := make([]chroma.WhereClause, 0, len(batchSlugs))
-			for _, slug := range batchSlugs {
-				linksFilters = append(linksFilters, chroma.EqString("source_slug", slug))
-			}
-			var linksWhereFilter chroma.WhereFilter
-			if len(linksFilters) == 1 {
-				linksWhereFilter = linksFilters[0]
-			} else {
-				linksWhereFilter = chroma.Or(linksFilters...)
-			}
+			linksWhereFilter := buildSlugFilter(batchSlugs, "source_slug")
 
 			resLinks, err := s.links.Get(ctx,
 				chroma.WithWhere(linksWhereFilter),
@@ -159,6 +139,20 @@ func (s *Store) BatchIngest(ctx context.Context, data []BatchIngestData, staleSl
 	}
 
 	return nil
+}
+
+func buildSlugFilter(slugs []string, key string) chroma.WhereFilter {
+	if len(slugs) == 0 {
+		return nil
+	}
+	if len(slugs) == 1 {
+		return chroma.EqString(key, slugs[0])
+	}
+	filters := make([]chroma.WhereClause, len(slugs))
+	for i, slug := range slugs {
+		filters[i] = chroma.EqString(key, slug)
+	}
+	return chroma.Or(filters...)
 }
 
 // UpsertChunks stores a batch of chunks (upsert = insert or replace by ID).
@@ -356,7 +350,7 @@ func buildChunkMeta(c ChunkRecord) map[string]any {
 		"has_task":      c.HasTask,
 		"code_blocks":   c.CodeBlocks,
 		"has_code":      c.CodeBlocks > 0,
-		"modified_ms":   int(c.ModifiedMs),
+		"modified_ms":   c.ModifiedMs,
 		"content_hash":  c.ContentHash,
 		"tag_count":     len(c.Tags),
 	}

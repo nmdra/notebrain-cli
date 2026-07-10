@@ -50,253 +50,239 @@ func setupTestData(t *testing.T, ctx context.Context, st *store.Store) {
 	}
 }
 
-func TestQueries(t *testing.T) {
+func setupStoreTest(t *testing.T) (context.Context, *store.Store, []float32) {
 	ctx := context.Background()
-	st, err := store.Open(ctx, t.TempDir())
-	if err != nil {
-		t.Fatalf("Open failed: %v", err)
-	}
-	defer func() { _ = st.Close() }()
-
+	st := newTestStore(t)
 	setupTestData(t, ctx, st)
+	return ctx, st, []float32{1.0, 0.0, 0.0}
+}
 
-	qVec := []float32{1.0, 0.0, 0.0}
+func TestSemanticSearch(t *testing.T) {
+	ctx, st, qVec := setupStoreTest(t)
+	res, err := st.SemanticSearch(ctx, qVec, 10, 1, nil, false)
+	if err != nil {
+		t.Fatalf("SemanticSearch failed: %v", err)
+	}
+	if len(res) == 0 || res[0].NoteSlug != "note-a" {
+		t.Errorf("Expected note-a to be best match, got %v", res)
+	}
+}
 
-	t.Run("SemanticSearch", func(t *testing.T) {
-		res, err := st.SemanticSearch(ctx, qVec, 10, 1, nil, false)
-		if err != nil {
-			t.Fatalf("SemanticSearch failed: %v", err)
-		}
-		if len(res) == 0 || res[0].NoteSlug != "note-a" {
-			t.Errorf("Expected note-a to be best match, got %v", res)
-		}
-	})
+func TestBacklinks(t *testing.T) {
+	ctx, st, _ := setupStoreTest(t)
+	res, err := st.Backlinks(ctx, "note-b")
+	if err != nil {
+		t.Fatalf("Backlinks failed: %v", err)
+	}
+	if len(res) == 0 || res[0].NoteSlug != "note-a" {
+		t.Errorf("Expected note-a to backlink to note-b, got %v", res)
+	}
+}
 
-	t.Run("Backlinks", func(t *testing.T) {
-		res, err := st.Backlinks(ctx, "note-b")
-		if err != nil {
-			t.Fatalf("Backlinks failed: %v", err)
-		}
-		if len(res) == 0 || res[0].NoteSlug != "note-a" {
-			t.Errorf("Expected note-a to backlink to note-b, got %v", res)
-		}
-	})
+func TestConnections(t *testing.T) {
+	ctx, st, _ := setupStoreTest(t)
+	res, err := st.Connections(ctx, "note-a", 1)
+	if err != nil {
+		t.Fatalf("Connections failed: %v", err)
+	}
+	if len(res) == 0 || res[0].NoteSlug != "note-b" {
+		t.Errorf("Expected note-b to be connected to note-a, got %v", res)
+	}
+}
 
-	t.Run("Connections", func(t *testing.T) {
-		res, err := st.Connections(ctx, "note-a", 1)
-		if err != nil {
-			t.Fatalf("Connections failed: %v", err)
-		}
-		if len(res) == 0 || res[0].NoteSlug != "note-b" {
-			t.Errorf("Expected note-b to be connected to note-a, got %v", res)
-		}
-	})
+func TestHiddenConnections(t *testing.T) {
+	ctx, st, qVec := setupStoreTest(t)
+	chunks := []store.ChunkRecord{
+		{
+			ID:         "note-c:0",
+			NoteSlug:   "note-c",
+			Title:      "Note C",
+			FilePath:   "Note C.md",
+			ChunkIndex: 0,
+			Text:       "text about golang",
+			Tags:       []string{"go"},
+			HasLinks:   false,
+			Embedding:  []float32{0.9, 0.0, 0.0},
+		},
+	}
+	_ = st.UpsertChunks(ctx, chunks)
 
-	t.Run("HiddenConnections", func(t *testing.T) {
-		// query that matches note-a, but note-a is linked from note-a (self).
-		// note-b is linked. Let's find note-c that is similar but not linked.
-		chunks := []store.ChunkRecord{
-			{
-				ID:         "note-c:0",
-				NoteSlug:   "note-c",
-				Title:      "Note C",
-				FilePath:   "Note C.md",
-				ChunkIndex: 0,
-				Text:       "text about golang",
-				Tags:       []string{"go"},
-				HasLinks:   false,
-				Embedding:  []float32{0.9, 0.0, 0.0},
-			},
-		}
-		_ = st.UpsertChunks(ctx, chunks)
+	hidden, err := st.HiddenConnections(ctx, qVec, "note-a", 10, false)
+	if err != nil {
+		t.Fatalf("HiddenConnections failed: %v", err)
+	}
+	if len(hidden) == 0 || hidden[0].NoteSlug != "note-c" {
+		t.Errorf("Expected note-c to be hidden connection to note-a, got %v", hidden)
+	}
+}
 
-		hidden, err := st.HiddenConnections(ctx, qVec, "note-a", 10, false)
-		if err != nil {
-			t.Fatalf("HiddenConnections failed: %v", err)
-		}
-		if len(hidden) == 0 || hidden[0].NoteSlug != "note-c" {
-			t.Errorf("Expected note-c to be hidden connection to note-a, got %v", hidden)
-		}
-	})
+func TestHiddenConnectionsDeep(t *testing.T) {
+	ctx, st, _ := setupStoreTest(t)
+	chunks := []store.ChunkRecord{
+		{
+			ID:         "note-c:0",
+			NoteSlug:   "note-c",
+			Title:      "Note C",
+			FilePath:   "Note C.md",
+			ChunkIndex: 0,
+			Text:       "text about golang",
+			Tags:       []string{"go"},
+			HasLinks:   false,
+			Embedding:  []float32{0.9, 0.0, 0.0},
+		},
+	}
+	_ = st.UpsertChunks(ctx, chunks)
 
-	t.Run("HiddenConnectionsDeep", func(t *testing.T) {
-		chunks := []store.ChunkRecord{
-			{
-				ID:         "note-c:0",
-				NoteSlug:   "note-c",
-				Title:      "Note C",
-				FilePath:   "Note C.md",
-				ChunkIndex: 0,
-				Text:       "text about golang",
-				Tags:       []string{"go"},
-				HasLinks:   false,
-				Embedding:  []float32{0.9, 0.0, 0.0},
-			},
-		}
-		_ = st.UpsertChunks(ctx, chunks)
+	hidden, seedChunks, err := st.HiddenConnectionsDeep(ctx, "note-a", 10, 3, false)
+	if err != nil {
+		t.Fatalf("HiddenConnectionsDeep failed: %v", err)
+	}
+	if len(hidden) == 0 || hidden[0].NoteSlug != "note-c" {
+		t.Errorf("Expected note-c to be deep hidden connection to note-a, got %v", hidden)
+	}
+	if len(seedChunks) == 0 {
+		t.Errorf("Expected non-empty seedChunks, got %v", seedChunks)
+	}
+	if len(hidden) > 0 && len(hidden[0].MatchedQueries) == 0 {
+		t.Errorf("Expected MatchedQueries to be populated on result, got %v", hidden[0].MatchedQueries)
+	}
 
-		// note-a has 1 chunk with embedding [1.0, 0.0, 0.0].
-		// note-b is linked to note-a. note-c is unlinked with embedding [0.9, 0.0, 0.0].
-		hidden, seedChunks, err := st.HiddenConnectionsDeep(ctx, "note-a", 10, 3, false)
-		if err != nil {
-			t.Fatalf("HiddenConnectionsDeep failed: %v", err)
-		}
-		if len(hidden) == 0 || hidden[0].NoteSlug != "note-c" {
-			t.Errorf("Expected note-c to be deep hidden connection to note-a, got %v", hidden)
-		}
-		if len(seedChunks) == 0 {
-			t.Errorf("Expected non-empty seedChunks, got %v", seedChunks)
-		}
-		if len(hidden) > 0 && len(hidden[0].MatchedQueries) == 0 {
-			t.Errorf("Expected MatchedQueries to be populated on result, got %v", hidden[0].MatchedQueries)
-		}
+	_, _, err = st.HiddenConnectionsDeep(ctx, "non-existent-note", 10, 3, false)
+	if err == nil {
+		t.Errorf("Expected error for non-existent note in deep hidden check, got nil")
+	}
+}
 
-		// Verify error when querying a non-existent seed note
-		_, _, err = st.HiddenConnectionsDeep(ctx, "non-existent-note", 10, 3, false)
-		if err == nil {
-			t.Errorf("Expected error for non-existent note in deep hidden check, got nil")
-		}
-	})
+func TestMultiSemanticSearch_ThresholdFiltering(t *testing.T) {
+	ctx, st, _ := setupStoreTest(t)
+	chunks := []store.ChunkRecord{
+		{
+			ID:         "note-x:0",
+			NoteSlug:   "note-x",
+			Title:      "Note X",
+			FilePath:   "Note X.md",
+			ChunkIndex: 0,
+			Text:       "target vector alignment",
+			Embedding:  []float32{1.0, 0.0, 0.0},
+		},
+	}
+	_ = st.UpsertChunks(ctx, chunks)
 
-	t.Run("MultiSemanticSearch_ThresholdFiltering", func(t *testing.T) {
-		// Test two-tier filtering: a candidate note with one strong match (>= 0.70) should not include weak noise matches (< 0.70 / < 85% peak)
-		chunks := []store.ChunkRecord{
-			{
-				ID:         "note-x:0",
-				NoteSlug:   "note-x",
-				Title:      "Note X",
-				FilePath:   "Note X.md",
-				ChunkIndex: 0,
-				Text:       "target vector alignment",
-				Embedding:  []float32{1.0, 0.0, 0.0},
-			},
-		}
-		_ = st.UpsertChunks(ctx, chunks)
+	queryVecs := [][]float32{
+		{1.0, 0.0, 0.0},
+		{0.4, 0.9165, 0.0},
+	}
+	queries := []string{"§ StrongMatch", "§ WeakMatch"}
 
-		queryVecs := [][]float32{
-			{1.0, 0.0, 0.0},    // exact match -> cosine similarity ~ 1.0 (StrongMatch)
-			{0.4, 0.9165, 0.0}, // orthogonal/weak match -> cosine similarity ~ 0.40 (WeakMatch)
-		}
-		queries := []string{"§ StrongMatch", "§ WeakMatch"}
-
-		res, err := st.MultiSemanticSearch(ctx, queryVecs, queries, 10, 3, nil, false)
-		if err != nil {
-			t.Fatalf("MultiSemanticSearch failed: %v", err)
-		}
-		if len(res) == 0 {
-			t.Fatalf("Expected results from MultiSemanticSearch, got 0")
-		}
-		for _, r := range res {
-			if r.NoteSlug == "note-x" {
-				for _, mq := range r.MatchedQueries {
-					if mq == "§ WeakMatch" {
-						t.Errorf("Expected § WeakMatch to be filtered out by threshold, but got MatchedQueries=%v", r.MatchedQueries)
-					}
-				}
-				foundStrong := false
-				for _, mq := range r.MatchedQueries {
-					if mq == "§ StrongMatch" {
-						foundStrong = true
-					}
-				}
-				if !foundStrong {
-					t.Errorf("Expected § StrongMatch in MatchedQueries, got %v", r.MatchedQueries)
+	res, err := st.MultiSemanticSearch(ctx, queryVecs, queries, 10, 3, nil, false)
+	if err != nil {
+		t.Fatalf("MultiSemanticSearch failed: %v", err)
+	}
+	if len(res) == 0 {
+		t.Fatalf("Expected results from MultiSemanticSearch, got 0")
+	}
+	for _, r := range res {
+		if r.NoteSlug == "note-x" {
+			for _, mq := range r.MatchedQueries {
+				if mq == "§ WeakMatch" {
+					t.Errorf("Expected § WeakMatch to be filtered out by threshold, but got MatchedQueries=%v", r.MatchedQueries)
 				}
 			}
-		}
-	})
-
-	t.Run("SharedTags", func(t *testing.T) {
-		res, err := st.SharedTags(ctx, "note-a", 1)
-		if err != nil {
-			t.Fatalf("SharedTags failed: %v", err)
-		}
-		if len(res) == 0 {
-			t.Fatalf("Expected shared tags, got none")
-		}
-		found := false
-		for _, r := range res {
-			if r.NoteSlug == "note-b" {
-				found = true
+			foundStrong := false
+			for _, mq := range r.MatchedQueries {
+				if mq == "§ StrongMatch" {
+					foundStrong = true
+				}
+			}
+			if !foundStrong {
+				t.Errorf("Expected § StrongMatch in MatchedQueries, got %v", r.MatchedQueries)
 			}
 		}
-		if !found {
-			t.Errorf("Expected note-b to share tags with note-a")
-		}
-	})
+	}
+}
 
-	t.Run("GraphBoostedSearch", func(t *testing.T) {
-		// Querying near note-a, with seed note-b and boost
-		boosted, err := st.GraphBoostedSearch(ctx, qVec, "note-b", 0.5, 10, false)
-		if err != nil {
-			t.Fatalf("GraphBoostedSearch failed: %v", err)
+func TestSharedTags(t *testing.T) {
+	ctx, st, _ := setupStoreTest(t)
+	res, err := st.SharedTags(ctx, "note-a", 1)
+	if err != nil {
+		t.Fatalf("SharedTags failed: %v", err)
+	}
+	if len(res) == 0 {
+		t.Fatalf("Expected shared tags, got none")
+	}
+	found := false
+	for _, r := range res {
+		if r.NoteSlug == "note-b" {
+			found = true
 		}
-		if len(boosted) == 0 {
-			t.Fatalf("Expected results, got none")
-		}
+	}
+	if !found {
+		t.Errorf("Expected note-b to share tags with note-a")
+	}
+}
 
-		found := false
-		for _, r := range boosted {
-			if r.NoteSlug == "note-b" {
-				found = true
+func TestGraphBoostedSearch(t *testing.T) {
+	ctx, st, qVec := setupStoreTest(t)
+	boosted, err := st.GraphBoostedSearch(ctx, qVec, "note-b", 0.5, 10, false)
+	if err != nil {
+		t.Fatalf("GraphBoostedSearch failed: %v", err)
+	}
+	if len(boosted) == 0 {
+		t.Fatalf("Expected results, got none")
+	}
+
+	found := false
+	for _, r := range boosted {
+		if r.NoteSlug == "note-b" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("Expected note-b in boosted results")
+	}
+}
+
+func TestResolveNoteSlug(t *testing.T) {
+	ctx, st, _ := setupStoreTest(t)
+
+	tests := []struct {
+		name    string
+		input   string
+		want    string
+		wantErr bool
+	}{
+		{"empty", "", "", false},
+		{"exact match", "note-a", "note-a", false},
+		{"from title", "Note A", "note-a", false},
+		{"from filename", "Note A.md", "note-a", false},
+		{"from suffix", "e-a", "note-a", false},
+		{"note-b exact", "note-b", "note-b", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := st.ResolveNoteSlug(ctx, tt.input)
+			if (err != nil) != tt.wantErr || got != tt.want {
+				t.Errorf("ResolveNoteSlug(%q) = %q, err: %v (want %q, wantErr: %v)", tt.input, got, err, tt.want, tt.wantErr)
 			}
-		}
-		if !found {
-			t.Errorf("Expected note-b in boosted results")
-		}
-	})
+		})
+	}
 
-	t.Run("ResolveNoteSlug", func(t *testing.T) {
-		got, err := st.ResolveNoteSlug(ctx, "")
-		if err != nil || got != "" {
-			t.Errorf("Expected empty string for empty input, got %q (err: %v)", got, err)
-		}
+	ambigChunks := []store.ChunkRecord{
+		{ID: "ambig-1:0", NoteSlug: "ambig-1", Title: "Ambig Note", FilePath: "dir1/Ambig Note.md", ChunkIndex: 0, Embedding: []float32{1.0, 0.0, 0.0}},
+		{ID: "ambig-2:0", NoteSlug: "ambig-2", Title: "Ambig Note", FilePath: "dir2/Ambig Note.md", ChunkIndex: 0, Embedding: []float32{1.0, 0.0, 0.0}},
+	}
+	_ = st.UpsertChunks(ctx, ambigChunks)
 
-		got, err = st.ResolveNoteSlug(ctx, "note-a")
-		if err != nil || got != "note-a" {
-			t.Errorf("Expected note-a exact match, got %s (err: %v)", got, err)
-		}
-
-		got, err = st.ResolveNoteSlug(ctx, "Note A")
-		if err != nil || got != "note-a" {
-			t.Errorf("Expected note-a from title, got %s (err: %v)", got, err)
-		}
-
-		got, err = st.ResolveNoteSlug(ctx, "Note A.md")
-		if err != nil || got != "note-a" {
-			t.Errorf("Expected note-a from filename, got %s (err: %v)", got, err)
-		}
-
-		got, err = st.ResolveNoteSlug(ctx, "e-a")
-		if err != nil || got != "note-a" {
-			t.Errorf("Expected note-a from suffix, got %s (err: %v)", got, err)
-		}
-
-		ambigChunks := []store.ChunkRecord{
-			{ID: "ambig-1:0", NoteSlug: "ambig-1", Title: "Ambig Note", FilePath: "dir1/Ambig Note.md", ChunkIndex: 0, Embedding: []float32{1.0, 0.0, 0.0}},
-			{ID: "ambig-2:0", NoteSlug: "ambig-2", Title: "Ambig Note", FilePath: "dir2/Ambig Note.md", ChunkIndex: 0, Embedding: []float32{1.0, 0.0, 0.0}},
-		}
-		_ = st.UpsertChunks(ctx, ambigChunks)
-
-		_, err = st.ResolveNoteSlug(ctx, "Ambig Note")
-		if err == nil || !strings.Contains(err.Error(), "matches multiple indexed notes") {
-			t.Errorf("Expected multiple match error for Ambig Note, got %v", err)
-		}
-
-		got, err = st.ResolveNoteSlug(ctx, "note-b")
-		if err != nil || got != "note-b" {
-			t.Errorf("Expected note-b, got %s (err: %v)", got, err)
-		}
-	})
+	_, err := st.ResolveNoteSlug(ctx, "Ambig Note")
+	if err == nil || !strings.Contains(err.Error(), "matches multiple indexed notes") {
+		t.Errorf("Expected multiple match error for Ambig Note, got %v", err)
+	}
 }
 
 func TestMultiSemanticSearch_WithText(t *testing.T) {
 	ctx := context.Background()
-	st, err := store.Open(ctx, t.TempDir())
-	if err != nil {
-		t.Fatalf("Open failed: %v", err)
-	}
-	defer func() { _ = st.Close() }()
+	st := newTestStore(t)
 
 	chunks := []store.ChunkRecord{
 		{
@@ -367,11 +353,7 @@ func TestTagWhereClause(t *testing.T) {
 
 func TestGetNoteHashes(t *testing.T) {
 	ctx := context.Background()
-	st, err := store.Open(ctx, t.TempDir())
-	if err != nil {
-		t.Fatalf("Open failed: %v", err)
-	}
-	defer func() { _ = st.Close() }()
+	st := newTestStore(t)
 
 	chunks := []store.ChunkRecord{
 		{
@@ -398,11 +380,7 @@ func TestGetNoteHashes(t *testing.T) {
 
 func TestTagSearch(t *testing.T) {
 	ctx := context.Background()
-	st, err := store.Open(ctx, t.TempDir())
-	if err != nil {
-		t.Fatalf("Open failed: %v", err)
-	}
-	defer func() { _ = st.Close() }()
+	st := newTestStore(t)
 
 	setupTestData(t, ctx, st)
 
@@ -417,11 +395,7 @@ func TestTagSearch(t *testing.T) {
 
 func TestGetNote(t *testing.T) {
 	ctx := context.Background()
-	st, err := store.Open(ctx, t.TempDir())
-	if err != nil {
-		t.Fatalf("Open failed: %v", err)
-	}
-	defer func() { _ = st.Close() }()
+	st := newTestStore(t)
 
 	setupTestData(t, ctx, st)
 
@@ -439,11 +413,7 @@ func TestGetNote(t *testing.T) {
 
 func TestSemanticSearch_TopKDeduplication(t *testing.T) {
 	ctx := context.Background()
-	st, err := store.Open(ctx, t.TempDir())
-	if err != nil {
-		t.Fatalf("Open failed: %v", err)
-	}
-	defer func() { _ = st.Close() }()
+	st := newTestStore(t)
 
 	chunks := []store.ChunkRecord{
 		{
@@ -505,11 +475,7 @@ func TestSemanticSearch_TopKDeduplication(t *testing.T) {
 
 func TestGetChunkWindow(t *testing.T) {
 	ctx := context.Background()
-	st, err := store.Open(ctx, t.TempDir())
-	if err != nil {
-		t.Fatalf("Open failed: %v", err)
-	}
-	defer func() { _ = st.Close() }()
+	st := newTestStore(t)
 
 	chunks := []store.ChunkRecord{
 		{
@@ -578,11 +544,7 @@ func TestGetChunkWindow(t *testing.T) {
 
 func TestConcurrentReadWrite(t *testing.T) {
 	ctx := context.Background()
-	st, err := store.Open(ctx, t.TempDir())
-	if err != nil {
-		t.Fatalf("Open failed: %v", err)
-	}
-	defer func() { _ = st.Close() }()
+	st := newTestStore(t)
 
 	setupTestData(t, ctx, st)
 
@@ -629,11 +591,7 @@ func TestConcurrentReadWrite(t *testing.T) {
 
 func TestConnections_PhantomAndAttachment(t *testing.T) {
 	ctx := context.Background()
-	st, err := store.Open(ctx, t.TempDir())
-	if err != nil {
-		t.Fatalf("Open failed: %v", err)
-	}
-	defer func() { _ = st.Close() }()
+	st := newTestStore(t)
 
 	chunks := []store.ChunkRecord{
 		{
@@ -709,11 +667,7 @@ func TestConnections_PhantomAndAttachment(t *testing.T) {
 
 func TestBacklinks_Attachment(t *testing.T) {
 	ctx := context.Background()
-	st, err := store.Open(ctx, t.TempDir())
-	if err != nil {
-		t.Fatalf("Open failed: %v", err)
-	}
-	defer func() { _ = st.Close() }()
+	st := newTestStore(t)
 
 	chunks := []store.ChunkRecord{
 		{
@@ -751,11 +705,7 @@ func TestBacklinks_Attachment(t *testing.T) {
 
 func TestMultiSemanticSearch(t *testing.T) {
 	ctx := context.Background()
-	st, err := store.Open(ctx, t.TempDir())
-	if err != nil {
-		t.Fatalf("Open failed: %v", err)
-	}
-	defer func() { _ = st.Close() }()
+	st := newTestStore(t)
 
 	chunks := []store.ChunkRecord{
 		{
@@ -811,5 +761,49 @@ func TestMultiSemanticSearch(t *testing.T) {
 	}
 	if len(res[0].MatchedQueries) != 2 {
 		t.Errorf("Expected 2 matched queries for note-c, got %v", res[0].MatchedQueries)
+	}
+}
+
+func TestMultiSemanticSearch_EmptyAndEdgeCases(t *testing.T) {
+	ctx := context.Background()
+	st := newTestStore(t)
+
+	res, err := st.MultiSemanticSearch(ctx, nil, nil, 10, 3, nil, false)
+	if err != nil {
+		t.Fatalf("MultiSemanticSearch empty failed: %v", err)
+	}
+	if len(res) != 0 {
+		t.Errorf("Expected 0 results for empty queries, got %d", len(res))
+	}
+}
+
+func TestStoreOpen_WithSkipAttachments(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(ctx, t.TempDir(), store.WithSkipAttachments(true))
+	if err != nil {
+		t.Fatalf("Open failed: %v", err)
+	}
+	defer func() { _ = st.Close() }()
+
+	links := []string{"target-note", "image.png", "doc.pdf"}
+	if err := st.UpsertLinks(ctx, "source-note", links); err != nil {
+		t.Fatalf("UpsertLinks failed: %v", err)
+	}
+
+	backlinks, err := st.Backlinks(ctx, "target-note")
+	if err != nil {
+		t.Fatalf("Backlinks target-note failed: %v", err)
+	}
+	if len(backlinks) != 1 || backlinks[0].NoteSlug != "source-note" {
+		t.Errorf("Expected backlink for target-note, got %v", backlinks)
+	}
+
+	// Because image.png was skipped during UpsertLinks due to WithSkipAttachments(true), Backlinks for image.png should be 0
+	imgBacklinks, err := st.Backlinks(ctx, "image.png")
+	if err != nil {
+		t.Fatalf("Backlinks image.png failed: %v", err)
+	}
+	if len(imgBacklinks) != 0 {
+		t.Errorf("Expected 0 backlinks for image.png when SkipAttachments=true, got %v", imgBacklinks)
 	}
 }

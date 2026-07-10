@@ -23,8 +23,6 @@ package cmd
 
 import (
 	"fmt"
-
-	"github.com/nmdra/notebrain-cli/v2/internal/store"
 )
 
 type ConnectionsCmd struct {
@@ -36,14 +34,12 @@ func (c *ConnectionsCmd) Run(globals *Globals) error {
 	targetNote := c.Note
 	hops := c.Hops
 
-	chromaPath := globals.ChromaPath
 	ctx := globals.Ctx
-	st, err := store.Open(ctx, chromaPath)
+	st, err := openStore(ctx, globals)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = st.Close() }()
-	st.SkipAttachments = globals.SkipAttachments
 
 	targetSlug, err := st.ResolveNoteSlug(ctx, targetNote)
 	if err != nil {

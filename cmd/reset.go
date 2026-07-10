@@ -28,7 +28,6 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
-	"github.com/nmdra/notebrain-cli/v2/internal/store"
 )
 
 type ResetCmd struct {
@@ -37,6 +36,7 @@ type ResetCmd struct {
 
 func (c *ResetCmd) Run(globals *Globals) error {
 	if !c.Yes {
+		initStyles()
 		warnStyle := lipgloss.NewStyle().Bold(true).Foreground(colorWarn)
 		fmt.Println(warnStyle.Render(fmt.Sprintf("WARNING: This will delete ALL indexed data inside %s", globals.ChromaPath)))
 		fmt.Print("Type 'yes' to confirm: ")
@@ -53,9 +53,8 @@ func (c *ResetCmd) Run(globals *Globals) error {
 		}
 	}
 
-	chromaPath := globals.ChromaPath
 	ctx := globals.Ctx
-	st, err := store.Open(ctx, chromaPath)
+	st, err := openStore(ctx, globals)
 	if err != nil {
 		return err
 	}

@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sort"
 	"strings"
 
@@ -160,50 +161,8 @@ func (s *Store) MultiSemanticSearch(ctx context.Context, queryVecs [][]float32, 
 
 	out := deduplicateResultsByNote(merged, limit, topKPerNote)
 
-	type queryScore struct {
-		query string
-		score float32
-	}
-	const (
-		minAbsoluteMatchScore = float32(0.70)
-		relativeMatchMargin   = float32(0.85)
-		fallbackDelta         = float32(0.05)
-	)
-
 	for i := range out {
-		qsMap := noteQueryScores[out[i].NoteSlug]
-		if len(qsMap) > 0 {
-			qsList := make([]queryScore, 0, len(qsMap))
-			bestNoteScore := float32(out[i].Score)
-			for q, score := range qsMap {
-				isHighRelevance := score >= minAbsoluteMatchScore && score >= bestNoteScore*relativeMatchMargin
-				isFallbackBest := bestNoteScore < minAbsoluteMatchScore && score >= bestNoteScore-fallbackDelta
-				if isHighRelevance || isFallbackBest {
-					qsList = append(qsList, queryScore{query: q, score: score})
-				}
-			}
-			if len(qsList) == 0 {
-				var bestQ string
-				var maxS float32
-				for q, score := range qsMap {
-					if bestQ == "" || score > maxS {
-						bestQ = q
-						maxS = score
-					}
-				}
-				if bestQ != "" {
-					qsList = append(qsList, queryScore{query: bestQ, score: maxS})
-				}
-			}
-			sort.Slice(qsList, func(a, b int) bool {
-				return qsList[a].score > qsList[b].score
-			})
-			sortedQueries := make([]string, len(qsList))
-			for j, item := range qsList {
-				sortedQueries[j] = item.query
-			}
-			out[i].MatchedQueries = sortedQueries
-		}
+		out[i].MatchedQueries = filterMatchedQueries(noteQueryScores[out[i].NoteSlug], float32(out[i].Score))
 	}
 
 	if includeText && len(out) > 0 {
@@ -238,6 +197,50 @@ func (s *Store) populateTextLocked(ctx context.Context, results []Result) {
 	}
 }
 
+func filterMatchedQueries(qsMap map[string]float32, bestNoteScore float32) []string {
+	if len(qsMap) == 0 {
+		return nil
+	}
+	type queryScore struct {
+		query string
+		score float32
+	}
+	const (
+		minAbsoluteMatchScore = float32(0.70)
+		relativeMatchMargin   = float32(0.85)
+		fallbackDelta         = float32(0.05)
+	)
+	qsList := make([]queryScore, 0, len(qsMap))
+	for q, score := range qsMap {
+		isHighRelevance := score >= minAbsoluteMatchScore && score >= bestNoteScore*relativeMatchMargin
+		isFallbackBest := bestNoteScore < minAbsoluteMatchScore && score >= bestNoteScore-fallbackDelta
+		if isHighRelevance || isFallbackBest {
+			qsList = append(qsList, queryScore{query: q, score: score})
+		}
+	}
+	if len(qsList) == 0 {
+		var bestQ string
+		var maxS float32
+		for q, score := range qsMap {
+			if bestQ == "" || score > maxS {
+				bestQ = q
+				maxS = score
+			}
+		}
+		if bestQ != "" {
+			qsList = append(qsList, queryScore{query: bestQ, score: maxS})
+		}
+	}
+	sort.Slice(qsList, func(a, b int) bool {
+		return qsList[a].score > qsList[b].score
+	})
+	sortedQueries := make([]string, len(qsList))
+	for j, item := range qsList {
+		sortedQueries[j] = item.query
+	}
+	return sortedQueries
+}
+
 func deduplicateResultsByNote(results []Result, limit int, topKPerNote int) []Result {
 	if topKPerNote <= 0 {
 		topKPerNote = 3
@@ -265,16 +268,13 @@ func deduplicateResultsByNote(results []Result, limit int, topKPerNote int) []Re
 func (s *Store) GetNoteHashes(ctx context.Context) (map[string]string, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	res, err := s.chunks.Get(ctx,
-		chroma.WithWhere(chroma.EqInt("chunk_index", 0)),
-		chroma.WithInclude(chroma.IncludeMetadatas),
-	)
+	metas, err := s.paginatedZeroIndexMetadatas(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("get note hashes: %w", wrapChromaErr(err))
 	}
 
 	hashes := make(map[string]string)
-	for _, m := range res.GetMetadatas() {
+	for _, m := range metas {
 		slug := metaString(m, "note_slug")
 		hash := metaString(m, "content_hash")
 		if slug != "" && hash != "" {
@@ -282,6 +282,68 @@ func (s *Store) GetNoteHashes(ctx context.Context) (map[string]string, error) {
 		}
 	}
 	return hashes, nil
+}
+
+func (s *Store) paginatedZeroIndexMetadatas(ctx context.Context) ([]chroma.DocumentMetadata, error) {
+	var all []chroma.DocumentMetadata
+	offset := 0
+	const pageSize = 1000
+	for {
+		res, err := s.chunks.Get(ctx,
+			chroma.WithWhere(chroma.EqInt("chunk_index", 0)),
+			chroma.WithInclude(chroma.IncludeMetadatas),
+			chroma.WithLimit(pageSize),
+			chroma.WithOffset(offset),
+		)
+		if err != nil {
+			return nil, err
+		}
+		metas := res.GetMetadatas()
+		if len(metas) == 0 {
+			break
+		}
+		all = append(all, metas...)
+		if len(metas) < pageSize {
+			break
+		}
+		offset += pageSize
+	}
+	return all, nil
+}
+
+// paginatedDistinctSlugs returns distinct note_slug values matching the given where filter across paginated queries.
+func (s *Store) paginatedDistinctSlugs(ctx context.Context, where chroma.WhereFilter) ([]string, error) {
+	var slugs []string
+	seen := make(map[string]bool)
+	offset := 0
+	const pageSize = 1000
+	for {
+		res, err := s.chunks.Get(ctx,
+			chroma.WithWhere(where),
+			chroma.WithInclude(chroma.IncludeMetadatas),
+			chroma.WithLimit(pageSize),
+			chroma.WithOffset(offset),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("paginated distinct slugs: %w", wrapChromaErr(err))
+		}
+		metas := res.GetMetadatas()
+		if len(metas) == 0 {
+			break
+		}
+		for _, m := range metas {
+			slug := metaString(m, "note_slug")
+			if slug != "" && !seen[slug] {
+				seen[slug] = true
+				slugs = append(slugs, slug)
+			}
+		}
+		if len(metas) < pageSize {
+			break
+		}
+		offset += pageSize
+	}
+	return slugs, nil
 }
 
 // ─── Backlinks ───────────────────────────────────────────────────
@@ -337,10 +399,13 @@ func (s *Store) Connections(ctx context.Context, seedSlug string, maxHops int) (
 		var next []string
 		for _, src := range frontier {
 			// Outgoing links
-			out, _ := s.links.Get(ctx,
+			out, err := s.links.Get(ctx,
 				chroma.WithWhere(chroma.EqString("source_slug", src)),
 				chroma.WithInclude(chroma.IncludeMetadatas),
 			)
+			if err != nil {
+				return nil, fmt.Errorf("connections out: %w", wrapChromaErr(err))
+			}
 			if out != nil {
 				for _, meta := range out.GetMetadatas() {
 					if s.SkipAttachments && (parser.IsAttachmentLink(metaString(meta, "target_path")) || parser.IsAttachmentLink(metaString(meta, "display_text"))) {
@@ -354,10 +419,13 @@ func (s *Store) Connections(ctx context.Context, seedSlug string, maxHops int) (
 				}
 			}
 			// Incoming links (bidirectional)
-			in, _ := s.links.Get(ctx,
+			in, err := s.links.Get(ctx,
 				chroma.WithWhere(chroma.EqString("target_slug", src)),
 				chroma.WithInclude(chroma.IncludeMetadatas),
 			)
+			if err != nil {
+				return nil, fmt.Errorf("connections in: %w", wrapChromaErr(err))
+			}
 			if in != nil {
 				for _, meta := range in.GetMetadatas() {
 					if s.SkipAttachments && (parser.IsAttachmentLink(metaString(meta, "target_path")) || parser.IsAttachmentLink(metaString(meta, "display_text"))) {
@@ -404,7 +472,10 @@ func (s *Store) HiddenConnections(ctx context.Context, queryVec []float32, seedS
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	// 1. Collect all slugs already linked to/from seed
-	linked := s.linkedSlugs(ctx, seedSlug)
+	linked, err := s.linkedSlugs(ctx, seedSlug)
+	if err != nil {
+		return nil, err
+	}
 	linked[seedSlug] = true
 
 	// 2. Wide semantic search
@@ -438,7 +509,11 @@ func (s *Store) HiddenConnectionsDeep(ctx context.Context, seedSlug string, limi
 
 	s.mu.RLock()
 	// 1. Collect all slugs already linked to/from seed
-	linked := s.linkedSlugs(ctx, seedSlug)
+	linked, err := s.linkedSlugs(ctx, seedSlug)
+	if err != nil {
+		s.mu.RUnlock()
+		return nil, nil, err
+	}
 	linked[seedSlug] = true
 
 	// 2. Fetch all stored chunks and embeddings for the seed note
@@ -582,13 +657,16 @@ func CombineWhereFilters(f1, f2 chroma.WhereFilter) chroma.WhereFilter {
 	if ok1 && ok2 {
 		return chroma.And(wc1, wc2)
 	}
+	slog.Warn("CombineWhereFilters: could not combine filters, using first only")
 	return f1
 }
+
+const maxNoteTags = 20
 
 // TagWhereClause constructs a Chroma Or filter matching tag against tag_0 through tag_19.
 func TagWhereClause(tag string) chroma.WhereClause {
 	var clauses []chroma.WhereClause
-	for n := range 20 {
+	for n := range maxNoteTags {
 		clauses = append(clauses, chroma.EqString(fmt.Sprintf("tag_%d", n), tag))
 	}
 	return chroma.Or(clauses...)
@@ -623,7 +701,10 @@ func (s *Store) TagSearch(ctx context.Context, tag string, limit int, whereFilte
 func (s *Store) GraphBoostedSearch(ctx context.Context, queryVec []float32, seedSlug string, boost float64, limit int, includeText bool) ([]Result, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	linked := s.linkedSlugs(ctx, seedSlug)
+	linked, err := s.linkedSlugs(ctx, seedSlug)
+	if err != nil {
+		return nil, err
+	}
 
 	candidates, err := s.semanticSearch(ctx, queryVec, limit*3, 1, nil, includeText)
 	if err != nil {
@@ -695,6 +776,7 @@ func deduplicateByNote(res chroma.QueryResult, limit int, topKPerNote int) []Res
 			Title:       metaString(meta, "title"),
 			FilePath:    metaString(meta, "file_path"),
 			Score:       float64(1 - dist), // convert distance → similarity
+			ChunkIndex:  metaInt(meta, "chunk_index"),
 			HeadingPath: metaString(meta, "heading_path"),
 			Text:        txt,
 			Tags:        decodeTags(meta),
@@ -718,6 +800,7 @@ func getResultToResults(res chroma.GetResult, limit int) []Result {
 	type best struct {
 		title       string
 		filePath    string
+		chunkIndex  int
 		headingPath string
 		text        string
 		tags        []string
@@ -737,6 +820,7 @@ func getResultToResults(res chroma.GetResult, limit int) []Result {
 			seen[slug] = &best{
 				title:       metaString(meta, "title"),
 				filePath:    metaString(meta, "file_path"),
+				chunkIndex:  metaInt(meta, "chunk_index"),
 				headingPath: metaString(meta, "heading_path"),
 				text:        txt,
 				tags:        decodeTags(meta),
@@ -751,6 +835,7 @@ func getResultToResults(res chroma.GetResult, limit int) []Result {
 			Title:       b.title,
 			FilePath:    b.filePath,
 			Score:       1.0,
+			ChunkIndex:  b.chunkIndex,
 			HeadingPath: b.headingPath,
 			Text:        b.text,
 			Tags:        b.tags,
@@ -764,12 +849,15 @@ func getResultToResults(res chroma.GetResult, limit int) []Result {
 }
 
 // linkedSlugs returns a set of note slugs linked to/from slug.
-func (s *Store) linkedSlugs(ctx context.Context, slug string) map[string]bool {
+func (s *Store) linkedSlugs(ctx context.Context, slug string) (map[string]bool, error) {
 	set := map[string]bool{}
-	out, _ := s.links.Get(ctx,
+	out, err := s.links.Get(ctx,
 		chroma.WithWhere(chroma.EqString("source_slug", slug)),
 		chroma.WithInclude(chroma.IncludeMetadatas),
 	)
+	if err != nil {
+		return nil, fmt.Errorf("linkedSlugs out: %w", wrapChromaErr(err))
+	}
 	if out != nil {
 		for _, m := range out.GetMetadatas() {
 			if t := metaString(m, "target_slug"); t != "" {
@@ -777,10 +865,13 @@ func (s *Store) linkedSlugs(ctx context.Context, slug string) map[string]bool {
 			}
 		}
 	}
-	in, _ := s.links.Get(ctx,
+	in, err := s.links.Get(ctx,
 		chroma.WithWhere(chroma.EqString("target_slug", slug)),
 		chroma.WithInclude(chroma.IncludeMetadatas),
 	)
+	if err != nil {
+		return nil, fmt.Errorf("linkedSlugs in: %w", wrapChromaErr(err))
+	}
 	if in != nil {
 		for _, m := range in.GetMetadatas() {
 			if src := metaString(m, "source_slug"); src != "" {
@@ -788,7 +879,7 @@ func (s *Store) linkedSlugs(ctx context.Context, slug string) map[string]bool {
 			}
 		}
 	}
-	return set
+	return set, nil
 }
 
 // tagsForNote fetches the tags of the first chunk of noteSlug.
@@ -808,28 +899,7 @@ func (s *Store) tagsForNote(ctx context.Context, noteSlug string) []string {
 
 // notesWithTag returns distinct note slugs that have the given tag.
 func (s *Store) notesWithTag(ctx context.Context, tag string) []string {
-	// Query all chunks for each possible tag_N position (up to 20 tags)
-	var filters []chroma.WhereClause
-	for n := range 20 {
-		filters = append(filters, chroma.EqString(fmt.Sprintf("tag_%d", n), tag))
-	}
-	res, err := s.chunks.Get(ctx,
-		chroma.WithWhere(chroma.Or(filters...)),
-		chroma.WithInclude(chroma.IncludeMetadatas),
-	)
-	if err != nil || len(res.GetMetadatas()) == 0 {
-		return nil
-	}
-
-	seen := map[string]bool{}
-	var slugs []string
-	for _, m := range res.GetMetadatas() {
-		slug := metaString(m, "note_slug")
-		if slug != "" && !seen[slug] {
-			seen[slug] = true
-			slugs = append(slugs, slug)
-		}
-	}
+	slugs, _ := s.paginatedDistinctSlugs(ctx, TagWhereClause(tag))
 	return slugs
 }
 
@@ -910,10 +980,7 @@ func (s *Store) ResolveNoteSlug(ctx context.Context, input string) (string, erro
 	}
 
 	s.mu.RLock()
-	res, err = s.chunks.Get(ctx,
-		chroma.WithWhere(chroma.EqInt("chunk_index", 0)),
-		chroma.WithInclude(chroma.IncludeMetadatas),
-	)
+	metas, err := s.paginatedZeroIndexMetadatas(ctx)
 	s.mu.RUnlock()
 	if err != nil {
 		return slug, nil
@@ -923,7 +990,7 @@ func (s *Store) ResolveNoteSlug(ctx context.Context, input string) (string, erro
 	var pathMatches []string
 	var suffixMatches []string
 
-	for _, m := range res.GetMetadatas() {
+	for _, m := range metas {
 		mSlug := metaString(m, "note_slug")
 		mTitle := metaString(m, "title")
 		mPath := metaString(m, "file_path")
@@ -1072,8 +1139,15 @@ func (s *Store) getChunkWindow(ctx context.Context, noteSlug string, chunkIndex 
 		return nil, nil
 	}
 
+	minIdx := max(0, chunkIndex-windowSize)
+	maxIdx := chunkIndex + windowSize
+
 	res, err := s.chunks.Get(ctx,
-		chroma.WithWhere(chroma.EqString("note_slug", noteSlug)),
+		chroma.WithWhere(chroma.And(
+			chroma.EqString("note_slug", noteSlug),
+			chroma.GteInt("chunk_index", minIdx),
+			chroma.LteInt("chunk_index", maxIdx),
+		)),
 		chroma.WithInclude(chroma.IncludeMetadatas, chroma.IncludeDocuments),
 	)
 	if err != nil {
@@ -1102,15 +1176,10 @@ func (s *Store) getChunkWindow(ctx context.Context, noteSlug string, chunkIndex 
 
 	sort.Slice(allChunks, func(i, j int) bool { return allChunks[i].index < allChunks[j].index })
 
-	minIdx := chunkIndex - windowSize
-	maxIdx := chunkIndex + windowSize
-
 	window := &ChunkWindow{MatchedIndex: chunkIndex}
 	for _, c := range allChunks {
-		if c.index >= minIdx && c.index <= maxIdx {
-			window.Texts = append(window.Texts, c.text)
-			window.Indices = append(window.Indices, c.index)
-		}
+		window.Texts = append(window.Texts, c.text)
+		window.Indices = append(window.Indices, c.index)
 	}
 
 	return window, nil
@@ -1118,15 +1187,98 @@ func (s *Store) getChunkWindow(ctx context.Context, noteSlug string, chunkIndex 
 
 // PopulateContext fetches adjacent chunks for each result when windowSize > 0.
 func (s *Store) PopulateContext(ctx context.Context, results []Result, windowSize int) {
-	if windowSize <= 0 {
+	if windowSize <= 0 || len(results) == 0 {
 		return
 	}
+	// Group results by NoteSlug to deduplicate and minimize queries
+	type noteRange struct {
+		minIdx int
+		maxIdx int
+	}
+	noteRanges := make(map[string]noteRange)
+	for _, r := range results {
+		if r.NoteSlug == "" {
+			continue
+		}
+		minI := max(0, r.ChunkIndex-windowSize)
+		maxI := r.ChunkIndex + windowSize
+		nr, exists := noteRanges[r.NoteSlug]
+		if !exists {
+			noteRanges[r.NoteSlug] = noteRange{minIdx: minI, maxIdx: maxI}
+		} else {
+			nr.minIdx = min(nr.minIdx, minI)
+			nr.maxIdx = max(nr.maxIdx, maxI)
+			noteRanges[r.NoteSlug] = nr
+		}
+	}
+
+	if len(noteRanges) == 0 {
+		return
+	}
+
+	var clauses []chroma.WhereClause
+	for slug, nr := range noteRanges {
+		clauses = append(clauses, chroma.And(
+			chroma.EqString("note_slug", slug),
+			chroma.GteInt("chunk_index", nr.minIdx),
+			chroma.LteInt("chunk_index", nr.maxIdx),
+		))
+	}
+
+	var whereFilter chroma.WhereFilter
+	if len(clauses) == 1 {
+		whereFilter = clauses[0]
+	} else {
+		whereFilter = chroma.Or(clauses...)
+	}
+
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+	res, err := s.chunks.Get(ctx,
+		chroma.WithWhere(whereFilter),
+		chroma.WithInclude(chroma.IncludeMetadatas, chroma.IncludeDocuments),
+	)
+	if err != nil || len(res.GetMetadatas()) == 0 {
+		return
+	}
+
+	type chunkInfo struct {
+		slug  string
+		index int
+		text  string
+	}
+	var fetched []chunkInfo
+	metas := res.GetMetadatas()
+	texts := res.GetDocuments()
+	for i, m := range metas {
+		slug := metaString(m, "note_slug")
+		idx := metaInt(m, "chunk_index")
+		txt := ""
+		if len(texts) > i && texts[i] != nil {
+			txt = texts[i].ContentString()
+		}
+		fetched = append(fetched, chunkInfo{slug: slug, index: idx, text: txt})
+	}
+	sort.Slice(fetched, func(i, j int) bool {
+		if fetched[i].slug != fetched[j].slug {
+			return fetched[i].slug < fetched[j].slug
+		}
+		return fetched[i].index < fetched[j].index
+	})
+
 	for i := range results {
-		window, err := s.getChunkWindow(ctx, results[i].NoteSlug, results[i].ChunkIndex, windowSize)
-		if err == nil && window != nil {
-			results[i].Context = window.Texts
+		slug := results[i].NoteSlug
+		cIdx := results[i].ChunkIndex
+		minI := cIdx - windowSize
+		maxI := cIdx + windowSize
+		var ctxTexts []string
+		for _, fc := range fetched {
+			if fc.slug == slug && fc.index >= minI && fc.index <= maxI {
+				ctxTexts = append(ctxTexts, fc.text)
+			}
+		}
+		if len(ctxTexts) > 0 {
+			results[i].Context = ctxTexts
 		}
 	}
 }

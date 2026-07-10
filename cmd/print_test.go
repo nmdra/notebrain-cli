@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"bytes"
-	"os"
 	"strings"
 	"testing"
 
@@ -11,9 +10,7 @@ import (
 )
 
 func TestPrintResultsFormatted_Phantom(t *testing.T) {
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
+	var buf bytes.Buffer
 
 	results := []store.Result{
 		{NoteSlug: "real-note", Title: "Real Note", Score: 1.0, IsPhantom: false},
@@ -24,12 +21,7 @@ func TestPrintResultsFormatted_Phantom(t *testing.T) {
 		SkipPhantom: true,
 	}
 
-	printResultsFormatted("test", "query", results, globals)
-	_ = w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	_, _ = buf.ReadFrom(r)
+	printResultsFormattedToWriter(&buf, "test", "query", results, globals)
 	out := buf.String()
 
 	if !strings.Contains(out, "Real Note") {
@@ -40,15 +32,9 @@ func TestPrintResultsFormatted_Phantom(t *testing.T) {
 	}
 
 	// Now test SkipPhantom = false
-	r2, w2, _ := os.Pipe()
-	os.Stdout = w2
-	globals.SkipPhantom = false
-	printResultsFormatted("test", "query", results, globals)
-	_ = w2.Close()
-	os.Stdout = oldStdout
-
 	buf.Reset()
-	_, _ = buf.ReadFrom(r2)
+	globals.SkipPhantom = false
+	printResultsFormattedToWriter(&buf, "test", "query", results, globals)
 	out2 := buf.String()
 
 	if !strings.Contains(out2, "Real Note") || !strings.Contains(out2, "Phantom Note") {
@@ -60,9 +46,7 @@ func TestPrintResultsFormatted_Phantom(t *testing.T) {
 }
 
 func TestPrintResultsFormatted_ChunkDisambiguationAndFooter(t *testing.T) {
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
+	var buf bytes.Buffer
 
 	results := []store.Result{
 		{NoteSlug: "openchoreo", Title: "OpenChoreo", Score: 0.4568, HeadingPath: "Architecture > Overview"},
@@ -72,12 +56,7 @@ func TestPrintResultsFormatted_ChunkDisambiguationAndFooter(t *testing.T) {
 		Format: "text",
 	}
 
-	printResultsFormatted("search", "query", results, globals)
-	_ = w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	_, _ = buf.ReadFrom(r)
+	printResultsFormattedToWriter(&buf, "search", "query", results, globals)
 	out := buf.String()
 
 	if !strings.Contains(out, "OpenChoreo (§ Architecture > Overview)") {
@@ -96,9 +75,7 @@ func TestPrintResultsFormatted_Truncation(t *testing.T) {
 	getTerminalWidth = func() int { return 50 }
 	defer func() { getTerminalWidth = oldWidthFunc }()
 
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
+	var buf bytes.Buffer
 
 	results := []store.Result{
 		{
@@ -112,12 +89,7 @@ func TestPrintResultsFormatted_Truncation(t *testing.T) {
 		Format: "text",
 	}
 
-	printResultsFormatted("search", "query", results, globals)
-	_ = w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	_, _ = buf.ReadFrom(r)
+	printResultsFormattedToWriter(&buf, "search", "query", results, globals)
 	out := buf.String()
 
 	if !strings.Contains(out, "…") {
@@ -134,9 +106,7 @@ func TestPrintResultsFormatted_Truncation(t *testing.T) {
 }
 
 func TestPrintResultsFormatted_MultiQuery(t *testing.T) {
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
+	var buf bytes.Buffer
 
 	results := []store.Result{
 		{
@@ -151,12 +121,7 @@ func TestPrintResultsFormatted_MultiQuery(t *testing.T) {
 		Queries: []string{"redis", "broker"},
 	}
 
-	printResultsFormatted("search", "redis | broker", results, globals)
-	_ = w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	_, _ = buf.ReadFrom(r)
+	printResultsFormattedToWriter(&buf, "search", "redis | broker", results, globals)
 	out := buf.String()
 
 	if !strings.Contains(out, `[hits: "redis", "broker"]`) {
@@ -165,9 +130,7 @@ func TestPrintResultsFormatted_MultiQuery(t *testing.T) {
 }
 
 func TestPrintResultsFormatted_HideTags(t *testing.T) {
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
+	var buf bytes.Buffer
 
 	results := []store.Result{
 		{NoteSlug: "redis-note", Title: "Redis Note", Score: 0.9, Tags: []string{"Database/Redis", "Backend"}},
@@ -177,12 +140,7 @@ func TestPrintResultsFormatted_HideTags(t *testing.T) {
 		HideTags: true,
 	}
 
-	printResultsFormatted("test", "query", results, globals)
-	_ = w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	_, _ = buf.ReadFrom(r)
+	printResultsFormattedToWriter(&buf, "test", "query", results, globals)
 	out := buf.String()
 
 	if strings.Contains(out, "#Database/Redis") || strings.Contains(out, "#Backend") {
@@ -193,15 +151,9 @@ func TestPrintResultsFormatted_HideTags(t *testing.T) {
 	}
 
 	// Now test HideTags = false
-	r2, w2, _ := os.Pipe()
-	os.Stdout = w2
-	globals.HideTags = false
-	printResultsFormatted("test", "query", results, globals)
-	_ = w2.Close()
-	os.Stdout = oldStdout
-
 	buf.Reset()
-	_, _ = buf.ReadFrom(r2)
+	globals.HideTags = false
+	printResultsFormattedToWriter(&buf, "test", "query", results, globals)
 	out2 := buf.String()
 
 	if !strings.Contains(out2, "#Database/Redis") || !strings.Contains(out2, "#Backend") {
@@ -210,9 +162,7 @@ func TestPrintResultsFormatted_HideTags(t *testing.T) {
 }
 
 func TestPrintResultsFormatted_Deep(t *testing.T) {
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
+	var buf bytes.Buffer
 
 	results := []store.Result{
 		{
@@ -230,12 +180,7 @@ func TestPrintResultsFormatted_Deep(t *testing.T) {
 		IncludeText: true,
 	}
 
-	printResultsFormatted("hidden --deep", "query", results, globals)
-	_ = w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	_, _ = buf.ReadFrom(r)
+	printResultsFormattedToWriter(&buf, "hidden --deep", "query", results, globals)
 	out := buf.String()
 
 	if !strings.Contains(out, "├─ Matched target sections (2):") || !strings.Contains(out, "\"§ Ownership\", \"§ Lifetimes\"") {
@@ -250,9 +195,7 @@ func TestPrintResultsFormatted_Deep(t *testing.T) {
 }
 
 func TestPrintResultsFormatted_Deep_SmartCapping(t *testing.T) {
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
+	var buf bytes.Buffer
 
 	results := []store.Result{
 		{
@@ -267,12 +210,7 @@ func TestPrintResultsFormatted_Deep_SmartCapping(t *testing.T) {
 		Verbose: false,
 	}
 
-	printResultsFormatted("hidden --deep", "query", results, globals)
-	_ = w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	_, _ = buf.ReadFrom(r)
+	printResultsFormattedToWriter(&buf, "hidden --deep", "query", results, globals)
 	out := buf.String()
 
 	if !strings.Contains(out, "└─ Matched target sections (5):") || !strings.Contains(out, "\"§ Methodologies\", \"§ Latency\", \"§ Queueing\"") || !strings.Contains(out, "(+2 more)") {
@@ -280,15 +218,9 @@ func TestPrintResultsFormatted_Deep_SmartCapping(t *testing.T) {
 	}
 
 	// Now verify --verbose shows all 5
-	r2, w2, _ := os.Pipe()
-	os.Stdout = w2
-	globals.Verbose = true
-	printResultsFormatted("hidden --deep", "query", results, globals)
-	_ = w2.Close()
-	os.Stdout = oldStdout
-
 	buf.Reset()
-	_, _ = buf.ReadFrom(r2)
+	globals.Verbose = true
+	printResultsFormattedToWriter(&buf, "hidden --deep", "query", results, globals)
 	out2 := buf.String()
 
 	if !strings.Contains(out2, "└─ Matched target sections (5):") || !strings.Contains(out2, "\"§ Methodologies\", \"§ Latency\", \"§ Queueing\", \"§ Profiling\", \"§ Caching\"") {
@@ -297,9 +229,7 @@ func TestPrintResultsFormatted_Deep_SmartCapping(t *testing.T) {
 }
 
 func TestPrintJSONPathResult(t *testing.T) {
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
+	var buf bytes.Buffer
 
 	obj := map[string]any{
 		"title": "My Note",
@@ -311,34 +241,91 @@ func TestPrintJSONPathResult(t *testing.T) {
 		},
 	}
 
-	if err := printJSONPathResult(obj, "{.title}"); err != nil {
+	if err := printJSONPathResultToWriter(&buf, obj, "{.title}"); err != nil {
 		t.Errorf("printJSONPathResult {.title} failed: %v", err)
 	}
-	if err := printJSONPathResult(obj, "$.count"); err != nil {
+	if err := printJSONPathResultToWriter(&buf, obj, "$.count"); err != nil {
 		t.Errorf("printJSONPathResult $.count failed: %v", err)
 	}
-	if err := printJSONPathResult(obj, "valid"); err != nil {
+	if err := printJSONPathResultToWriter(&buf, obj, "valid"); err != nil {
 		t.Errorf("printJSONPathResult valid failed: %v", err)
 	}
-	if err := printJSONPathResult(obj, "items"); err != nil {
+	if err := printJSONPathResultToWriter(&buf, obj, "items"); err != nil {
 		t.Errorf("printJSONPathResult items failed: %v", err)
 	}
-	if err := printJSONPathResult(obj, "nested"); err != nil {
+	if err := printJSONPathResultToWriter(&buf, obj, "nested"); err != nil {
 		t.Errorf("printJSONPathResult nested failed: %v", err)
 	}
-	_ = printJSONPathResult(obj, "$.nonexistent") // Verify non-existent key handling does not panic
-	if err := printJSONPathResult(obj, "invalid[syntax[["); err == nil {
+	_ = printJSONPathResultToWriter(&buf, obj, "$.nonexistent") // Verify non-existent key handling does not panic
+	if err := printJSONPathResultToWriter(&buf, obj, "invalid[syntax[["); err == nil {
 		t.Errorf("Expected error for invalid jsonpath syntax, got nil")
 	}
 
-	_ = w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	_, _ = buf.ReadFrom(r)
 	out := buf.String()
 
 	if !strings.Contains(out, "My Note") || !strings.Contains(out, "42") || !strings.Contains(out, "true") || !strings.Contains(out, "a\nb\n") || !strings.Contains(out, `"key":"value"`) {
 		t.Errorf("Expected jsonpath outputs in buffer, got %q", out)
+	}
+}
+
+func TestPrintResultsFormatted_Formats(t *testing.T) {
+	var buf bytes.Buffer
+	results := []store.Result{
+		{
+			NoteSlug: "json-note",
+			Title:    "JSON Note",
+			Score:    0.95,
+			FilePath: "notes/json.md",
+			Text:     "sample text",
+			Tags:     []string{"tag1", "tag2"},
+		},
+	}
+
+	// Test JSON format
+	globals := &Globals{Format: "json"}
+	printResultsFormattedToWriter(&buf, "search", "query", results, globals)
+	if !strings.Contains(buf.String(), `"note_slug": "json-note"`) && !strings.Contains(buf.String(), `"note_slug":"json-note"`) {
+		t.Errorf("Expected json output containing note_slug, got %q", buf.String())
+	}
+
+	// Test TSV format
+	buf.Reset()
+	globals.Format = "tsv"
+	printResultsFormattedToWriter(&buf, "search", "query", results, globals)
+	outTSV := buf.String()
+	if !strings.Contains(outTSV, "slug\ttitle\tfile_path") || !strings.Contains(outTSV, "json-note\tJSON Note") {
+		t.Errorf("Expected tsv header and row, got %q", outTSV)
+	}
+
+	// Test NDJSON format
+	buf.Reset()
+	globals.Format = "ndjson"
+	printResultsFormattedToWriter(&buf, "search", "query", results, globals)
+	outNDJSON := buf.String()
+	if !strings.Contains(outNDJSON, `"note_slug":"json-note"`) && !strings.Contains(outNDJSON, `"note_slug": "json-note"`) {
+		t.Errorf("Expected ndjson output containing note_slug, got %q", outNDJSON)
+	}
+}
+
+func TestPrintResultsFormatted_MinScore(t *testing.T) {
+	var buf bytes.Buffer
+	results := []store.Result{
+		{NoteSlug: "high-score", Title: "High Score Note", Score: 0.9},
+		{NoteSlug: "low-score", Title: "Low Score Note", Score: 0.3},
+	}
+
+	globals := &Globals{
+		Format:   "text",
+		MinScore: 0.5,
+	}
+
+	printResultsFormattedToWriter(&buf, "search", "query", results, globals)
+	out := buf.String()
+
+	if !strings.Contains(out, "High Score Note") {
+		t.Errorf("Expected high score note in output when MinScore=0.5, got %q", out)
+	}
+	if strings.Contains(out, "Low Score Note") {
+		t.Errorf("Did not expect low score note in output when MinScore=0.5, got %q", out)
 	}
 }

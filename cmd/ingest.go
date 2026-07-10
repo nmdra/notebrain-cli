@@ -28,7 +28,6 @@ import (
 
 	"github.com/nmdra/notebrain-cli/v2/internal/embedder"
 	"github.com/nmdra/notebrain-cli/v2/internal/ingest"
-	"github.com/nmdra/notebrain-cli/v2/internal/store"
 )
 
 type IngestCmd struct {
@@ -52,12 +51,11 @@ func (c *IngestCmd) Run(globals *Globals) error {
 	ctx := globals.Ctx
 
 	slog.Info("opening vector store", "chroma_path", chromaPath)
-	st, err := store.Open(ctx, chromaPath)
+	st, err := openStore(ctx, globals)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = st.Close() }()
-	st.SkipAttachments = globals.SkipAttachments
 
 	slog.Info("initializing embedded ONNX vector models")
 	emb, err := embedder.NewLocalEmbedder()

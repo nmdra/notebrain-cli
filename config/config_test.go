@@ -116,3 +116,53 @@ func TestDefault_Fields(t *testing.T) {
 		})
 	}
 }
+
+func TestValidate(t *testing.T) {
+	tests := []struct {
+		name    string
+		mutate  func(*Config)
+		wantErr bool
+	}{
+		{
+			name:    "valid default",
+			mutate:  func(c *Config) {},
+			wantErr: false,
+		},
+		{
+			name:    "zero chunk size",
+			mutate:  func(c *Config) { c.ChunkSize = 0 },
+			wantErr: true,
+		},
+		{
+			name:    "negative chunk overlap",
+			mutate:  func(c *Config) { c.ChunkOverlap = -1 },
+			wantErr: true,
+		},
+		{
+			name:    "overlap greater than chunk size",
+			mutate:  func(c *Config) { c.ChunkSize = 100; c.ChunkOverlap = 150 },
+			wantErr: true,
+		},
+		{
+			name:    "zero limit",
+			mutate:  func(c *Config) { c.Limit = 0 },
+			wantErr: true,
+		},
+		{
+			name:    "zero top-k per note",
+			mutate:  func(c *Config) { c.TopKPerNote = 0 },
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := Default()
+			tt.mutate(cfg)
+			err := cfg.Validate()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}

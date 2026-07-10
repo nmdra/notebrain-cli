@@ -129,7 +129,6 @@ Examples:
 		if cli.Format == "json" || cli.Format == "ndjson" {
 			// Print error as JSON to stdout for agents
 			_, _ = fmt.Fprintf(os.Stdout, "{\"error\": %q}\n", err.Error())
-			os.Exit(1)
 		}
 		return err
 	}
