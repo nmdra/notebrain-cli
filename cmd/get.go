@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
-	"github.com/nmdra/notebrain-cli/v2/internal/store"
 )
 
 type GetCmd struct {
@@ -16,7 +15,7 @@ type GetCmd struct {
 
 func (c *GetCmd) Run(globals *Globals) error {
 	ctx := globals.Ctx
-	st, err := store.Open(ctx, globals.ChromaPath)
+	st, err := openStore(ctx, globals)
 	if err != nil {
 		return err
 	}
@@ -39,7 +38,7 @@ func (c *GetCmd) Run(globals *Globals) error {
 
 	case "tsv":
 		fmt.Println("note_slug\ttitle\tfile_path\ttags\tchunks\ttext")
-		tagsStr := strings.Join(note.Tags, ",")
+		tagsStr := formatTags(note.Tags)
 		fmt.Printf("%s\t%s\t%s\t%s\t%d\t%s\n",
 			note.NoteSlug, note.Title, note.FilePath, tagsStr, note.Chunks, note.Text)
 		return nil

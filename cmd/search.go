@@ -92,14 +92,12 @@ func (c *SearchCmd) Run(globals *Globals) error {
 		globals.Queries = resolved
 	}
 
-	chromaPath := globals.ChromaPath
 	ctx := globals.Ctx
-	st, err := store.Open(ctx, chromaPath)
+	st, err := openStore(ctx, globals)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = st.Close() }()
-	st.SkipAttachments = globals.SkipAttachments
 
 	emb, err := embedder.NewLocalEmbedder()
 	if err != nil {
@@ -113,25 +111,7 @@ func (c *SearchCmd) Run(globals *Globals) error {
 			return fmt.Errorf("interactive mode requires a TTY terminal; use --format json or remove --interactive")
 		}
 		// Build the chroma where-filter once (same logic as static path).
-		filters := make([]chroma.WhereClause, 0, 4)
-		if c.Section != "" {
-			filters = append(filters, chroma.EqString("heading_path", c.Section))
-		}
-		if c.HasTasks {
-			filters = append(filters, chroma.EqBool("has_task", true))
-		}
-		if c.HasCode {
-			filters = append(filters, chroma.EqBool("has_code", true))
-		}
-		if c.Tag != "" {
-			filters = append(filters, store.TagWhereClause(c.Tag))
-		}
-		var whereFilter chroma.WhereFilter
-		if len(filters) == 1 {
-			whereFilter = filters[0]
-		} else if len(filters) > 1 {
-			whereFilter = chroma.And(filters...)
-		}
+		whereFilter := c.buildWhereFilter(true)
 
 		limit := c.Limit
 		topK := c.TopKPerNote
@@ -175,25 +155,7 @@ func (c *SearchCmd) Run(globals *Globals) error {
 	}
 
 	// ── Static non-interactive search ──────────────────────────────────────
-	filters := make([]chroma.WhereClause, 0, 4)
-	if c.Section != "" {
-		filters = append(filters, chroma.EqString("heading_path", c.Section))
-	}
-	if c.HasTasks {
-		filters = append(filters, chroma.EqBool("has_task", true))
-	}
-	if c.HasCode {
-		filters = append(filters, chroma.EqBool("has_code", true))
-	}
-	if c.Tag != "" && len(resolved) > 0 {
-		filters = append(filters, store.TagWhereClause(c.Tag))
-	}
-	var whereFilter chroma.WhereFilter
-	if len(filters) == 1 {
-		whereFilter = filters[0]
-	} else if len(filters) > 1 {
-		whereFilter = chroma.And(filters...)
-	}
+	whereFilter := c.buildWhereFilter(len(resolved) > 0)
 
 	if len(resolved) == 0 {
 		results, err := st.TagSearch(ctx, c.Tag, c.Limit, whereFilter, globals.IncludeText)
@@ -237,5 +199,28 @@ func (c *SearchCmd) Run(globals *Globals) error {
 	st.PopulateContext(ctx, results, globals.ContextWindow)
 
 	printResultsFormatted("search", fmt.Sprintf("Semantic Search: %q", resolved[0]), results, globals)
+	return nil
+}
+
+func (c *SearchCmd) buildWhereFilter(resolveTags bool) chroma.WhereFilter {
+	filters := make([]chroma.WhereClause, 0, 4)
+	if c.Section != "" {
+		filters = append(filters, chroma.EqString("heading_path", c.Section))
+	}
+	if c.HasTasks {
+		filters = append(filters, chroma.EqBool("has_task", true))
+	}
+	if c.HasCode {
+		filters = append(filters, chroma.EqBool("has_code", true))
+	}
+	if c.Tag != "" && resolveTags {
+		filters = append(filters, store.TagWhereClause(c.Tag))
+	}
+	if len(filters) == 1 {
+		return filters[0]
+	}
+	if len(filters) > 1 {
+		return chroma.And(filters...)
+	}
 	return nil
 }

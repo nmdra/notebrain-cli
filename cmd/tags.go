@@ -23,8 +23,6 @@ package cmd
 
 import (
 	"fmt"
-
-	"github.com/nmdra/notebrain-cli/v2/internal/store"
 )
 
 type TagsCmd struct {
@@ -36,14 +34,12 @@ func (c *TagsCmd) Run(globals *Globals) error {
 	targetNote := c.Note
 	minShared := c.MinShared
 
-	chromaPath := globals.ChromaPath
 	ctx := globals.Ctx
-	st, err := store.Open(ctx, chromaPath)
+	st, err := openStore(ctx, globals)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = st.Close() }()
-	st.SkipAttachments = globals.SkipAttachments
 
 	targetSlug, err := st.ResolveNoteSlug(ctx, targetNote)
 	if err != nil {

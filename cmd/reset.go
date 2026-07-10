@@ -26,8 +26,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-
-	"github.com/nmdra/notebrain-cli/v2/internal/store"
 )
 
 type ResetCmd struct {
@@ -48,9 +46,8 @@ func (c *ResetCmd) Run(globals *Globals) error {
 		return nil
 	}
 
-	chromaPath := globals.ChromaPath
 	ctx := globals.Ctx
-	st, err := store.Open(ctx, chromaPath)
+	st, err := openStore(ctx, globals)
 	if err != nil {
 		return err
 	}

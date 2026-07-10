@@ -23,8 +23,6 @@ package cmd
 
 import (
 	"fmt"
-
-	"github.com/nmdra/notebrain-cli/v2/internal/store"
 )
 
 type BacklinksCmd struct {
@@ -34,14 +32,12 @@ type BacklinksCmd struct {
 func (c *BacklinksCmd) Run(globals *Globals) error {
 	targetNote := c.Note
 
-	chromaPath := globals.ChromaPath
 	ctx := globals.Ctx
-	st, err := store.Open(ctx, chromaPath)
+	st, err := openStore(ctx, globals)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = st.Close() }()
-	st.SkipAttachments = globals.SkipAttachments
 
 	targetSlug, err := st.ResolveNoteSlug(ctx, targetNote)
 	if err != nil {
