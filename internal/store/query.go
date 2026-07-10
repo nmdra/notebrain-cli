@@ -266,16 +266,13 @@ func deduplicateResultsByNote(results []Result, limit int, topKPerNote int) []Re
 func (s *Store) GetNoteHashes(ctx context.Context) (map[string]string, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	res, err := s.chunks.Get(ctx,
-		chroma.WithWhere(chroma.EqInt("chunk_index", 0)),
-		chroma.WithInclude(chroma.IncludeMetadatas),
-	)
+	metas, err := s.paginatedZeroIndexMetadatas(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("get note hashes: %w", wrapChromaErr(err))
 	}
 
 	hashes := make(map[string]string)
-	for _, m := range res.GetMetadatas() {
+	for _, m := range metas {
 		slug := metaString(m, "note_slug")
 		hash := metaString(m, "content_hash")
 		if slug != "" && hash != "" {
@@ -283,6 +280,33 @@ func (s *Store) GetNoteHashes(ctx context.Context) (map[string]string, error) {
 		}
 	}
 	return hashes, nil
+}
+
+func (s *Store) paginatedZeroIndexMetadatas(ctx context.Context) ([]chroma.DocumentMetadata, error) {
+	var all []chroma.DocumentMetadata
+	offset := 0
+	const pageSize = 1000
+	for {
+		res, err := s.chunks.Get(ctx,
+			chroma.WithWhere(chroma.EqInt("chunk_index", 0)),
+			chroma.WithInclude(chroma.IncludeMetadatas),
+			chroma.WithLimit(pageSize),
+			chroma.WithOffset(offset),
+		)
+		if err != nil {
+			return nil, err
+		}
+		metas := res.GetMetadatas()
+		if len(metas) == 0 {
+			break
+		}
+		all = append(all, metas...)
+		if len(metas) < pageSize {
+			break
+		}
+		offset += pageSize
+	}
+	return all, nil
 }
 
 // ─── Backlinks ───────────────────────────────────────────────────
@@ -933,10 +957,7 @@ func (s *Store) ResolveNoteSlug(ctx context.Context, input string) (string, erro
 	}
 
 	s.mu.RLock()
-	res, err = s.chunks.Get(ctx,
-		chroma.WithWhere(chroma.EqInt("chunk_index", 0)),
-		chroma.WithInclude(chroma.IncludeMetadatas),
-	)
+	metas, err := s.paginatedZeroIndexMetadatas(ctx)
 	s.mu.RUnlock()
 	if err != nil {
 		return slug, nil
@@ -946,7 +967,7 @@ func (s *Store) ResolveNoteSlug(ctx context.Context, input string) (string, erro
 	var pathMatches []string
 	var suffixMatches []string
 
-	for _, m := range res.GetMetadatas() {
+	for _, m := range metas {
 		mSlug := metaString(m, "note_slug")
 		mTitle := metaString(m, "title")
 		mPath := metaString(m, "file_path")
@@ -1095,8 +1116,18 @@ func (s *Store) getChunkWindow(ctx context.Context, noteSlug string, chunkIndex 
 		return nil, nil
 	}
 
+	minIdx := chunkIndex - windowSize
+	if minIdx < 0 {
+		minIdx = 0
+	}
+	maxIdx := chunkIndex + windowSize
+
 	res, err := s.chunks.Get(ctx,
-		chroma.WithWhere(chroma.EqString("note_slug", noteSlug)),
+		chroma.WithWhere(chroma.And(
+			chroma.EqString("note_slug", noteSlug),
+			chroma.GteInt("chunk_index", minIdx),
+			chroma.LteInt("chunk_index", maxIdx),
+		)),
 		chroma.WithInclude(chroma.IncludeMetadatas, chroma.IncludeDocuments),
 	)
 	if err != nil {
@@ -1125,15 +1156,10 @@ func (s *Store) getChunkWindow(ctx context.Context, noteSlug string, chunkIndex 
 
 	sort.Slice(allChunks, func(i, j int) bool { return allChunks[i].index < allChunks[j].index })
 
-	minIdx := chunkIndex - windowSize
-	maxIdx := chunkIndex + windowSize
-
 	window := &ChunkWindow{MatchedIndex: chunkIndex}
 	for _, c := range allChunks {
-		if c.index >= minIdx && c.index <= maxIdx {
-			window.Texts = append(window.Texts, c.text)
-			window.Indices = append(window.Indices, c.index)
-		}
+		window.Texts = append(window.Texts, c.text)
+		window.Indices = append(window.Indices, c.index)
 	}
 
 	return window, nil
@@ -1141,15 +1167,105 @@ func (s *Store) getChunkWindow(ctx context.Context, noteSlug string, chunkIndex 
 
 // PopulateContext fetches adjacent chunks for each result when windowSize > 0.
 func (s *Store) PopulateContext(ctx context.Context, results []Result, windowSize int) {
-	if windowSize <= 0 {
+	if windowSize <= 0 || len(results) == 0 {
 		return
 	}
+	// Group results by NoteSlug to deduplicate and minimize queries
+	type noteRange struct {
+		minIdx int
+		maxIdx int
+	}
+	noteRanges := make(map[string]noteRange)
+	for _, r := range results {
+		if r.NoteSlug == "" {
+			continue
+		}
+		minI := r.ChunkIndex - windowSize
+		if minI < 0 {
+			minI = 0
+		}
+		maxI := r.ChunkIndex + windowSize
+		nr, exists := noteRanges[r.NoteSlug]
+		if !exists {
+			noteRanges[r.NoteSlug] = noteRange{minIdx: minI, maxIdx: maxI}
+		} else {
+			if minI < nr.minIdx {
+				nr.minIdx = minI
+			}
+			if maxI > nr.maxIdx {
+				nr.maxIdx = maxI
+			}
+			noteRanges[r.NoteSlug] = nr
+		}
+	}
+
+	if len(noteRanges) == 0 {
+		return
+	}
+
+	var clauses []chroma.WhereClause
+	for slug, nr := range noteRanges {
+		clauses = append(clauses, chroma.And(
+			chroma.EqString("note_slug", slug),
+			chroma.GteInt("chunk_index", nr.minIdx),
+			chroma.LteInt("chunk_index", nr.maxIdx),
+		))
+	}
+
+	var whereFilter chroma.WhereFilter
+	if len(clauses) == 1 {
+		whereFilter = clauses[0]
+	} else {
+		whereFilter = chroma.Or(clauses...)
+	}
+
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+	res, err := s.chunks.Get(ctx,
+		chroma.WithWhere(whereFilter),
+		chroma.WithInclude(chroma.IncludeMetadatas, chroma.IncludeDocuments),
+	)
+	if err != nil || len(res.GetMetadatas()) == 0 {
+		return
+	}
+
+	type chunkInfo struct {
+		slug  string
+		index int
+		text  string
+	}
+	var fetched []chunkInfo
+	metas := res.GetMetadatas()
+	texts := res.GetDocuments()
+	for i, m := range metas {
+		slug := metaString(m, "note_slug")
+		idx := metaInt(m, "chunk_index")
+		txt := ""
+		if len(texts) > i && texts[i] != nil {
+			txt = texts[i].ContentString()
+		}
+		fetched = append(fetched, chunkInfo{slug: slug, index: idx, text: txt})
+	}
+	sort.Slice(fetched, func(i, j int) bool {
+		if fetched[i].slug != fetched[j].slug {
+			return fetched[i].slug < fetched[j].slug
+		}
+		return fetched[i].index < fetched[j].index
+	})
+
 	for i := range results {
-		window, err := s.getChunkWindow(ctx, results[i].NoteSlug, results[i].ChunkIndex, windowSize)
-		if err == nil && window != nil {
-			results[i].Context = window.Texts
+		slug := results[i].NoteSlug
+		cIdx := results[i].ChunkIndex
+		minI := cIdx - windowSize
+		maxI := cIdx + windowSize
+		var ctxTexts []string
+		for _, fc := range fetched {
+			if fc.slug == slug && fc.index >= minI && fc.index <= maxI {
+				ctxTexts = append(ctxTexts, fc.text)
+			}
+		}
+		if len(ctxTexts) > 0 {
+			results[i].Context = ctxTexts
 		}
 	}
 }

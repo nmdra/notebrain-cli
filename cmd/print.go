@@ -108,22 +108,19 @@ func printResultsFormatted(commandName string, query string, results []store.Res
 		useLinks := hyperlinkSupported(globals)
 		termWidth := getTerminalWidth()
 
+		noteCounts := make(map[string]int, len(filtered))
+		for _, r := range filtered {
+			noteCounts[r.NoteSlug]++
+		}
+
 		for i, r := range filtered {
 			rank := rankStyle.Render(fmt.Sprintf("%d.", i+1))
 
 			displayTitle := r.Title
 			if r.HeadingPath != "" {
 				displayTitle = fmt.Sprintf("%s (§ %s)", displayTitle, r.HeadingPath)
-			} else if len(filtered) > 1 {
-				sameNoteCount := 0
-				for _, other := range filtered {
-					if other.NoteSlug == r.NoteSlug {
-						sameNoteCount++
-					}
-				}
-				if sameNoteCount > 1 {
-					displayTitle = fmt.Sprintf("%s (chunk #%d)", displayTitle, r.ChunkIndex+1)
-				}
+			} else if noteCounts[r.NoteSlug] > 1 {
+				displayTitle = fmt.Sprintf("%s (chunk #%d)", displayTitle, r.ChunkIndex+1)
 			}
 
 			titleWidth := 42
