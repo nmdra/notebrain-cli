@@ -161,50 +161,8 @@ func (s *Store) MultiSemanticSearch(ctx context.Context, queryVecs [][]float32, 
 
 	out := deduplicateResultsByNote(merged, limit, topKPerNote)
 
-	type queryScore struct {
-		query string
-		score float32
-	}
-	const (
-		minAbsoluteMatchScore = float32(0.70)
-		relativeMatchMargin   = float32(0.85)
-		fallbackDelta         = float32(0.05)
-	)
-
 	for i := range out {
-		qsMap := noteQueryScores[out[i].NoteSlug]
-		if len(qsMap) > 0 {
-			qsList := make([]queryScore, 0, len(qsMap))
-			bestNoteScore := float32(out[i].Score)
-			for q, score := range qsMap {
-				isHighRelevance := score >= minAbsoluteMatchScore && score >= bestNoteScore*relativeMatchMargin
-				isFallbackBest := bestNoteScore < minAbsoluteMatchScore && score >= bestNoteScore-fallbackDelta
-				if isHighRelevance || isFallbackBest {
-					qsList = append(qsList, queryScore{query: q, score: score})
-				}
-			}
-			if len(qsList) == 0 {
-				var bestQ string
-				var maxS float32
-				for q, score := range qsMap {
-					if bestQ == "" || score > maxS {
-						bestQ = q
-						maxS = score
-					}
-				}
-				if bestQ != "" {
-					qsList = append(qsList, queryScore{query: bestQ, score: maxS})
-				}
-			}
-			sort.Slice(qsList, func(a, b int) bool {
-				return qsList[a].score > qsList[b].score
-			})
-			sortedQueries := make([]string, len(qsList))
-			for j, item := range qsList {
-				sortedQueries[j] = item.query
-			}
-			out[i].MatchedQueries = sortedQueries
-		}
+		out[i].MatchedQueries = filterMatchedQueries(noteQueryScores[out[i].NoteSlug], float32(out[i].Score))
 	}
 
 	if includeText && len(out) > 0 {
@@ -237,6 +195,50 @@ func (s *Store) populateTextLocked(ctx context.Context, results []Result) {
 			}
 		}
 	}
+}
+
+func filterMatchedQueries(qsMap map[string]float32, bestNoteScore float32) []string {
+	if len(qsMap) == 0 {
+		return nil
+	}
+	type queryScore struct {
+		query string
+		score float32
+	}
+	const (
+		minAbsoluteMatchScore = float32(0.70)
+		relativeMatchMargin   = float32(0.85)
+		fallbackDelta         = float32(0.05)
+	)
+	qsList := make([]queryScore, 0, len(qsMap))
+	for q, score := range qsMap {
+		isHighRelevance := score >= minAbsoluteMatchScore && score >= bestNoteScore*relativeMatchMargin
+		isFallbackBest := bestNoteScore < minAbsoluteMatchScore && score >= bestNoteScore-fallbackDelta
+		if isHighRelevance || isFallbackBest {
+			qsList = append(qsList, queryScore{query: q, score: score})
+		}
+	}
+	if len(qsList) == 0 {
+		var bestQ string
+		var maxS float32
+		for q, score := range qsMap {
+			if bestQ == "" || score > maxS {
+				bestQ = q
+				maxS = score
+			}
+		}
+		if bestQ != "" {
+			qsList = append(qsList, queryScore{query: bestQ, score: maxS})
+		}
+	}
+	sort.Slice(qsList, func(a, b int) bool {
+		return qsList[a].score > qsList[b].score
+	})
+	sortedQueries := make([]string, len(qsList))
+	for j, item := range qsList {
+		sortedQueries[j] = item.query
+	}
+	return sortedQueries
 }
 
 func deduplicateResultsByNote(results []Result, limit int, topKPerNote int) []Result {
@@ -307,6 +309,41 @@ func (s *Store) paginatedZeroIndexMetadatas(ctx context.Context) ([]chroma.Docum
 		offset += pageSize
 	}
 	return all, nil
+}
+
+// paginatedDistinctSlugs returns distinct note_slug values matching the given where filter across paginated queries.
+func (s *Store) paginatedDistinctSlugs(ctx context.Context, where chroma.WhereFilter) ([]string, error) {
+	var slugs []string
+	seen := make(map[string]bool)
+	offset := 0
+	const pageSize = 1000
+	for {
+		res, err := s.chunks.Get(ctx,
+			chroma.WithWhere(where),
+			chroma.WithInclude(chroma.IncludeMetadatas),
+			chroma.WithLimit(pageSize),
+			chroma.WithOffset(offset),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("paginated distinct slugs: %w", wrapChromaErr(err))
+		}
+		metas := res.GetMetadatas()
+		if len(metas) == 0 {
+			break
+		}
+		for _, m := range metas {
+			slug := metaString(m, "note_slug")
+			if slug != "" && !seen[slug] {
+				seen[slug] = true
+				slugs = append(slugs, slug)
+			}
+		}
+		if len(metas) < pageSize {
+			break
+		}
+		offset += pageSize
+	}
+	return slugs, nil
 }
 
 // ─── Backlinks ───────────────────────────────────────────────────
@@ -624,10 +661,12 @@ func CombineWhereFilters(f1, f2 chroma.WhereFilter) chroma.WhereFilter {
 	return f1
 }
 
+const maxNoteTags = 20
+
 // TagWhereClause constructs a Chroma Or filter matching tag against tag_0 through tag_19.
 func TagWhereClause(tag string) chroma.WhereClause {
 	var clauses []chroma.WhereClause
-	for n := range 20 {
+	for n := range maxNoteTags {
 		clauses = append(clauses, chroma.EqString(fmt.Sprintf("tag_%d", n), tag))
 	}
 	return chroma.Or(clauses...)
@@ -860,23 +899,7 @@ func (s *Store) tagsForNote(ctx context.Context, noteSlug string) []string {
 
 // notesWithTag returns distinct note slugs that have the given tag.
 func (s *Store) notesWithTag(ctx context.Context, tag string) []string {
-	res, err := s.chunks.Get(ctx,
-		chroma.WithWhere(TagWhereClause(tag)),
-		chroma.WithInclude(chroma.IncludeMetadatas),
-	)
-	if err != nil || len(res.GetMetadatas()) == 0 {
-		return nil
-	}
-
-	seen := map[string]bool{}
-	var slugs []string
-	for _, m := range res.GetMetadatas() {
-		slug := metaString(m, "note_slug")
-		if slug != "" && !seen[slug] {
-			seen[slug] = true
-			slugs = append(slugs, slug)
-		}
-	}
+	slugs, _ := s.paginatedDistinctSlugs(ctx, TagWhereClause(tag))
 	return slugs
 }
 
