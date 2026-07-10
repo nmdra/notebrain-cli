@@ -11,11 +11,7 @@ import (
 
 func TestUpsertAndDeleteChunks(t *testing.T) {
 	ctx := context.Background()
-	st, err := store.Open(ctx, t.TempDir())
-	if err != nil {
-		t.Fatalf("Open failed: %v", err)
-	}
-	defer func() { _ = st.Close() }()
+	st := newTestStore(t)
 
 	chunks := []store.ChunkRecord{
 		{
@@ -44,7 +40,7 @@ func TestUpsertAndDeleteChunks(t *testing.T) {
 		},
 	}
 
-	err = st.UpsertChunks(ctx, chunks)
+	err := st.UpsertChunks(ctx, chunks)
 	if err != nil {
 		t.Fatalf("UpsertChunks failed: %v", err)
 	}
@@ -68,15 +64,11 @@ func TestUpsertAndDeleteChunks(t *testing.T) {
 
 func TestUpsertLinks(t *testing.T) {
 	ctx := context.Background()
-	st, err := store.Open(ctx, t.TempDir())
-	if err != nil {
-		t.Fatalf("Open failed: %v", err)
-	}
-	defer func() { _ = st.Close() }()
+	st := newTestStore(t)
 
 	links := []string{"other-note"}
 
-	err = st.UpsertLinks(ctx, "test-note", links)
+	err := st.UpsertLinks(ctx, "test-note", links)
 	if err != nil {
 		t.Fatalf("UpsertLinks failed: %v", err)
 	}
@@ -109,11 +101,7 @@ func TestUpsertLinks(t *testing.T) {
 
 func TestIngestNote(t *testing.T) {
 	ctx := context.Background()
-	st, err := store.Open(ctx, t.TempDir())
-	if err != nil {
-		t.Fatalf("Open failed: %v", err)
-	}
-	defer func() { _ = st.Close() }()
+	st := newTestStore(t)
 
 	chunks := []store.ChunkRecord{
 		{ID: "test-note:0", NoteSlug: "test-note", ChunkIndex: 0, Text: "chunk 0", Embedding: []float32{0.1}},
@@ -123,7 +111,7 @@ func TestIngestNote(t *testing.T) {
 	links := []string{"link-a", "link-b"}
 
 	// Initial ingest
-	err = st.IngestNote(ctx, "test-note", chunks, links)
+	err := st.IngestNote(ctx, "test-note", chunks, links)
 	if err != nil {
 		t.Fatalf("Initial IngestNote failed: %v", err)
 	}
@@ -152,11 +140,7 @@ func TestIngestNote(t *testing.T) {
 
 func TestBatchIngest(t *testing.T) {
 	ctx := context.Background()
-	st, err := store.Open(ctx, t.TempDir())
-	if err != nil {
-		t.Fatalf("Open failed: %v", err)
-	}
-	defer func() { _ = st.Close() }()
+	st := newTestStore(t)
 
 	// 1. Initial Batch Ingest: Ingest Note A and Note B
 	data := []store.BatchIngestData{
@@ -177,7 +161,7 @@ func TestBatchIngest(t *testing.T) {
 		},
 	}
 
-	err = st.BatchIngest(ctx, data, nil)
+	err := st.BatchIngest(ctx, data, nil)
 	if err != nil {
 		t.Fatalf("Initial BatchIngest failed: %v", err)
 	}
@@ -223,11 +207,7 @@ func TestBatchIngest(t *testing.T) {
 
 func BenchmarkUpsertLinks(b *testing.B) {
 	ctx := context.Background()
-	st, err := store.Open(ctx, b.TempDir())
-	if err != nil {
-		b.Fatalf("Open failed: %v", err)
-	}
-	defer func() { _ = st.Close() }()
+	st := newTestStore(b)
 
 	links := make([]string, 100)
 	for i := range 100 {

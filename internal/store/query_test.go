@@ -52,11 +52,7 @@ func setupTestData(t *testing.T, ctx context.Context, st *store.Store) {
 
 func TestQueries(t *testing.T) {
 	ctx := context.Background()
-	st, err := store.Open(ctx, t.TempDir())
-	if err != nil {
-		t.Fatalf("Open failed: %v", err)
-	}
-	defer func() { _ = st.Close() }()
+	st := newTestStore(t)
 
 	setupTestData(t, ctx, st)
 
@@ -292,11 +288,7 @@ func TestQueries(t *testing.T) {
 
 func TestMultiSemanticSearch_WithText(t *testing.T) {
 	ctx := context.Background()
-	st, err := store.Open(ctx, t.TempDir())
-	if err != nil {
-		t.Fatalf("Open failed: %v", err)
-	}
-	defer func() { _ = st.Close() }()
+	st := newTestStore(t)
 
 	chunks := []store.ChunkRecord{
 		{
@@ -367,11 +359,7 @@ func TestTagWhereClause(t *testing.T) {
 
 func TestGetNoteHashes(t *testing.T) {
 	ctx := context.Background()
-	st, err := store.Open(ctx, t.TempDir())
-	if err != nil {
-		t.Fatalf("Open failed: %v", err)
-	}
-	defer func() { _ = st.Close() }()
+	st := newTestStore(t)
 
 	chunks := []store.ChunkRecord{
 		{
@@ -398,11 +386,7 @@ func TestGetNoteHashes(t *testing.T) {
 
 func TestTagSearch(t *testing.T) {
 	ctx := context.Background()
-	st, err := store.Open(ctx, t.TempDir())
-	if err != nil {
-		t.Fatalf("Open failed: %v", err)
-	}
-	defer func() { _ = st.Close() }()
+	st := newTestStore(t)
 
 	setupTestData(t, ctx, st)
 
@@ -417,11 +401,7 @@ func TestTagSearch(t *testing.T) {
 
 func TestGetNote(t *testing.T) {
 	ctx := context.Background()
-	st, err := store.Open(ctx, t.TempDir())
-	if err != nil {
-		t.Fatalf("Open failed: %v", err)
-	}
-	defer func() { _ = st.Close() }()
+	st := newTestStore(t)
 
 	setupTestData(t, ctx, st)
 
@@ -439,11 +419,7 @@ func TestGetNote(t *testing.T) {
 
 func TestSemanticSearch_TopKDeduplication(t *testing.T) {
 	ctx := context.Background()
-	st, err := store.Open(ctx, t.TempDir())
-	if err != nil {
-		t.Fatalf("Open failed: %v", err)
-	}
-	defer func() { _ = st.Close() }()
+	st := newTestStore(t)
 
 	chunks := []store.ChunkRecord{
 		{
@@ -505,11 +481,7 @@ func TestSemanticSearch_TopKDeduplication(t *testing.T) {
 
 func TestGetChunkWindow(t *testing.T) {
 	ctx := context.Background()
-	st, err := store.Open(ctx, t.TempDir())
-	if err != nil {
-		t.Fatalf("Open failed: %v", err)
-	}
-	defer func() { _ = st.Close() }()
+	st := newTestStore(t)
 
 	chunks := []store.ChunkRecord{
 		{
@@ -578,11 +550,7 @@ func TestGetChunkWindow(t *testing.T) {
 
 func TestConcurrentReadWrite(t *testing.T) {
 	ctx := context.Background()
-	st, err := store.Open(ctx, t.TempDir())
-	if err != nil {
-		t.Fatalf("Open failed: %v", err)
-	}
-	defer func() { _ = st.Close() }()
+	st := newTestStore(t)
 
 	setupTestData(t, ctx, st)
 
@@ -629,11 +597,7 @@ func TestConcurrentReadWrite(t *testing.T) {
 
 func TestConnections_PhantomAndAttachment(t *testing.T) {
 	ctx := context.Background()
-	st, err := store.Open(ctx, t.TempDir())
-	if err != nil {
-		t.Fatalf("Open failed: %v", err)
-	}
-	defer func() { _ = st.Close() }()
+	st := newTestStore(t)
 
 	chunks := []store.ChunkRecord{
 		{
@@ -709,11 +673,7 @@ func TestConnections_PhantomAndAttachment(t *testing.T) {
 
 func TestBacklinks_Attachment(t *testing.T) {
 	ctx := context.Background()
-	st, err := store.Open(ctx, t.TempDir())
-	if err != nil {
-		t.Fatalf("Open failed: %v", err)
-	}
-	defer func() { _ = st.Close() }()
+	st := newTestStore(t)
 
 	chunks := []store.ChunkRecord{
 		{
@@ -751,11 +711,7 @@ func TestBacklinks_Attachment(t *testing.T) {
 
 func TestMultiSemanticSearch(t *testing.T) {
 	ctx := context.Background()
-	st, err := store.Open(ctx, t.TempDir())
-	if err != nil {
-		t.Fatalf("Open failed: %v", err)
-	}
-	defer func() { _ = st.Close() }()
+	st := newTestStore(t)
 
 	chunks := []store.ChunkRecord{
 		{
@@ -811,5 +767,49 @@ func TestMultiSemanticSearch(t *testing.T) {
 	}
 	if len(res[0].MatchedQueries) != 2 {
 		t.Errorf("Expected 2 matched queries for note-c, got %v", res[0].MatchedQueries)
+	}
+}
+
+func TestMultiSemanticSearch_EmptyAndEdgeCases(t *testing.T) {
+	ctx := context.Background()
+	st := newTestStore(t)
+
+	res, err := st.MultiSemanticSearch(ctx, nil, nil, 10, 3, nil, false)
+	if err != nil {
+		t.Fatalf("MultiSemanticSearch empty failed: %v", err)
+	}
+	if len(res) != 0 {
+		t.Errorf("Expected 0 results for empty queries, got %d", len(res))
+	}
+}
+
+func TestStoreOpen_WithSkipAttachments(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(ctx, t.TempDir(), store.WithSkipAttachments(true))
+	if err != nil {
+		t.Fatalf("Open failed: %v", err)
+	}
+	defer func() { _ = st.Close() }()
+
+	links := []string{"target-note", "image.png", "doc.pdf"}
+	if err := st.UpsertLinks(ctx, "source-note", links); err != nil {
+		t.Fatalf("UpsertLinks failed: %v", err)
+	}
+
+	backlinks, err := st.Backlinks(ctx, "target-note")
+	if err != nil {
+		t.Fatalf("Backlinks target-note failed: %v", err)
+	}
+	if len(backlinks) != 1 || backlinks[0].NoteSlug != "source-note" {
+		t.Errorf("Expected backlink for target-note, got %v", backlinks)
+	}
+
+	// Because image.png was skipped during UpsertLinks due to WithSkipAttachments(true), Backlinks for image.png should be 0
+	imgBacklinks, err := st.Backlinks(ctx, "image.png")
+	if err != nil {
+		t.Fatalf("Backlinks image.png failed: %v", err)
+	}
+	if len(imgBacklinks) != 0 {
+		t.Errorf("Expected 0 backlinks for image.png when SkipAttachments=true, got %v", imgBacklinks)
 	}
 }
