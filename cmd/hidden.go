@@ -29,10 +29,10 @@ import (
 )
 
 type HiddenCmd struct {
-	Note  string `arg:"" help:"Note slug"`
+	Note  string `arg:"" help:"note slug, title, or file path (auto-resolved)"`
 	Limit int    `help:"maximum number of hidden connections to return" default:"10"`
-	Deep  bool   `help:"use chunk-by-chunk deep analysis against all target note chunks"`
-	TopK  int    `name:"top-k" help:"maximum number of chunks to return per note when --deep is used" default:"3"`
+	Deep  bool   `help:"analyze each chunk individually for granular section-level matches"`
+	TopK  int    `name:"top-k" help:"chunks to evaluate per candidate note in --deep mode" default:"3"`
 }
 
 func (c *HiddenCmd) Run(globals *Globals) error {

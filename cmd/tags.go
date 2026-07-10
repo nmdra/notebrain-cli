@@ -28,8 +28,8 @@ import (
 )
 
 type TagsCmd struct {
-	Note      string `arg:"" help:"Note slug"`
-	MinShared int    `help:"minimum number of shared tags to include a result" default:"1"`
+	Note      string `arg:"" help:"note slug, title, or file path (auto-resolved)"`
+	MinShared int    `help:"minimum shared tags required to include a result" default:"1"`
 }
 
 func (c *TagsCmd) Run(globals *Globals) error {

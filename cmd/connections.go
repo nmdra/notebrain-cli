@@ -28,8 +28,8 @@ import (
 )
 
 type ConnectionsCmd struct {
-	Note string `arg:"" help:"Note slug"`
-	Hops int    `help:"maximum number of graph hops to traverse" default:"2"`
+	Note string `arg:"" help:"note slug, title, or file path (auto-resolved)"`
+	Hops int    `help:"graph traversal depth (keep 1-2 to avoid exponential blowup)" default:"2"`
 }
 
 func (c *ConnectionsCmd) Run(globals *Globals) error {

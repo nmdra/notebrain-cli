@@ -11,7 +11,7 @@ import (
 )
 
 type GetCmd struct {
-	Slug string `arg:"" help:"Note slug or file path to retrieve"`
+	Slug string `arg:"" help:"note slug, title, or file path (auto-resolved)"`
 }
 
 func (c *GetCmd) Run(globals *Globals) error {
@@ -45,8 +45,8 @@ func (c *GetCmd) Run(globals *Globals) error {
 		return nil
 
 	default: // "text"
-		titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39"))
-		metaStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("244"))
+		titleStyle := lipgloss.NewStyle().Bold(true).Foreground(colorAccent)
+		metaStyle := lipgloss.NewStyle().Foreground(colorMuted)
 
 		fmt.Println(titleStyle.Render(note.Title))
 		if note.FilePath != "" {

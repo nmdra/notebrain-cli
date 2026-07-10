@@ -118,7 +118,7 @@ func (s *Store) Reset(ctx context.Context) error {
 	return err
 }
 
-// Stats returns document counts for both collections.
+// Stats returns document counts for collections and distinct notes.
 func (s *Store) Stats(ctx context.Context) (map[string]int64, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -130,8 +130,22 @@ func (s *Store) Stats(ctx context.Context) (map[string]int64, error) {
 	if err != nil {
 		return nil, err
 	}
+	var distinctNotes int64
+	if nc > 0 {
+		res, err := s.chunks.Get(ctx, chroma.WithInclude(chroma.IncludeMetadatas))
+		if err == nil && res != nil {
+			seen := make(map[string]struct{})
+			for _, m := range res.GetMetadatas() {
+				if slug, ok := m.GetString("note_slug"); ok && slug != "" {
+					seen[slug] = struct{}{}
+				}
+			}
+			distinctNotes = int64(len(seen))
+		}
+	}
 	return map[string]int64{
 		"chunks": int64(nc),
 		"links":  int64(nl),
+		"notes":  distinctNotes,
 	}, nil
 }

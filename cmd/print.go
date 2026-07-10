@@ -98,7 +98,11 @@ func printResultsFormatted(commandName string, query string, results []store.Res
 		}
 
 	default: // "text"
-		fmt.Println(headerStyle.Render(query))
+		headerText := fmt.Sprintf("%s (%d results)", query, len(filtered))
+		if len(filtered) == 1 {
+			headerText = fmt.Sprintf("%s (1 result)", query)
+		}
+		fmt.Println(headerStyle.Render(headerText))
 
 		if len(filtered) == 0 {
 			fmt.Println(extraStyle.Render("  (no results)"))
@@ -140,7 +144,7 @@ func printResultsFormatted(commandName string, query string, results []store.Res
 				title = hyperlink(true, uri, paddedTitle)
 			}
 
-			score := scoreStyle.Render(fmt.Sprintf("score=%.4f", r.Score))
+			score := scoreStyleFor(r.Score).Render(fmt.Sprintf("score=%.4f", r.Score))
 			line := fmt.Sprintf("%s %s  %s", rank, title, score)
 
 			if strings.Contains(commandName, "deep") {
@@ -188,7 +192,7 @@ func printResultsFormatted(commandName string, query string, results []store.Res
 					}
 					fmt.Println(dLine)
 				}
-				if i < len(filtered)-1 && len(details) > 0 {
+				if i < len(filtered)-1 {
 					fmt.Println()
 				}
 				continue
@@ -218,10 +222,24 @@ func printResultsFormatted(commandName string, query string, results []store.Res
 			fmt.Println(line)
 		}
 
+		hasDuplicateNotes := false
+		if len(filtered) > 1 {
+			seenSlugs := make(map[string]bool)
+			for _, r := range filtered {
+				if seenSlugs[r.NoteSlug] {
+					hasDuplicateNotes = true
+					break
+				}
+				seenSlugs[r.NoteSlug] = true
+			}
+		}
+
 		if useLinks {
 			fmt.Println("\n  " + extraStyle.Render("(Ctrl+click / Cmd+click a title to open in Obsidian)"))
 		}
-		fmt.Println("  " + extraStyle.Render("Note: Results are matching text chunks; Repeated titles represent different relevant sections."))
+		if hasDuplicateNotes {
+			fmt.Println("  " + extraStyle.Render("Note: Results are matching text chunks; Repeated titles represent different relevant sections."))
+		}
 		fmt.Println()
 	}
 }

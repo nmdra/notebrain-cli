@@ -36,16 +36,16 @@ import (
 )
 
 type SearchCmd struct {
-	Queries     []string `arg:"" optional:"" name:"query" help:"Search query or multiple queries (when using --split or multiple args)"`
-	Split       bool     `help:"Split query string by delimiters (comma, pipe, semicolon) or execute independent searches for each positional query argument"`
-	SplitBy     string   `name:"split-by" help:"Delimiters used to split query strings when --split is active" default:",|;"`
-	Limit       int      `help:"maximum number of results to return" default:"10"`
-	TopKPerNote int      `name:"top-k" help:"maximum number of chunks to return per note" default:"3"`
-	Section     string   `help:"filter by heading path"`
-	Tag         string   `help:"filter or search by tag name"`
-	HasTasks    bool     `help:"only return chunks that contain task lists"`
-	HasCode     bool     `help:"only return chunks that contain code blocks"`
-	Interactive bool     `help:"launch live interactive search TUI"`
+	Queries     []string `arg:"" optional:"" name:"query" help:"search query (multiple args for multi-hit boosting)"`
+	Split       bool     `help:"split query by delimiters for independent sub-searches with multi-hit boosting"`
+	SplitBy     string   `name:"split-by" help:"delimiter characters for --split" default:",|;"`
+	Limit       int      `help:"maximum number of results" default:"10"`
+	TopKPerNote int      `name:"top-k" help:"maximum chunks to retain per note (prevents one note dominating)" default:"3"`
+	Section     string   `help:"filter results to chunks under this heading path (e.g. 'Architecture > Components')"`
+	Tag         string   `help:"filter results to notes with this tag"`
+	HasTasks    bool     `help:"only return chunks containing task lists (checkboxes)"`
+	HasCode     bool     `help:"only return chunks containing fenced code blocks"`
+	Interactive bool     `help:"launch the live interactive search TUI"`
 }
 
 func resolveQueries(queries []string, split bool, splitBy string) []string {
