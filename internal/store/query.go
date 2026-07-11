@@ -1103,10 +1103,33 @@ func (s *Store) GetNote(ctx context.Context, slugOrPath string) (*NoteContent, e
 	tags := decodeTags(firstMeta)
 
 	var textParts []string
+	var prevParts []string
 	for _, c := range chunks {
+		hp := metaString(c.meta, "heading_path")
+		var currParts []string
+		if hp != "" {
+			currParts = strings.Split(hp, " > ")
+		}
+
+		commonLen := 0
+		for commonLen < len(prevParts) && commonLen < len(currParts) && prevParts[commonLen] == currParts[commonLen] {
+			commonLen++
+		}
+
+		for i := commonLen; i < len(currParts); i++ {
+			lvl := i + 1
+			if i == len(currParts)-1 {
+				if hLvl := metaInt(c.meta, "heading_level"); hLvl > 0 {
+					lvl = hLvl
+				}
+			}
+			textParts = append(textParts, strings.Repeat("#", lvl)+" "+currParts[i])
+		}
+
 		if c.text != "" {
 			textParts = append(textParts, c.text)
 		}
+		prevParts = currParts
 	}
 	fullText := strings.Join(textParts, "\n\n")
 

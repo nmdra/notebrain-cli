@@ -411,6 +411,88 @@ func TestGetNote(t *testing.T) {
 	}
 }
 
+func TestGetNote_WithHeadings(t *testing.T) {
+	ctx := context.Background()
+	st := newTestStore(t)
+
+	chunks := []store.ChunkRecord{
+		{
+			ID:           "heading-note:0",
+			NoteSlug:     "heading-note",
+			Title:        "Heading Note",
+			FilePath:     "Heading Note.md",
+			ChunkIndex:   0,
+			Text:         "This is the overview.",
+			HeadingPath:  "Overview",
+			HeadingLevel: 1,
+			ModifiedMs:   time.Now().UnixMilli(),
+			Embedding:    []float32{1.0, 0.0, 0.0},
+		},
+		{
+			ID:           "heading-note:1",
+			NoteSlug:     "heading-note",
+			Title:        "Heading Note",
+			FilePath:     "Heading Note.md",
+			ChunkIndex:   1,
+			Text:         "Second paragraph of overview.",
+			HeadingPath:  "Overview",
+			HeadingLevel: 1,
+			ModifiedMs:   time.Now().UnixMilli(),
+			Embedding:    []float32{1.0, 0.0, 0.0},
+		},
+		{
+			ID:           "heading-note:2",
+			NoteSlug:     "heading-note",
+			Title:        "Heading Note",
+			FilePath:     "Heading Note.md",
+			ChunkIndex:   2,
+			Text:         "Architectural details.",
+			HeadingPath:  "Overview > Architecture",
+			HeadingLevel: 2,
+			ModifiedMs:   time.Now().UnixMilli(),
+			Embedding:    []float32{1.0, 0.0, 0.0},
+		},
+		{
+			ID:           "heading-note:3",
+			NoteSlug:     "heading-note",
+			Title:        "Heading Note",
+			FilePath:     "Heading Note.md",
+			ChunkIndex:   3,
+			Text:         "Component A details.",
+			HeadingPath:  "Overview > Architecture > Component A",
+			HeadingLevel: 3,
+			ModifiedMs:   time.Now().UnixMilli(),
+			Embedding:    []float32{1.0, 0.0, 0.0},
+		},
+	}
+	if err := st.UpsertChunks(ctx, chunks); err != nil {
+		t.Fatalf("UpsertChunks failed: %v", err)
+	}
+
+	note, err := st.GetNote(ctx, "heading-note")
+	if err != nil {
+		t.Fatalf("GetNote failed: %v", err)
+	}
+
+	expected := `# Overview
+
+This is the overview.
+
+Second paragraph of overview.
+
+## Architecture
+
+Architectural details.
+
+### Component A
+
+Component A details.`
+
+	if note.Text != expected {
+		t.Errorf("GetNote text mismatch.\nExpected:\n%s\nGot:\n%s", expected, note.Text)
+	}
+}
+
 func TestSemanticSearch_TopKDeduplication(t *testing.T) {
 	ctx := context.Background()
 	st := newTestStore(t)
