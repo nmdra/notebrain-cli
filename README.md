@@ -92,8 +92,12 @@ notebrain search "how do message brokers work?" --limit 5 --top-k 2
 Find notes that share similar concepts without direct wikilinks, using `--deep` chunk-by-chunk section matching (`§ <Heading>`):
 
 ```bash
-notebrain hidden "Event-Driven Architecture" --deep --limit 5 --top-k 2
+notebrain hidden "TLS" --deep
 ```
+
+<p align="center">
+  <img src="assets/deep-hidden-connections.png" alt="Notebrain deep hidden connections" width="100%">
+</p>
 
 **4. Get structured output for scripts and AI agents:**
 
