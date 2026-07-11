@@ -66,7 +66,7 @@ notebrain-cli/
 - Name test files `*_test.go` alongside the source file.
 - **Go Vendoring:** This repository uses Go vendoring (`vendor/`). Whenever dependencies in `go.mod` or `go.sum` are added, removed, or updated, you MUST run `go mod vendor` before running tests or builds.
 - **Strict Non-Regression Guardrails:** When refactoring or removing features, always add explicit assertion tests across `config/`, `internal/configfile/`, and `internal/store/` to verify that existing core functions, default settings, TOML key resolution, and database initialization do not regress or depend on removed parameters.
-- **CLI Testing & Flag Standards:** When executing CLI commands or writing automated tests/scripts for NoteBrain, strictly use the exact flag names `--vault-path` and `--chroma-path` (never `--vault` or `--db`). For graph and note commands (`backlinks`, `connections`, `hidden`, `tags`, `get`), pass exactly one positional argument: the note slug (`<note>`). For `boosted` search, always provide the required `--seed=<slug>` flag. When testing `reset` in automated scripts, pipe confirmation via stdin (`echo yes | ./notebrain reset`).
+- **CLI Testing & Flag Standards:** When executing CLI commands or writing automated tests/scripts for NoteBrain, strictly use the exact flag names `--vault-path` and `--chroma-path` (never `--vault` or `--db`). For graph and note commands (`backlinks`, `connections`, `hidden`, `tags`, `get`), pass exactly one positional argument: the note slug (`<note>`). For `boosted` search, always provide the required `--seed=<slug>` flag. When testing `hidden` connection discovery where already-linked notes should be included, pass `--include-linked`. Note that `backlinks` and `connections` canonicalize link targets by stripping `#heading` anchors and matching exact vault subfolders. When testing `reset` in automated scripts, pipe confirmation via stdin (`echo yes | ./notebrain reset`). To avoid TUI formatting and contextual empty-result hints in automated scripts, always request machine formats (`--format=json`, `tsv`, `ndjson`, or `--jsonpath`).
 
 ## Coding Conventions
 
@@ -83,7 +83,7 @@ notebrain-cli/
 | Collection | Purpose | Has Embeddings |
 |---|---|---|
 | `nb_chunks` | Note text chunks with vectors + metadata | Yes |
-| `nb_links` | Wikilink graph edges (metadata-only) | No (dummy 1-dim) |
+| `nb_links` | Wikilink graph edges (metadata-only) | No (dummy 16-dim random L2 vectors) |
 
 ## Testing Strategy
 
@@ -109,10 +109,11 @@ fix(ingest): handle empty frontmatter gracefully
 
 1. Tags encoded as `tag_0`, `tag_1`, … (not array metadata) for Go client compatibility.
 2. Graph traversal (BFS) done in Go, not SQL — ChromaDB has no SQL.
-3. `nb_links` uses dummy 1-dim embeddings since Chroma requires uniform dimensions per collection.
+3. `nb_links` uses dummy 16-dimensional random float vectors in L2 space because Chroma requires non-empty vectors with uniform dimensions per collection, and flat zero-vectors or 1-dim vectors trigger HNSW index degeneracy/crashes.
 4. `DeleteNoteChunks` BEFORE `UpsertChunks` (not after) to handle interrupted re-ingests.
 5. Persistent client is single-writer — fine for CLI usage.
 6. **TOML-Only Configuration:** Configuration hierarchy is strictly 2-tier: CLI flags > TOML configuration file (`~/.notebrain/config/config.toml` or `--config`). No `.env` files or application environment variable fallbacks are permitted. TOML keys support normalized matching (`snake_case` and `kebab-case` match interchangeably).
 7. **Embedded Persistent Storage Only:** NoteBrain strictly embeds ChromaDB in persistent mode (`CGO_ENABLED=1`). Standalone HTTP server connections (`CGO_ENABLED=0`) are intentionally unsupported to keep the CLI lightweight, self-contained, and zero-setup.
 8. **OS-Level Scheduled Ingestion:** In line with Unix philosophy, periodic re-indexing is handled by standard OS schedulers (cron, systemd timers) rather than a custom persistent background watch daemon or file-watching loop. Recommended ingestion interval is every 3 hours.
 9. **Decoupled Automated Ingestion Logging (No TUI for Ingestion):** Because `notebrain ingest` is frequently executed as an automated background task (cron, systemd timers, agentic workflows), it strictly uses structured logging (`log/slog`) for progress reporting. Interactive TUI progress bars (e.g., Bubble Tea) are intentionally disabled and omitted from the ingestion pipeline to guarantee clean, machine-readable operational logs.
+10. **Goldmark AST & Structural Continuity:** Note text chunking (`internal/parser`) strictly preserves syntax for Markdown lists (`1. `, `- `), task checkboxes (`[ ] `), blockquotes/callout headers (`> [!NOTE]`), and GFM tables with alignment separator rows (`| --- | --- |`). Distinct structural blocks (`paragraph`, `list`, `table`, `blockquote`, `code`) are separated by `\n\n` across chunks, while reconstructed notes (`notebrain get`) automatically prepend dynamic section headers (`### Section Heading\n\n<text>`).
