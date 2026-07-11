@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -346,14 +347,99 @@ func (s *Store) paginatedDistinctSlugs(ctx context.Context, where chroma.WhereFi
 	return slugs, nil
 }
 
+// buildLinkTargetResolver builds a mapping of link targets (titles, basenames, file paths) to canonical note slugs.
+func (s *Store) buildLinkTargetResolver(ctx context.Context) map[string]string {
+	resolver := make(map[string]string)
+	if ctx == nil {
+		return resolver
+	}
+	metas, err := s.paginatedZeroIndexMetadatas(ctx)
+	if err != nil {
+		return resolver
+	}
+	for _, m := range metas {
+		slug := metaString(m, "note_slug")
+		title := metaString(m, "title")
+		path := metaString(m, "file_path")
+		if slug == "" {
+			continue
+		}
+		resolver[slug] = slug
+		if title != "" {
+			resolver[title] = slug
+			resolver[strings.ToLower(title)] = slug
+			resolver[parser.Slugify(title)] = slug
+		}
+		if path != "" {
+			resolver[path] = slug
+			resolver[strings.ToLower(path)] = slug
+			resolver[parser.Slugify(path)] = slug
+			base := filepath.Base(path)
+			baseNoExt := strings.TrimSuffix(base, filepath.Ext(base))
+			if baseNoExt != "" {
+				resolver[baseNoExt] = slug
+				resolver[strings.ToLower(baseNoExt)] = slug
+				resolver[parser.Slugify(baseNoExt)] = slug
+			}
+		}
+	}
+	return resolver
+}
+
+// linkWhereFilters builds a Chroma WhereFilter matching both exact targetSlug and uncanonicalized candidates.
+func (s *Store) linkWhereFilters(ctx context.Context, targetSlug string, resolver map[string]string) chroma.WhereFilter {
+	candidatesMap := map[string]struct{}{
+		targetSlug: {},
+	}
+	title, filePath, found := s.noteInfoForSlug(ctx, targetSlug)
+	if found {
+		if title != "" {
+			candidatesMap[title] = struct{}{}
+			candidatesMap[parser.Slugify(title)] = struct{}{}
+		}
+		if filePath != "" {
+			base := filepath.Base(filePath)
+			baseNoExt := strings.TrimSuffix(base, filepath.Ext(base))
+			if baseNoExt != "" {
+				candidatesMap[baseNoExt] = struct{}{}
+				candidatesMap[parser.Slugify(baseNoExt)] = struct{}{}
+			}
+		}
+	}
+	for k, v := range resolver {
+		if v == targetSlug && k != "" {
+			candidatesMap[k] = struct{}{}
+			candidatesMap[parser.Slugify(k)] = struct{}{}
+		}
+	}
+	var whereFilters []chroma.WhereClause
+	for c := range candidatesMap {
+		if c == "" {
+			continue
+		}
+		whereFilters = append(whereFilters,
+			chroma.EqString("target_slug", c),
+			chroma.EqString("target_path", c),
+		)
+	}
+	if len(whereFilters) == 1 {
+		return whereFilters[0]
+	}
+	if len(whereFilters) > 1 {
+		return chroma.Or(whereFilters...)
+	}
+	return chroma.EqString("target_slug", targetSlug)
+}
+
 // ─── Backlinks ───────────────────────────────────────────────────
 
 // Backlinks returns all notes that link TO targetSlug.
 func (s *Store) Backlinks(ctx context.Context, targetSlug string) ([]Result, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+	resolver := s.buildLinkTargetResolver(ctx)
 	res, err := s.links.Get(ctx,
-		chroma.WithWhere(chroma.EqString("target_slug", targetSlug)),
+		chroma.WithWhere(s.linkWhereFilters(ctx, targetSlug, resolver)),
 		chroma.WithInclude(chroma.IncludeMetadatas),
 	)
 	if err != nil {
@@ -367,6 +453,9 @@ func (s *Store) Backlinks(ctx context.Context, targetSlug string) ([]Result, err
 			continue
 		}
 		slug := metaString(meta, "source_slug")
+		if canon, ok := resolver[slug]; ok && canon != "" {
+			slug = canon
+		}
 		if seen[slug] {
 			continue
 		}
@@ -392,6 +481,7 @@ func (s *Store) Backlinks(ctx context.Context, targetSlug string) ([]Result, err
 func (s *Store) Connections(ctx context.Context, seedSlug string, maxHops int) ([]Result, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+	resolver := s.buildLinkTargetResolver(ctx)
 	visited := map[string]int{seedSlug: 0} // slug → hop count
 	frontier := []string{seedSlug}
 
@@ -412,6 +502,11 @@ func (s *Store) Connections(ctx context.Context, seedSlug string, maxHops int) (
 						continue
 					}
 					tgt := metaString(meta, "target_slug")
+					if canon, ok := resolver[tgt]; ok && canon != "" {
+						tgt = canon
+					} else if canon, ok := resolver[metaString(meta, "target_path")]; ok && canon != "" {
+						tgt = canon
+					}
 					if _, ok := visited[tgt]; !ok {
 						visited[tgt] = hop
 						next = append(next, tgt)
@@ -420,7 +515,7 @@ func (s *Store) Connections(ctx context.Context, seedSlug string, maxHops int) (
 			}
 			// Incoming links (bidirectional)
 			in, err := s.links.Get(ctx,
-				chroma.WithWhere(chroma.EqString("target_slug", src)),
+				chroma.WithWhere(s.linkWhereFilters(ctx, src, resolver)),
 				chroma.WithInclude(chroma.IncludeMetadatas),
 			)
 			if err != nil {
@@ -432,6 +527,9 @@ func (s *Store) Connections(ctx context.Context, seedSlug string, maxHops int) (
 						continue
 					}
 					tgt := metaString(meta, "source_slug")
+					if canon, ok := resolver[tgt]; ok && canon != "" {
+						tgt = canon
+					}
 					if _, ok := visited[tgt]; !ok {
 						visited[tgt] = hop
 						next = append(next, tgt)
@@ -851,6 +949,7 @@ func getResultToResults(res chroma.GetResult, limit int) []Result {
 // linkedSlugs returns a set of note slugs linked to/from slug.
 func (s *Store) linkedSlugs(ctx context.Context, slug string) (map[string]bool, error) {
 	set := map[string]bool{}
+	resolver := s.buildLinkTargetResolver(ctx)
 	out, err := s.links.Get(ctx,
 		chroma.WithWhere(chroma.EqString("source_slug", slug)),
 		chroma.WithInclude(chroma.IncludeMetadatas),
@@ -861,12 +960,21 @@ func (s *Store) linkedSlugs(ctx context.Context, slug string) (map[string]bool, 
 	if out != nil {
 		for _, m := range out.GetMetadatas() {
 			if t := metaString(m, "target_slug"); t != "" {
-				set[t] = true
+				if canon, ok := resolver[t]; ok && canon != "" {
+					set[canon] = true
+				} else {
+					set[t] = true
+				}
+			}
+			if p := metaString(m, "target_path"); p != "" {
+				if canon, ok := resolver[p]; ok && canon != "" {
+					set[canon] = true
+				}
 			}
 		}
 	}
 	in, err := s.links.Get(ctx,
-		chroma.WithWhere(chroma.EqString("target_slug", slug)),
+		chroma.WithWhere(s.linkWhereFilters(ctx, slug, resolver)),
 		chroma.WithInclude(chroma.IncludeMetadatas),
 	)
 	if err != nil {
@@ -875,7 +983,11 @@ func (s *Store) linkedSlugs(ctx context.Context, slug string) (map[string]bool, 
 	if in != nil {
 		for _, m := range in.GetMetadatas() {
 			if src := metaString(m, "source_slug"); src != "" {
-				set[src] = true
+				if canon, ok := resolver[src]; ok && canon != "" {
+					set[canon] = true
+				} else {
+					set[src] = true
+				}
 			}
 		}
 	}

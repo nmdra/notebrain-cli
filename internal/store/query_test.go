@@ -889,3 +889,49 @@ func TestStoreOpen_WithSkipAttachments(t *testing.T) {
 		t.Errorf("Expected 0 backlinks for image.png when SkipAttachments=true, got %v", imgBacklinks)
 	}
 }
+
+func TestBacklinks_SubfolderSlugResolution(t *testing.T) {
+	ctx := context.Background()
+	st := newTestStore(t)
+
+	chunks := []store.ChunkRecord{
+		{
+			ID:         "01projectssystem-design02-scalability:0",
+			NoteSlug:   "01projectssystem-design02-scalability",
+			Title:      "02 - Scalability",
+			FilePath:   "01.Projects/System Design/02 - Scalability.md",
+			ChunkIndex: 0,
+			Text:       "Scalability notes",
+			ModifiedMs: time.Now().UnixMilli(),
+			Embedding:  []float32{1.0, 0.0, 0.0},
+		},
+		{
+			ID:         "01projectssystem-designsystem-design:0",
+			NoteSlug:   "01projectssystem-designsystem-design",
+			Title:      "System Design",
+			FilePath:   "01.Projects/System Design/System Design.md",
+			ChunkIndex: 0,
+			Text:       "Overview link [[02 - Scalability#Proxy]]",
+			HasLinks:   true,
+			ModifiedMs: time.Now().UnixMilli(),
+			Embedding:  []float32{1.0, 0.0, 0.0},
+		},
+	}
+	if err := st.UpsertChunks(ctx, chunks); err != nil {
+		t.Fatalf("UpsertChunks: %v", err)
+	}
+
+	// Source note links to "02 - Scalability#Proxy" (title + heading anchor)
+	if err := st.UpsertLinks(ctx, "01projectssystem-designsystem-design", []string{"02 - Scalability#Proxy"}); err != nil {
+		t.Fatalf("UpsertLinks: %v", err)
+	}
+
+	// Backlinks query for the canonical target slug
+	res, err := st.Backlinks(ctx, "01projectssystem-design02-scalability")
+	if err != nil {
+		t.Fatalf("Backlinks: %v", err)
+	}
+	if len(res) != 1 || res[0].NoteSlug != "01projectssystem-designsystem-design" {
+		t.Errorf("Expected 1 backlink from System Design note, got %v", res)
+	}
+}

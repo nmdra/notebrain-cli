@@ -48,7 +48,7 @@ func (s *Store) IngestNote(ctx context.Context, noteSlug string, chunks []ChunkR
 		return err
 	}
 	// 3. Sync links (upserts new/existing, deletes stale)
-	return s.upsertLinks(ctx, noteSlug, links)
+	return s.upsertLinks(ctx, noteSlug, links, s.buildLinkTargetResolver(ctx))
 }
 
 type BatchIngestData struct {
@@ -130,9 +130,10 @@ func (s *Store) BatchIngest(ctx context.Context, data []BatchIngestData, staleSl
 	}
 
 	// 4. Batch upsert new links
+	resolver := s.buildLinkTargetResolver(ctx)
 	for _, d := range data {
 		if len(d.Links) > 0 {
-			if err := s.upsertLinks(ctx, d.NoteSlug, d.Links); err != nil {
+			if err := s.upsertLinks(ctx, d.NoteSlug, d.Links, resolver); err != nil {
 				return fmt.Errorf("batch upsert links for %s: %w", d.NoteSlug, err)
 			}
 		}
@@ -235,11 +236,11 @@ func (s *Store) cleanupNoteChunks(ctx context.Context, noteSlug string, validCou
 func (s *Store) UpsertLinks(ctx context.Context, noteSlug string, links []string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.upsertLinks(ctx, noteSlug, links)
+	return s.upsertLinks(ctx, noteSlug, links, s.buildLinkTargetResolver(ctx))
 }
 
 // upsertLinks is the unlocked implementation. Caller must hold s.mu.
-func (s *Store) upsertLinks(ctx context.Context, noteSlug string, links []string) error {
+func (s *Store) upsertLinks(ctx context.Context, noteSlug string, links []string, resolver map[string]string) error {
 	// Deduplicate links
 	uniqueLinks := make([]string, 0, len(links))
 	seenSlugs := make(map[string]struct{}, len(links))
@@ -249,7 +250,33 @@ func (s *Store) upsertLinks(ctx context.Context, noteSlug string, links []string
 		if s.SkipAttachments && parser.IsAttachmentLink(l) {
 			continue
 		}
-		targetSlug := parser.Slugify(l)
+		linkBase := l
+		if idx := strings.Index(linkBase, "#"); idx != -1 {
+			linkBase = strings.TrimSpace(linkBase[:idx])
+		}
+		if linkBase == "" {
+			continue
+		}
+		targetSlug := ""
+		if resolver != nil {
+			if s, ok := resolver[linkBase]; ok && s != "" {
+				targetSlug = s
+			} else if s, ok := resolver[strings.ToLower(linkBase)]; ok && s != "" {
+				targetSlug = s
+			} else if s, ok := resolver[parser.Slugify(linkBase)]; ok && s != "" {
+				targetSlug = s
+			}
+		}
+		if targetSlug == "" {
+			if ctx != nil && resolver == nil {
+				if resolved, err := s.ResolveNoteSlug(ctx, linkBase); err == nil && resolved != "" {
+					targetSlug = resolved
+				}
+			}
+			if targetSlug == "" || targetSlug == linkBase {
+				targetSlug = parser.Slugify(linkBase)
+			}
+		}
 		if targetSlug == "" {
 			continue
 		}
