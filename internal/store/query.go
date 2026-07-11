@@ -564,9 +564,29 @@ func (s *Store) Connections(ctx context.Context, seedSlug string, maxHops int) (
 
 // ─── Hidden Connections ───────────────────────────────────────────
 
+type HiddenOptions struct {
+	IncludeLinked bool
+}
+
+type HiddenOption func(*HiddenOptions)
+
+// WithIncludeLinked allows returning notes that are already linked to/from the seed note.
+func WithIncludeLinked(includeLinked bool) HiddenOption {
+	return func(o *HiddenOptions) {
+		o.IncludeLinked = includeLinked
+	}
+}
+
 // HiddenConnections finds notes semantically similar to queryVec
-// but NOT already linked to/from seedSlug.
-func (s *Store) HiddenConnections(ctx context.Context, queryVec []float32, seedSlug string, limit int, includeText bool) ([]Result, error) {
+// but NOT already linked to/from seedSlug (unless WithIncludeLinked is set).
+func (s *Store) HiddenConnections(ctx context.Context, queryVec []float32, seedSlug string, limit int, includeText bool, options ...HiddenOption) ([]Result, error) {
+	opts := HiddenOptions{}
+	for _, opt := range options {
+		if opt != nil {
+			opt(&opts)
+		}
+	}
+
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	// 1. Collect all slugs already linked to/from seed
@@ -582,10 +602,13 @@ func (s *Store) HiddenConnections(ctx context.Context, queryVec []float32, seedS
 		return nil, err
 	}
 
-	// 3. Filter out already-linked notes
+	// 3. Filter out already-linked notes (or self if IncludeLinked is true)
 	var out []Result
 	for _, r := range candidates {
-		if linked[r.NoteSlug] {
+		if r.NoteSlug == seedSlug {
+			continue
+		}
+		if !opts.IncludeLinked && linked[r.NoteSlug] {
 			continue
 		}
 		out = append(out, r)
@@ -598,7 +621,14 @@ func (s *Store) HiddenConnections(ctx context.Context, queryVec []float32, seedS
 
 // HiddenConnectionsDeep runs chunk-by-chunk semantic comparison between all chunks of seedSlug
 // and all other chunks in the vault. Returns deduplicated results and the labels of the seed chunks analyzed.
-func (s *Store) HiddenConnectionsDeep(ctx context.Context, seedSlug string, limit int, topKPerNote int, includeText bool) ([]Result, []string, error) {
+func (s *Store) HiddenConnectionsDeep(ctx context.Context, seedSlug string, limit int, topKPerNote int, includeText bool, options ...HiddenOption) ([]Result, []string, error) {
+	opts := HiddenOptions{}
+	for _, opt := range options {
+		if opt != nil {
+			opt(&opts)
+		}
+	}
+
 	resolved, err := s.ResolveNoteSlug(ctx, seedSlug)
 	if err != nil {
 		return nil, nil, err
@@ -679,10 +709,13 @@ func (s *Store) HiddenConnectionsDeep(ctx context.Context, seedSlug string, limi
 		return nil, nil, fmt.Errorf("hidden connections deep: %w", err)
 	}
 
-	// 4. Filter out already-linked notes
+	// 4. Filter out already-linked notes (or self if IncludeLinked is true)
 	var out []Result
 	for _, r := range candidates {
-		if linked[r.NoteSlug] {
+		if r.NoteSlug == seedSlug {
+			continue
+		}
+		if !opts.IncludeLinked && linked[r.NoteSlug] {
 			continue
 		}
 		out = append(out, r)

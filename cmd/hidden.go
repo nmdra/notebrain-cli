@@ -25,13 +25,15 @@ import (
 	"fmt"
 
 	"github.com/nmdra/notebrain-cli/v2/internal/embedder"
+	"github.com/nmdra/notebrain-cli/v2/internal/store"
 )
 
 type HiddenCmd struct {
-	Note  string `arg:"" help:"note slug, title, or file path (auto-resolved)"`
-	Limit int    `help:"maximum number of hidden connections to return" default:"10"`
-	Deep  bool   `help:"analyze each chunk individually for granular section-level matches"`
-	TopK  int    `name:"top-k" help:"chunks to evaluate per candidate note in --deep mode" default:"3"`
+	Note          string `arg:"" help:"note slug, title, or file path (auto-resolved)"`
+	Limit         int    `help:"maximum number of hidden connections to return" default:"10"`
+	Deep          bool   `help:"analyze each chunk individually for granular section-level matches"`
+	TopK          int    `name:"top-k" help:"chunks to evaluate per candidate note in --deep mode" default:"3"`
+	IncludeLinked bool   `name:"include-linked" help:"include notes even if they are already linked directly or indirectly"`
 }
 
 func (c *HiddenCmd) Run(globals *Globals) error {
@@ -50,14 +52,22 @@ func (c *HiddenCmd) Run(globals *Globals) error {
 		return err
 	}
 
+	opts := []store.HiddenOption{store.WithIncludeLinked(c.IncludeLinked)}
+
 	if c.Deep {
-		results, seedChunks, err := st.HiddenConnectionsDeep(ctx, targetSlug, limit, c.TopK, globals.IncludeText)
+		results, seedChunks, err := st.HiddenConnectionsDeep(ctx, targetSlug, limit, c.TopK, globals.IncludeText, opts...)
 		if err != nil {
 			return err
 		}
 		st.PopulateContext(ctx, results, globals.ContextWindow)
 		globals.Queries = seedChunks
-		printResultsFormatted("hidden --deep", fmt.Sprintf("Deep chunk-by-chunk hidden connections for: %q (slug: %s) [%d target chunks analyzed]", targetNote, targetSlug, len(seedChunks)), results, globals)
+		cmdName := "hidden --deep"
+		title := fmt.Sprintf("Deep chunk-by-chunk hidden connections for: %q (slug: %s) [%d target chunks analyzed]", targetNote, targetSlug, len(seedChunks))
+		if c.IncludeLinked {
+			cmdName = "hidden --deep --include-linked"
+			title = fmt.Sprintf("Deep chunk-by-chunk related connections (including linked) for: %q (slug: %s) [%d target chunks analyzed]", targetNote, targetSlug, len(seedChunks))
+		}
+		printResultsFormatted(cmdName, title, results, globals)
 		return nil
 	}
 
@@ -72,12 +82,18 @@ func (c *HiddenCmd) Run(globals *Globals) error {
 		return err
 	}
 
-	results, err := st.HiddenConnections(ctx, qVec, targetSlug, limit, globals.IncludeText)
+	results, err := st.HiddenConnections(ctx, qVec, targetSlug, limit, globals.IncludeText, opts...)
 	if err != nil {
 		return err
 	}
 	st.PopulateContext(ctx, results, globals.ContextWindow)
 
-	printResultsFormatted("hidden", fmt.Sprintf("Hidden connections for: %q (slug: %s)", targetNote, targetSlug), results, globals)
+	cmdName := "hidden"
+	title := fmt.Sprintf("Hidden connections for: %q (slug: %s)", targetNote, targetSlug)
+	if c.IncludeLinked {
+		cmdName = "hidden --include-linked"
+		title = fmt.Sprintf("Related connections (including linked) for: %q (slug: %s)", targetNote, targetSlug)
+	}
+	printResultsFormatted(cmdName, title, results, globals)
 	return nil
 }

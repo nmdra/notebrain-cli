@@ -120,11 +120,47 @@ func printTSVResults(w io.Writer, filtered []store.Result) {
 	}
 }
 
+func emptyResultHint(commandName string) string {
+	if strings.HasPrefix(commandName, "backlinks") {
+		return "No incoming links found. Other notes may not reference this note, or the vault may need re-indexing: notebrain ingest"
+	}
+	if strings.HasPrefix(commandName, "connections") {
+		return "No graph connections found within N hops. Try increasing --hops or check that the note has wikilinks."
+	}
+	if strings.HasPrefix(commandName, "hidden --deep") {
+		if strings.Contains(commandName, "--include-linked") {
+			return "No semantically similar notes found (deep mode). The note may be too unique, or the vault may need re-indexing: notebrain ingest"
+		}
+		return "No hidden connections found (deep mode). All semantically similar notes may already be linked. Try --include-linked to include them."
+	}
+	if strings.HasPrefix(commandName, "hidden") {
+		if strings.Contains(commandName, "--include-linked") {
+			return "No semantically similar notes found. The note may be too unique, or the vault may need re-indexing: notebrain ingest"
+		}
+		return "No hidden connections found. All semantically similar notes may already be linked. Try --include-linked to include them."
+	}
+	if strings.HasPrefix(commandName, "tags") {
+		return "No notes share tags with this note. The note may have no tags, or try lowering --min-shared."
+	}
+	if strings.HasPrefix(commandName, "search") {
+		return "No matching notes found. Try broadening your query, or check that the vault is indexed: notebrain ingest"
+	}
+	if strings.HasPrefix(commandName, "boosted") {
+		return "No results for this query. Try broadening your search terms or adjusting --boost."
+	}
+	return ""
+}
+
 func printTextResults(w io.Writer, commandName, query string, filtered []store.Result, globals *Globals) {
 	_, _ = fmt.Fprintln(w, headerStyle.Render(query))
 
 	if len(filtered) == 0 {
-		_, _ = fmt.Fprintln(w, extraStyle.Render("  (no results)"))
+		hint := emptyResultHint(commandName)
+		if hint != "" {
+			_, _ = fmt.Fprintln(w, hintStyle.Render("  "+hint))
+		} else {
+			_, _ = fmt.Fprintln(w, extraStyle.Render("  (no results)"))
+		}
 		return
 	}
 

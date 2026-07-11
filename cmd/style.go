@@ -18,6 +18,7 @@ var (
 	scoreStyle     lipgloss.Style
 	warnScoreStyle lipgloss.Style
 	extraStyle     lipgloss.Style
+	hintStyle      lipgloss.Style
 	rankStyle      lipgloss.Style
 	boxStyle       lipgloss.Style
 )
@@ -47,6 +48,10 @@ func initStyles() {
 
 		extraStyle = lipgloss.NewStyle().
 			Foreground(colorMuted).
+			Italic(true)
+
+		hintStyle = lipgloss.NewStyle().
+			Foreground(colorWarn).
 			Italic(true)
 
 		rankStyle = lipgloss.NewStyle().

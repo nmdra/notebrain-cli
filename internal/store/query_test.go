@@ -153,6 +153,58 @@ func TestHiddenConnectionsDeep(t *testing.T) {
 	}
 }
 
+func TestHiddenConnections_WithIncludeLinked(t *testing.T) {
+	ctx, st, qVec := setupStoreTest(t)
+	// note-a has outgoing link to note-b in setupStoreTest.
+	// Without WithIncludeLinked(true), note-b is excluded. With WithIncludeLinked(true), note-b is included.
+	hiddenNormal, err := st.HiddenConnections(ctx, qVec, "note-a", 10, false)
+	if err != nil {
+		t.Fatalf("HiddenConnections failed: %v", err)
+	}
+	for _, r := range hiddenNormal {
+		if r.NoteSlug == "note-b" || r.NoteSlug == "note-a" {
+			t.Errorf("Expected normal HiddenConnections to exclude linked note-b and self note-a, got %v", hiddenNormal)
+		}
+	}
+
+	hiddenLinked, err := st.HiddenConnections(ctx, qVec, "note-a", 10, false, store.WithIncludeLinked(true))
+	if err != nil {
+		t.Fatalf("HiddenConnections WithIncludeLinked failed: %v", err)
+	}
+	foundB := false
+	for _, r := range hiddenLinked {
+		if r.NoteSlug == "note-b" {
+			foundB = true
+		}
+		if r.NoteSlug == "note-a" {
+			t.Errorf("Expected WithIncludeLinked to still exclude self note-a, got %v", hiddenLinked)
+		}
+	}
+	if !foundB {
+		t.Errorf("Expected WithIncludeLinked(true) to include linked note-b, got %v", hiddenLinked)
+	}
+}
+
+func TestHiddenConnectionsDeep_WithIncludeLinked(t *testing.T) {
+	ctx, st, _ := setupStoreTest(t)
+	hiddenLinked, _, err := st.HiddenConnectionsDeep(ctx, "note-a", 10, 3, false, store.WithIncludeLinked(true))
+	if err != nil {
+		t.Fatalf("HiddenConnectionsDeep WithIncludeLinked failed: %v", err)
+	}
+	foundB := false
+	for _, r := range hiddenLinked {
+		if r.NoteSlug == "note-b" {
+			foundB = true
+		}
+		if r.NoteSlug == "note-a" {
+			t.Errorf("Expected deep WithIncludeLinked to still exclude self note-a, got %v", hiddenLinked)
+		}
+	}
+	if !foundB {
+		t.Errorf("Expected deep WithIncludeLinked(true) to include linked note-b, got %v", hiddenLinked)
+	}
+}
+
 func TestMultiSemanticSearch_ThresholdFiltering(t *testing.T) {
 	ctx, st, _ := setupStoreTest(t)
 	chunks := []store.ChunkRecord{

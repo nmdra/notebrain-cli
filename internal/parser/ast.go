@@ -722,7 +722,7 @@ func extractBlockquoteText(bq *ast.Blockquote, src []byte, indent int) string {
 		}
 
 		if strings.TrimSpace(childText) != "" {
-			for _, line := range strings.Split(childText, "\n") {
+			for line := range strings.SplitSeq(childText, "\n") {
 				lines = append(lines, prefix+line)
 			}
 		}
