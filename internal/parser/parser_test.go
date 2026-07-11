@@ -267,6 +267,104 @@ func TestParse_SkipAttachments(t *testing.T) {
 	}
 }
 
+func TestParse_ASTStructure(t *testing.T) {
+	tests := []struct {
+		name         string
+		body         string
+		wantTextSubs []string
+		wantRichSubs []string
+		wantHasTask  bool
+	}{
+		{
+			name: "tight_ordered_list",
+			body: "### Modular Architecture\n\nOpenChoreo is designed to be highly extensible. You can:\n\n1. Use default modules — sensible defaults\n2. Swap modules — replace default module\n3. Build your own — create custom modules\n\nThis architecture allows tools to be integrated without issue.",
+			wantTextSubs: []string{
+				"OpenChoreo is designed to be highly extensible. You can:\n\n1. Use default modules — sensible defaults\n2. Swap modules — replace default module\n3. Build your own — create custom modules\n\nThis architecture allows tools to be integrated without issue.",
+			},
+			wantRichSubs: []string{
+				"1. Use default modules — sensible defaults",
+				"2. Swap modules — replace default module",
+				"3. Build your own — create custom modules",
+			},
+		},
+		{
+			name: "unordered_bullet_list",
+			body: "# Bullets\n\n- First point\n- Second point\n",
+			wantTextSubs: []string{
+				"- First point\n- Second point",
+			},
+			wantRichSubs: []string{
+				"- First point\n- Second point",
+			},
+		},
+		{
+			name: "task_list",
+			body: "# Tasks\n\n- [ ] Unfinished task\n- [x] Completed task\n",
+			wantTextSubs: []string{
+				"- [ ] Unfinished task\n- [x] Completed task",
+			},
+			wantRichSubs: []string{
+				"- [ ] Unfinished task\n- [x] Completed task",
+			},
+			wantHasTask: true,
+		},
+		{
+			name: "nested_list",
+			body: "# Nested\n\n1. Top level one\n   - Nested bullet A\n   - Nested bullet B\n2. Top level two\n",
+			wantTextSubs: []string{
+				"1. Top level one\n  - Nested bullet A\n  - Nested bullet B\n2. Top level two",
+			},
+			wantRichSubs: []string{
+				"1. Top level one\n  - Nested bullet A\n  - Nested bullet B\n2. Top level two",
+			},
+		},
+		{
+			name: "table_structure",
+			body: "### Summary Data\n\n| Feature | Status | Priority |\n| --- | --- | --- |\n| Semantic Search | Active | High |\n| Graph View | Active | Medium |\n",
+			wantTextSubs: []string{
+				"| Feature | Status | Priority |\n| --- | --- | --- |\n| Semantic Search | Active | High |\n| Graph View | Active | Medium |",
+			},
+			wantRichSubs: []string{
+				"| Feature | Status | Priority |\n| --- | --- | --- |\n| Semantic Search | Active | High |\n| Graph View | Active | Medium |",
+			},
+		},
+		{
+			name: "blockquote_and_callout",
+			body: "# Quote\n\n> [!NOTE]\n> NoteBrain indexes Obsidian vaults into ChromaDB.\n> Graph boosted search is included.\n",
+			wantTextSubs: []string{
+				"> [!NOTE]\n> NoteBrain indexes Obsidian vaults into ChromaDB.\n> Graph boosted search is included.",
+			},
+			wantRichSubs: []string{
+				"> [!NOTE]\n> NoteBrain indexes Obsidian vaults into ChromaDB.\n> Graph boosted search is included.",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res := Parse(tt.body, "test-ast", 2000, 0, false)
+			if len(res.Chunks) == 0 {
+				t.Fatalf("expected at least 1 chunk for test %s, got 0", tt.name)
+			}
+			chunk := res.Chunks[0]
+
+			for _, sub := range tt.wantTextSubs {
+				if !strings.Contains(chunk.Text, sub) {
+					t.Errorf("chunk.Text missing expected substring.\nWant substring:\n%s\nGot Text:\n%s", sub, chunk.Text)
+				}
+			}
+			for _, sub := range tt.wantRichSubs {
+				if !strings.Contains(chunk.RichText, sub) {
+					t.Errorf("chunk.RichText missing expected substring.\nWant substring:\n%s\nGot RichText:\n%s", sub, chunk.RichText)
+				}
+			}
+			if chunk.HasTask != tt.wantHasTask {
+				t.Errorf("expected HasTask %v, got %v", tt.wantHasTask, chunk.HasTask)
+			}
+		})
+	}
+}
+
 func BenchmarkParse(b *testing.B) {
 	body := `---
 title: "Benchmark Note"

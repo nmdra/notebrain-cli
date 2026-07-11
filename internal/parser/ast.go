@@ -217,19 +217,43 @@ func extractSections(doc ast.Node, src []byte) []section {
 			})
 			return ast.WalkSkipChildren, nil
 
+		case *ast.List:
+			ensureCurrent()
+			t, isTask := extractListText(node, src, 0)
+			if t == "" {
+				return ast.WalkSkipChildren, nil
+			}
+			kind := "list"
+			if isTask {
+				kind = "task_list"
+			}
+			current.blocks = append(current.blocks, block{
+				kind: kind,
+				text: t,
+			})
+			return ast.WalkSkipChildren, nil
+
 		case *extast.Table:
 			ensureCurrent()
+			t := extractTableText(node, src)
+			if t == "" {
+				return ast.WalkSkipChildren, nil
+			}
 			current.blocks = append(current.blocks, block{
 				kind: "table",
-				text: extractText(node, src),
+				text: t,
 			})
 			return ast.WalkSkipChildren, nil
 
 		case *ast.Blockquote:
 			ensureCurrent()
+			t := extractBlockquoteText(node, src, 0)
+			if t == "" {
+				return ast.WalkSkipChildren, nil
+			}
 			current.blocks = append(current.blocks, block{
 				kind: "blockquote",
-				text: extractText(node, src),
+				text: t,
 			})
 			return ast.WalkSkipChildren, nil
 		}
@@ -286,24 +310,30 @@ func buildChunks(sections []section, noteSlug string, maxRunes, overlapRunes int
 
 		var prose strings.Builder
 		var codeInfos []codeBlockInfo
-		for _, b := range sec.blocks {
+		for idx, b := range sec.blocks {
+			if idx > 0 {
+				if b.kind == "paragraph" && sec.blocks[idx-1].kind == "paragraph" {
+					prose.WriteByte(' ')
+				} else {
+					prose.WriteString("\n\n")
+				}
+			}
 			switch b.kind {
 			case "code":
 				codeCount++
 				codeIdx := len(codeInfos)
 				codeInfos = append(codeInfos, codeBlockInfo{lang: b.language, code: b.codeText})
-				_, _ = fmt.Fprintf(&prose, "\x00CODE:%d:%s\x00 ", codeIdx, b.language)
+				_, _ = fmt.Fprintf(&prose, "\x00CODE:%d:%s\x00", codeIdx, b.language)
 			case "table":
 				hasTable = true
 				prose.WriteString(b.text)
-				prose.WriteByte(' ')
-			case "task_list":
-				hasTask = true
+			case "task_list", "list":
+				if b.kind == "task_list" {
+					hasTask = true
+				}
 				prose.WriteString(b.text)
-				prose.WriteByte(' ')
 			default:
 				prose.WriteString(b.text)
-				prose.WriteByte(' ')
 			}
 		}
 
@@ -529,4 +559,198 @@ func extractFrontmatterTags(fm map[string]any) []string {
 		}
 	}
 	return tags
+}
+
+func extractListText(l *ast.List, src []byte, indentLevel int) (string, bool) {
+	var lines []string
+	hasTask := false
+
+	itemIdx := 0
+	for child := l.FirstChild(); child != nil; child = child.NextSibling() {
+		item, ok := child.(*ast.ListItem)
+		if !ok {
+			continue
+		}
+
+		prefix := strings.Repeat("  ", indentLevel)
+		if l.IsOrdered() {
+			start := l.Start
+			if start == 0 {
+				start = 1
+			}
+			prefix += fmt.Sprintf("%d. ", start+itemIdx)
+		} else {
+			prefix += "- "
+		}
+
+		var itemParts []string
+		for itemChild := item.FirstChild(); itemChild != nil; itemChild = itemChild.NextSibling() {
+			switch sub := itemChild.(type) {
+			case *ast.List:
+				nestedText, nestedTask := extractListText(sub, src, indentLevel+1)
+				if nestedText != "" {
+					itemParts = append(itemParts, nestedText)
+				}
+				if nestedTask {
+					hasTask = true
+				}
+			default:
+				t, task := extractItemText(sub, src)
+				if task {
+					hasTask = true
+				}
+				if t != "" {
+					if len(itemParts) == 0 {
+						itemParts = append(itemParts, prefix+t)
+					} else {
+						itemParts = append(itemParts, strings.Repeat("  ", indentLevel+1)+t)
+					}
+				}
+			}
+		}
+
+		if len(itemParts) > 0 {
+			lines = append(lines, strings.Join(itemParts, "\n"))
+		} else if len(itemParts) == 0 {
+			lines = append(lines, prefix)
+		}
+		itemIdx++
+	}
+	return strings.Join(lines, "\n"), hasTask
+}
+
+func extractItemText(n ast.Node, src []byte) (string, bool) {
+	var buf bytes.Buffer
+	hasTask := false
+
+	_ = ast.Walk(n, func(node ast.Node, entering bool) (ast.WalkStatus, error) {
+		if !entering {
+			return ast.WalkContinue, nil
+		}
+		if tc, ok := node.(*extast.TaskCheckBox); ok {
+			hasTask = true
+			if tc.IsChecked {
+				buf.WriteString("[x] ")
+			} else {
+				buf.WriteString("[ ] ")
+			}
+			return ast.WalkContinue, nil
+		}
+		if t, ok := node.(*ast.Text); ok {
+			val := t.Segment.Value(src)
+			if node.Parent() != nil {
+				if _, isHashtag := node.Parent().(*hashtag.Node); isHashtag {
+					if len(val) > 0 && val[0] == '#' {
+						val = val[1:]
+					}
+				}
+			}
+			buf.Write(val)
+			if t.SoftLineBreak() || t.HardLineBreak() {
+				buf.WriteByte(' ')
+			}
+		}
+		return ast.WalkContinue, nil
+	})
+	return strings.TrimSpace(buf.String()), hasTask
+}
+
+func extractTableText(tbl *extast.Table, src []byte) string {
+	var rows []string
+
+	for rowNode := tbl.FirstChild(); rowNode != nil; rowNode = rowNode.NextSibling() {
+		switch row := rowNode.(type) {
+		case *extast.TableHeader:
+			var cells []string
+			for cell := row.FirstChild(); cell != nil; cell = cell.NextSibling() {
+				if c, ok := cell.(*extast.TableCell); ok {
+					cells = append(cells, extractText(c, src))
+				}
+			}
+			if len(cells) > 0 {
+				rows = append(rows, "| "+strings.Join(cells, " | ")+" |")
+				sepCells := make([]string, len(cells))
+				for i := range sepCells {
+					sepCells[i] = "---"
+				}
+				rows = append(rows, "| "+strings.Join(sepCells, " | ")+" |")
+			}
+		case *extast.TableRow:
+			var cells []string
+			for cell := row.FirstChild(); cell != nil; cell = cell.NextSibling() {
+				if c, ok := cell.(*extast.TableCell); ok {
+					cells = append(cells, extractText(c, src))
+				}
+			}
+			if len(cells) > 0 {
+				rows = append(rows, "| "+strings.Join(cells, " | ")+" |")
+			}
+		}
+	}
+	return strings.Join(rows, "\n")
+}
+
+func extractBlockquoteText(bq *ast.Blockquote, src []byte, indent int) string {
+	var lines []string
+	prefix := strings.Repeat("  ", indent) + "> "
+
+	for child := bq.FirstChild(); child != nil; child = child.NextSibling() {
+		var childText string
+		switch n := child.(type) {
+		case *ast.List:
+			childText, _ = extractListText(n, src, 0)
+		case *extast.Table:
+			childText = extractTableText(n, src)
+		case *ast.Blockquote:
+			childText = extractBlockquoteText(n, src, indent)
+		case *ast.FencedCodeBlock:
+			lang := ""
+			if n.Info != nil {
+				lang = string(n.Info.Segment.Value(src))
+				if fields := strings.Fields(lang); len(fields) > 0 {
+					lang = fields[0]
+				}
+			}
+			var code strings.Builder
+			for i := 0; i < n.Lines().Len(); i++ {
+				line := n.Lines().At(i)
+				code.Write(line.Value(src))
+			}
+			childText = "```" + lang + "\n" + strings.TrimSpace(code.String()) + "\n```"
+		default:
+			childText = extractBlockquoteChildText(child, src)
+		}
+
+		if strings.TrimSpace(childText) != "" {
+			for _, line := range strings.Split(childText, "\n") {
+				lines = append(lines, prefix+line)
+			}
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
+func extractBlockquoteChildText(n ast.Node, src []byte) string {
+	var buf bytes.Buffer
+	_ = ast.Walk(n, func(node ast.Node, entering bool) (ast.WalkStatus, error) {
+		if !entering {
+			return ast.WalkContinue, nil
+		}
+		if t, ok := node.(*ast.Text); ok {
+			val := t.Segment.Value(src)
+			if node.Parent() != nil {
+				if _, isHashtag := node.Parent().(*hashtag.Node); isHashtag {
+					if len(val) > 0 && val[0] == '#' {
+						val = val[1:]
+					}
+				}
+			}
+			buf.Write(val)
+			if t.SoftLineBreak() || t.HardLineBreak() {
+				buf.WriteByte('\n')
+			}
+		}
+		return ast.WalkContinue, nil
+	})
+	return strings.TrimSpace(buf.String())
 }
