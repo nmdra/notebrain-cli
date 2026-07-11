@@ -133,7 +133,7 @@ Stores directed edges representing wikilinks and Markdown links between notes (`
 | Field Name | Type | Description |
 | :--- | :--- | :--- |
 | `source_slug` | `string` | Slugified identifier of the source note where the link originates. |
-| `target_slug` | `string` | Slugified identifier of the target note being linked to. |
+| `target_slug` | `string` | Canonicalized slug identifier of the target note (`#anchor` headings stripped, exact vault subfolder/file paths resolved via `buildLinkTargetResolver`). |
 | `target_path` | `string` | Raw link text or path as written in the Markdown source. |
 | `display_text` | `string` | Display alias or text of the link (e.g., `[[Target|Alias]]` -> `Alias`). |
 
@@ -152,7 +152,7 @@ Stores directed edges representing wikilinks and Markdown links between notes (`
 - **CLI Layer (`cmd/`)**: Built using [Kong](https://github.com/alecthomas/kong) for command-line parsing and flag resolution. Supports a strict two-tier configuration hierarchy: CLI flags override TOML configuration file (`~/.notebrain/config/config.toml`).
 - **Configuration (`internal/configfile` & `config/`)**: Manages TOML configuration loading via Kong resolvers. Supports normalized key lookups (`snake_case` and `kebab-case`) and resolves flags without relying on `.env` files or application environment variables.
 - **Embedder (`internal/embedder`)**: Manages the local embedding models. Supports embedded ONNX MiniLM sentence embeddings or external Ollama service backends.
-- **Parser (`internal/parser`)**: Reads Markdown files from the Obsidian vault, extracts YAML frontmatter/properties, parses wikilinks and standard Markdown links, identifies task checkboxes and tables, and splits note text into semantic chunks.
+- **Parser (`internal/parser`)**: Reads Markdown files from the Obsidian vault, extracts YAML frontmatter/properties, parses wikilinks and standard Markdown links, identifies task checkboxes and tables, and splits note text into semantic chunks. It strictly preserves structural Markdown syntax across chunks, including tight ordered/unordered lists (`1. `, `- `), task checkboxes (`[ ] `, `[x] `), multi-line blockquotes and callout headers (`> [!NOTE]`), and GFM tables with alignment separator rows (`| --- | --- |`). Distinct structural blocks (`paragraph`, `list`, `table`, `blockquote`, `code`) are cleanly separated by `\n\n`.
 - **Ingest (`internal/ingest`)**: Handles multi-worker concurrent directory walking. It reads `.md` files, calls the parser, generates embeddings, and coordinates atomic note updates (`DeleteNoteChunks` -> `UpsertChunks` -> `UpsertLinks` under a single store mutex lock).
 - **Store (`internal/store`)**: The ChromaDB wrapper that abstracts collection creation, chunk upsertion, link deduplication, and exposes all graph (BFS traversal in Go) and semantic queries.
 - **Obsidian Client (`internal/obsidian`)**: Interacts with the Obsidian CLI for vault operations and note inspection.

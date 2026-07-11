@@ -55,6 +55,7 @@ To prevent excessive tool calls and context bloat, follow a tiered retrieval str
 | "What links directly to this note?"                 | `backlinks`   | `notebrain backlinks "<slug>" --jsonpath="$.results[*].note_slug"`       |
 | "What is structurally nearby in the graph?"         | `connections` | `notebrain connections "<slug>" --hops 2 --format tsv`                   |
 | "What is related in meaning but NOT linked?"        | `hidden`      | `notebrain hidden "<slug>" --context-window 1 --limit 5 --include-text`  |
+| "What is related in meaning (including linked notes)?" | `hidden`   | `notebrain hidden "<slug>" --include-linked --context-window 1 --limit 5` |
 | "Find concepts related to X centered around note Y" | `boosted`     | `notebrain boosted --seed="<slug>" "query" --context-window 1 --limit 5` |
 | "What notes share tags with X?"                     | `tags`        | `notebrain tags "<slug>" --min-shared 1`                                 |
 

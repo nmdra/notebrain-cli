@@ -53,6 +53,17 @@ For query-based commands (`search`, `backlinks`, `connections`, `hidden`, `boost
 - **`e`:** Explicitly open the note in your terminal or GUI editor (defined by the `$EDITOR` environment variable).
 - **`q` / `Esc`:** Exit the TUI.
 
+### Context-Aware Empty Result Guidance
+
+When a search or graph command returns zero results in standard terminal `text` format (`--format=text`), NoteBrain displays actionable, tailored tips formatted in italicized amber (`hintStyle`) under the command header instead of generic `(no results)` text:
+- **`backlinks`**: Suggests verifying whether other notes link to the target or re-indexing via `notebrain ingest`.
+- **`connections`**: Suggests increasing `--hops` or checking for valid Wikilinks.
+- **`hidden`**: Suggests trying `--include-linked` to include notes that may already be linked, or re-indexing if the note is too unique.
+- **`tags`**: Suggests checking note tags or lowering `--min-shared`.
+- **`search` / `boosted`**: Suggests broadening search terms, adjusting `--boost`, or running `notebrain ingest`.
+
+> *Note: To ensure compatibility with automated scripts and AI agents, contextual hints only appear in standard `text` output and are strictly omitted from machine formats (`json`, `ndjson`, `tsv`, `--jsonpath`).*
+
 ---
 
 ## Note Resolution (`<note>` argument)
@@ -170,7 +181,7 @@ When multiple queries are provided (either via multiple positional arguments or 
 
 ### `get`
 
-Reconstructs and displays the complete markdown text of a note by joining all of its indexed chunks.
+Reconstructs and displays the complete markdown text of a note by joining all of its indexed chunks. To ensure structural continuity and human readability, each chunk is automatically prepended with its dynamic Markdown section heading derived from its `heading_path` metadata (`### Section Heading\n\n<text>`).
 
 #### Usage
 
@@ -196,7 +207,7 @@ notebrain get "kubernetes-native-applications" --format json
 
 ### `backlinks`
 
-Finds all notes linking to the target note using the local Wikilink graph.
+Finds all notes linking to the target note using the local Wikilink graph. Link target resolution is fully canonicalized (`#anchor` headings stripped, subfolders resolved accurately against canonical paths), ensuring robust discovery even across deeply nested vault hierarchies.
 
 #### Usage
 
@@ -264,9 +275,10 @@ notebrain hidden <note> [flags]
 
 | Flag      | Type      | Default | Description                                                                                    |
 | :-------- | :-------- | :------ | :--------------------------------------------------------------------------------------------- |
-| `--deep`  | `boolean` | `false` | Perform granular chunk-by-chunk analysis across individual note sections using stored vectors. |
-| `--top-k` | `integer` | `3`     | Maximum matching target sections to evaluate and display per candidate note (in `--deep` mode).  |
-| `--limit` | `integer` | `10`    | Maximum number of hidden connections to return.                                                |
+| `--deep`           | `boolean` | `false` | Perform granular chunk-by-chunk analysis across individual note sections using stored vectors. |
+| `--include-linked` | `boolean` | `false` | Include notes that are already linked directly/indirectly in the hidden connections output while strictly excluding self-references. |
+| `--top-k`          | `integer` | `3`     | Maximum matching target sections to evaluate and display per candidate note (in `--deep` mode).  |
+| `--limit`          | `integer` | `10`    | Maximum number of hidden connections to return.                                                |
 
 #### Examples
 

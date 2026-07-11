@@ -23,6 +23,7 @@ This reference documents all available command flags for fine-tuning search, gra
 | Flag                 | Purpose                                                                                                                                | Default |
 | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ------- |
 | `--deep`             | For `hidden`: Perform granular chunk-by-chunk section matching across candidate notes using stored vectors without embedding overhead. | `false` |
+| `--include-linked`   | For `hidden`: Include notes that are already linked directly/indirectly in the hidden connections output while strictly excluding self-references. | `false` |
 | `--top-k N`          | For `hidden --deep` and `search`: Maximum sections/chunks to evaluate and retain **per note**.                                         | `3`     |
 | `--skip-attachments` | Exclude attachment and image links (e.g., `.webp`, `.png`, `.canvas`) from graph edges and backlinks.                                  | `true`  |
 | `--skip-phantom`     | Exclude uncreated notes (phantom wikilinks without a markdown file on disk) from results.                                              | `true`  |

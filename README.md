@@ -32,12 +32,12 @@ Ships with an [AI agent skill](wiki/Skill_Usage.md) for integration with Agents 
 
 - **Semantic Search** — Find notes by meaning, not just keywords. Uses the [`all-MiniLM-L6-v2`](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) ONNX model for fully offline inference.
 - **Multi-Query Support** — Search using multiple queries. This enables AI agents to search more accurately by separating searches that contain distinct topics.
-- **Graph Traversal** — Walk your Obsidian wikilink graph (`[[Note]]`) via BFS: `backlinks`, `connections` (multi-hop), `tags` (shared tag neighbors).
-- **Hidden Connections** — Discover notes that are semantically similar but not explicitly linked. Supports `--deep` chunk-by-chunk analysis to match specific target sections and headings (`§ <Heading>`) across your vault.
+- **Graph Traversal** — Walk your Obsidian wikilink graph (`[[Note]]`) via BFS: `backlinks` (canonicalized path resolution), `connections` (multi-hop), `tags` (shared tag neighbors).
+- **Hidden Connections** — Discover notes that are semantically similar but not explicitly linked (`notebrain hidden`). Supports `--deep` chunk-by-chunk analysis across sections and `--include-linked` to evaluate semantically related notes that are already linked.
 - **Graph-Boosted Search** — Combine semantic similarity scores with structural graph proximity for richer results.
-- **Interactive TUI** — Navigate search results with fuzzy-finding. Powered by [Bubble Tea](https://github.com/charmbracelet/bubbletea).
+- **Interactive TUI & Guidance** — Navigate search results with fuzzy-finding powered by Bubble Tea, plus intelligent, context-aware empty state hints when terminal queries return zero results.
 - **Advanced Filtering** — Narrow searches by `--section`, `--has-code`, `--has-tasks`, or `--tag`.
-- **Full Note Retrieval** — Reconstruct complete note content on the fly from indexed chunks (`notebrain get`).
+- **Full Note Retrieval** — Reconstruct complete note content dynamically from indexed chunks (`notebrain get`).
 - **Machine-Readable Output** — Structured JSON, TSV via `--format` flags, plus built-in `--jsonpath` extraction (no `jq` needed).
 - **AI Agent Skill** — Ships with a built-in AI agent skill (`.agents/skills/notebrain/`) for autonomous knowledge retrieval (see [AI Agent Skill Usage](wiki/Skill_Usage.md)).
 - **OSC 8 Hyperlinks** — Clickable `obsidian://open` links directly in your terminal. Works in [alacritty](https://github.com/alacritty/alacritty), [WezTerm](https://wezfurlong.org/wezterm/), [kitty](https://sw.kovidgoyal.net/kitty/) and others supporting the [OSC 8 spec](https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda).
@@ -48,7 +48,7 @@ Ships with an [AI agent skill](wiki/Skill_Usage.md) for integration with Agents 
 
 ### Under the Hood
 
-- **Goldmark AST-Aware Chunking** — Splits markdown by header hierarchy rather than arbitrary character offsets, preserving code blocks and structural metadata.
+- **Goldmark AST-Aware Chunking** — Splits markdown by header hierarchy rather than arbitrary character offsets, strictly preserving lists, GFM tables, blockquotes/callouts, and code blocks.
 - **Embedded ChromaDB** — Stores vectors directly on disk via [`chroma-go`](https://github.com/amikos-tech/chroma-go) v0.4.x (no external database server required).
 - **Incremental Ingestion** — SHA-256 content hashing skips unmodified notes in milliseconds on re-runs.
 
@@ -87,7 +87,15 @@ notebrain search "how do message brokers work?" --limit 5 --top-k 2
   <img src="assets/search.png" alt="Notebrain search" width="100%">
 </p>
 
-**3. Get structured output for scripts and AI agents:**
+**3. Discover deep hidden connections across note sections:**
+
+Find notes that share similar concepts without direct wikilinks, using `--deep` chunk-by-chunk section matching (`§ <Heading>`):
+
+```bash
+notebrain hidden "Event-Driven Architecture" --deep --limit 5 --top-k 2
+```
+
+**4. Get structured output for scripts and AI agents:**
 
 ```bash
 notebrain search "how do message brokers work?" --limit 2 --top-k 1 --format=json | jq
@@ -102,7 +110,7 @@ notebrain search "how do message brokers work?" --limit 2 --top-k 1 --format=jso
 
 </details>
 
-**4. Chain commands to retrieve full notes:**
+**5. Chain commands to retrieve full notes:**
 
 ```bash
 # Extract slug from top search result
@@ -112,7 +120,7 @@ SLUG=$(notebrain search "message broker" --limit 1 --jsonpath="$.results[0].note
 notebrain get "$SLUG" --jsonpath="$.text"
 ```
 
-**5. Automate indexing** with a cron job or systemd timer so your index stays fresh (see [Scheduled Ingestion](wiki/Scheduled_Ingestion.md)).
+**6. Automate indexing** with a cron job or systemd timer so your index stays fresh (see [Scheduled Ingestion](wiki/Scheduled_Ingestion.md)).
 
 ## Configuration
 
