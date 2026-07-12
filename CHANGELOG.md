@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.3.0] - 2026-07-12
+
+### Added
+- **Deep Connection Discovery (`--deep`)**: Implemented section-level chunk-by-chunk hidden connections parsing, matching specific target sections (`§ <Heading>`) and similarity thresholds rather than only comparing whole notes (`feat(hidden)`).
+- **Already-Linked Filtering Control (`--include-linked`)**: Added option to include notes that are already directly or indirectly linked in the hidden connections output, while strictly excluding self-references (`feat(cli)`).
+- **Dynamic Section Header Reconstruction**: Reconstructed note content via `notebrain get` now automatically prepends the matching section header metadata (`### Heading`) for all constituent chunks to ensure structural and markdown continuity (`feat(store)`).
+- **Two-Tier Similarity Filtering**: Enforced dual similarity thresholds across query pipelines to deliver highly targeted search results (`feat(store)`).
+- **Context-Aware Empty Result Guidance**: Display command-specific discovery tips in terminal `text` output (e.g., suggesting re-ingestion, increasing hops, or enabling `--include-linked`) when query results are empty, while ensuring machine-readable formats (`json`, `tsv`, `ndjson`, `--jsonpath`) remain perfectly clean (`feat(cli)`).
+- **Universal Note Slug Resolution**: Enabled fallback slug resolution to match notes across the CLI by either slug or relative path interchangeably (`feat(cli)`).
+
+### Fixed
+- **Markdown AST Ingestion Preservation**: Updated parsing to preserve structural markdown markup (unordered/ordered list formats, task checkboxes, callouts, blockquotes, and GFM tables with separator rows) verbatim across chunk divisions (`fix(parser)`).
+- **Link Target Path Canonicalization**: Strips `#heading` anchors and resolves nested folder paths to actual canonical vault paths, ensuring backlinks and connection traversals match accurately (`fix(store)`).
+- **Large Vault Stats Query Paginated Scan**: Paginated the database stats retrieval to prevent JSON buffer overflows on vaults containing tens of thousands of chunks (`fix(store)`).
+- **Systemd Service Specifier**: Explicitly set the service unit target in systemd timer files (`fix(systemd)`).
+
+### Changed
+- **CLI Output Styling and Help Standardization**: Polished TUI/terminal outputs, lazy-initialized lipgloss styles, and unified Kong flag descriptions (`feat(cli)`).
+- **Refactoring & Code Quality**: Modernized `cloneMetaMap` using Go 1.21 `maps.Copy`, extracted unified testing store setup (`newTestStore`), reduced complexity of database testing, and improved test coverage of CLI commands and edge cases (`refactor`).
+
 ## [v2.2.0] - 2026-07-07
 
 ### Added
