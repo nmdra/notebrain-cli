@@ -58,7 +58,7 @@ func (c *IngestCmd) Run(globals *Globals) error {
 	defer func() { _ = st.Close() }()
 
 	slog.Info("initializing embedded ONNX vector models")
-	emb, err := embedder.NewLocalEmbedder()
+	emb, err := embedder.NewLocalEmbedder(embedder.WithQuiet(true))
 	if err != nil {
 		return err
 	}

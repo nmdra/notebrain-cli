@@ -5,7 +5,7 @@ A Go CLI tool that turns your [Obsidian](https://obsidian.md/) vault into a full
 Ships with an [AI agent skill](wiki/Skill_Usage.md) for integration with Agents like [Google Antigravity](https://antigravity.google/), [Pi agent](https://pi.dev) and Claude Code.This skill is specially optimized to reduce token usage and latency.
 
 [![Release](https://github.com/nmdra/notebrain-cli/actions/workflows/release.yml/badge.svg)](https://github.com/nmdra/notebrain-cli/actions/workflows/release.yml)
-[![Go Reference](https://pkg.go.dev/badge/github.com/nmdra/notebrain-cli.svg)](https://pkg.go.dev/github.com/nmdra/notebrain-cli)
+[![Go Reference](https://pkg.go.dev/badge/github.com/nmdra/notebrain-cli.svg)](https://pkg.go.dev/github.com/nmdra/notebrain-cli/v2)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/nmdra/notebrain-cli)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/nmdra/notebrain-cli)](https://github.com/nmdra/notebrain-cli/blob/master/go.mod)
 [![License: MIT](https://img.shields.io/github/license/nmdra/notebrain-cli)](https://github.com/nmdra/notebrain-cli/blob/main/LICENSE)

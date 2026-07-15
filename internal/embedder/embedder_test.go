@@ -24,6 +24,14 @@ func TestLocalEmbedder(t *testing.T) {
 
 	ctx := context.Background()
 
+	t.Run("QuietInit", func(t *testing.T) {
+		quietEmb, err := embedder.NewLocalEmbedder(embedder.WithQuiet(true))
+		if err != nil {
+			t.Fatalf("NewLocalEmbedder with quiet failed: %v", err)
+		}
+		_ = quietEmb.Close()
+	})
+
 	t.Run("EmbedSingle", func(t *testing.T) {
 		vec, err := emb.Embed(ctx, "hello world")
 		if err != nil {

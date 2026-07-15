@@ -13,7 +13,24 @@ type LocalEmbedder struct {
 	destroy func() error
 }
 
-func NewLocalEmbedder() (*LocalEmbedder, error) {
+type Option func(*options)
+
+type options struct {
+	quiet bool
+}
+
+func WithQuiet(quiet bool) Option {
+	return func(o *options) {
+		o.quiet = quiet
+	}
+}
+
+func NewLocalEmbedder(opts ...Option) (*LocalEmbedder, error) {
+	var opt options
+	for _, o := range opts {
+		o(&opt)
+	}
+
 	var ef *ort.DefaultEmbeddingFunction
 	var destroy func() error
 	var err error
@@ -24,8 +41,12 @@ func NewLocalEmbedder() (*LocalEmbedder, error) {
 		ef, destroy, err = ort.NewDefaultEmbeddingFunction()
 	}()
 
-	if pErr := tui.RunSpinner("Setting up MiniLM (first run downloads ~33 MB)...", done); pErr != nil {
-		return nil, fmt.Errorf("spinner error: %w", pErr)
+	if opt.quiet {
+		<-done
+	} else {
+		if pErr := tui.RunSpinner("Setting up MiniLM (first run downloads ~33 MB)...", done); pErr != nil {
+			return nil, fmt.Errorf("spinner error: %w", pErr)
+		}
 	}
 
 	if err != nil {
