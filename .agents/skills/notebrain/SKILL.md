@@ -19,7 +19,7 @@ If `backlinks`, `connections`, or `hidden` was already executed for a given note
 
 1. **NoteBrain Only — No Generic Filesystem Search**: Never use `grep`, `find`, `ls`, or ad-hoc shell scripts against markdown files. Treat `notebrain` as the sole interface to the vault. If a query returns nothing, refine the query rather than falling back to bash.
 
-2. **Prioritize `--context-window N` + `--include-text` Over Blind `get`**: Never blindly run `notebrain get <slug>` after a search hit! In Obsidian vaults, full notes can be thousands of lines long; fetching entire notes floods your context window with irrelevant text and wastes massive tokens. Instead, pass `--context-window N` (e.g., `--context-window 1` or `2`) on your `search`, `hidden`, or `boosted` queries. This fetches ±N adjacent chunks around the match, giving you the exact surrounding context needed to answer the question without dumping the whole document into context. Only use `get` as a last resort when a task explicitly demands processing the entire note from start to finish.
+2. **Prioritize `--context-window N` + `--include-text` Over Blind `get`**: Never blindly run `notebrain get <slug>` after a search hit! In Obsidian vaults, full notes can be thousands of lines long; fetching entire notes floods your context window with irrelevant text and wastes massive tokens. Instead, pass `--context-window N` (e.g., `--context-window 1` or `2`) on your `search`, `hidden`, or `boosted` queries. This fetches ±N adjacent chunks around the match into `context` while specifically excluding the matched chunk itself (preventing duplicate text between `text` and `context`). Only use `get` as a last resort when a task explicitly demands processing the entire note from start to finish.
 
 3. **Token-Efficient Extraction (`--jsonpath` & `tsv`)**: Make `--jsonpath` your default tool for extracting targeted data! Instead of loading bulky JSON envelopes into context, append `--jsonpath` to extract exact scalar strings or arrays directly:
    - Extract matching text snippets: `--jsonpath="$.results[*].text"`
@@ -27,7 +27,7 @@ If `backlinks`, `connections`, or `hidden` was already executed for a given note
    - Extract note slugs for graph mapping: `--jsonpath="$.results[*].note_slug"`
      When scanning tabular lists without text, use `--format tsv` to drop repeating JSON key names.
 
-4. **Non-Interactive Execution**: Always specify `--format json` (or `tsv`/`--jsonpath`) on query commands to bypass the interactive TUI and receive structured data immediately.
+4. **Non-Interactive & Quiet Execution (`--format json --compact`)**: Always specify `--format json --compact` (or `tsv`/`--jsonpath`) on non-interactive query commands. Using any non-text machine format automatically activates quiet mode (`WithQuiet`), suppressing the embedder loading spinner and terminal log noise so you receive 100% clean, uncorrupted data. Adding `--compact` further reduces token footprint by stripping redundant envelope and result properties (`command`, `file_path`).
 
 5. **Intelligent Query Splitting**: When researching compound questions or orthogonal topics (e.g., comparing two technologies), split the query into distinct terms. There are two ways to do this:
    - **Positional arguments** (preferred when you know the exact terms): `notebrain search "redis pubsub" "kafka brokers" --limit 5 --format json`
