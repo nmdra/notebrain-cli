@@ -2,7 +2,7 @@
 
 A Go CLI tool that turns your [Obsidian](https://obsidian.md/) vault into a fully offline knowledge backend for **AI coding agents**. NoteBrain indexes markdown notes into a local **[ChromaDB](https://www.trychroma.com/)** vector database and exposes semantic search, wikilink graph traversal, and hidden connection discovery through structured output — designed to be chained directly by autonomous agents, shell pipelines, and LLM tool-use workflows.
 
-Ships with an [AI agent skill](wiki/Skill_Usage.md) for integration with Agents like [Google Antigravity](https://antigravity.google/), [Pi agent](https://pi.dev) and Claude Code.This skill is specially optimized to reduce token usage and latency.
+Ships with an [AI agent skill](wiki/Skill_Usage.md) and [OpenCode Agent Configuration](wiki/OpenCode_Integration.md) for integration with autonomous coding agents like [OpenCode](https://opencode.ai), [Google Antigravity](https://antigravity.google/), [Pi agent](https://pi.dev), and Claude Code. This setup is specially optimized to reduce token usage and latency.
 
 [![Release](https://github.com/nmdra/notebrain-cli/actions/workflows/release.yml/badge.svg)](https://github.com/nmdra/notebrain-cli/actions/workflows/release.yml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/nmdra/notebrain-cli.svg)](https://pkg.go.dev/github.com/nmdra/notebrain-cli/v2)
@@ -40,7 +40,7 @@ Ships with an [AI agent skill](wiki/Skill_Usage.md) for integration with Agents 
 - **Advanced Filtering** — Narrow searches by `--section`, `--has-code`, `--has-tasks`, or `--tag`.
 - **Full Note Retrieval** — Reconstruct complete note content dynamically from indexed chunks (`notebrain get`).
 - **Machine-Readable Output** — Structured JSON, TSV via `--format` flags, plus built-in `--jsonpath` extraction (no `jq` needed).
-- **AI Agent Skill** — Ships with a built-in AI agent skill (`.agents/skills/notebrain/`) for autonomous knowledge retrieval (see [AI Agent Skill Usage](wiki/Skill_Usage.md)).
+- **AI & OpenCode Agent Integration** — Ships with a built-in AI agent skill (`.agents/skills/notebrain/`) and dedicated [OpenCode Agent Configuration](wiki/OpenCode_Integration.md) (`notebrain-chat`) for sandboxed, autonomous knowledge retrieval.
 - **OSC 8 Hyperlinks** — Clickable `obsidian://open` links directly in your terminal. Works in [alacritty](https://github.com/alacritty/alacritty), [WezTerm](https://wezfurlong.org/wezterm/), [kitty](https://sw.kovidgoyal.net/kitty/) and others supporting the [OSC 8 spec](https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda).
 - **Editor Integration** — Open matched notes in `$EDITOR` or Obsidian directly from the TUI.
 - **Obsidian-Aware Ingestion** — Honors `userIgnoreFilters` and `attachmentFolderPath` from your Obsidian config. Optionally skip phantom links and attachment references.
@@ -170,6 +170,7 @@ To fully uninstall, remove the `notebrain` binary and delete `~/.notebrain/`.
 | [Architecture](wiki/Architecture.md)                 | Internals: chunking pipeline, embedding, ChromaDB schema   |
 | [Scheduled Ingestion](wiki/Scheduled_Ingestion.md)   | Cron and systemd timer setup for background indexing       |
 | [AI Agent Skill Usage](wiki/Skill_Usage.md)          | Using the built-in AI agent skill for autonomous retrieval |
+| [OpenCode Agent Integration](wiki/OpenCode_Integration.md) | Configuring NoteBrain as an OpenCode AI coding assistant (`notebrain-chat`) |
 | [DeepWiki](https://deepwiki.com/nmdra/notebrain-cli) | AI-generated codebase documentation                        |
 
 ## Contributing

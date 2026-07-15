@@ -35,9 +35,19 @@ These flags can be applied to `notebrain` before any subcommand (e.g., `notebrai
 | `--use-editor`       | `boolean` | `false`                           | Enable external editor (`$EDITOR` environment variable) integration as the default action to open notes.                                   |
 | `--log-format`       | `string`  | `auto`                            | Log format: `auto` (detects TTY), `json`, or `text`.                                                                                       |
 | `--log-level`        | `string`  | `info`                            | Minimum log severity to show: `info`, `debug`, `warn`, or `error`.                                                                         |
-| `--skip-attachments` | `boolean` | `true`                            | Exclude attachment and image links from graph edges.                                                                                       |
-| `--skip-phantom`     | `boolean` | `true`                            | Exclude uncreated notes (phantom links) from query results.                                                                                |
 | `--hide-tags`        | `boolean` | `true`                            | Hide tag names (`#Tag/Subtag`) in search and graph outputs.                                                                                |
+| `--compact`          | `boolean` | `false`                           | Omit redundant properties (`file_path`, `command`) from JSON/NDJSON outputs for token-efficient LLM consumption (`compact=true` in `config.toml`). |
+
+### Token Efficiency & Quiet Mode for AI Agents (`--compact` & `--quiet`)
+
+When executing NoteBrain queries inside AI agent workflows, automated pipelines, or background scripts, controlling token footprint and suppressing interactive TUI formatting is essential:
+
+1. **Automatic Quiet Mode (`--quiet`)**:
+   Whenever a non-interactive machine format (`--format=json`, `tsv`, `ndjson`, or `--jsonpath`) is specified, NoteBrain automatically activates quiet mode (`embedder.WithQuiet`). This suppresses the embedder loading spinner and background log output, ensuring stdout is 100% clean and uncorrupted for JSON parsers and AI agents.
+2. **Compact JSON Envelopes (`--compact`)**:
+   Passing `--compact` (or setting `compact = true` in `~/.notebrain/config/config.toml`) strips redundant envelope properties (`command`) and result properties (`file_path`) from structured outputs (`json` / `ndjson`), reducing token consumption by ~40–50% when ingested by Large Language Models. In compact mode, similarity scores (`score`) are rounded cleanly to 4 decimal places (`0.8520`), and query headers (`query`) are stripped of terminal decorations.
+3. **Non-Redundant Context Windows (`--context-window N`)**:
+   When `--context-window N` (e.g., `--context-window 1` or `2`) is passed alongside `--include-text`, NoteBrain fetches $\pm N$ adjacent chunks into the `context` array while specifically excluding the matched chunk (`text`) itself from the array (`PopulateContext`), eliminating duplicated text across `text` and `context`.
 | `--version`          | `boolean` | `false`                           | Show version information.                                                                                                                  |
 
 ---
