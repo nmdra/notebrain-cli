@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.4.0] - 2026-07-15
+
+### Added
+- **Token-Efficient Compact JSON Output (`--compact`)**: Added `--compact` CLI flag and `compact = true` TOML configuration option (`~/.notebrain/config/config.toml`) to strip redundant envelope properties (`command`) and result properties (`file_path`) across `json` and `ndjson` formats, reducing JSON token consumption by ~40–50% when ingested by LLMs (`feat(cli)`).
+- **Automatic Quiet Mode for Machine Formats (`--quiet`)**: Non-interactive command outputs (`--format=json`, `tsv`, `ndjson`, or `--jsonpath`) now automatically activate quiet mode (`embedder.WithQuiet`), suppressing the embedder loading spinner and background log noise so that AI agents and shell scripts receive 100% clean, uncorrupted machine data (`feat(embedder)`).
+
+### Changed
+- **LLM-Optimized Result Formatting**: Standardized similarity scores (`score`) to round to 4 decimal places across JSON envelopes, separated raw query strings (`rawQuery`) from TUI headers, and updated `notebrain search` / `hidden` / `boosted` context windowing (`--context-window N`) to exclude the matched chunk (`text`) itself from the `context` array to prevent token redundancy (`feat(cli,store)`).
+- **AI Agent Skill & Reference Documentation**: Expanded the `notebrain-assistant` skill (`SKILL.md`, `references/flags.md`, and `references/schema.md`) with comprehensive guidance on `--compact` mode, automatic `WithQuiet` suppression, 4-decimal score precision, and non-redundant context windows (`docs(skill)`).
+
 ## [v2.3.0] - 2026-07-12
 
 ### Added
