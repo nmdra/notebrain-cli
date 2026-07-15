@@ -35,6 +35,7 @@ This reference documents all available command flags for fine-tuning search, gra
 | Flag              | Purpose                                                                                                                                             | Default |
 | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
 | `--format FORMAT` | Output format: `json` (structured array), `ndjson` (streamed objects), `tsv` (tab-separated values), or `text` (human-readable TUI/plain text).     | `text`  |
+| `--compact`       | Omit redundant envelope fields (`command`) and result fields (`file_path`) from JSON output for token-efficient LLM consumption.                    | `false` |
 | `--jsonpath PATH` | Extract specific JSON elements using JSONPath syntax (e.g., `"$.results[*].note_slug"`). Eliminates JSON envelope overhead and avoids needing `jq`. | —       |
 | `--include-text`  | Include the matched markdown text chunk in the output. Omit during initial structure-mapping to save tokens.                                        | off     |
 | `--use-editor`    | Enable external editor (`$EDITOR`) integration as default open type.                                                                                | `false` |

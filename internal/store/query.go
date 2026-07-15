@@ -17,7 +17,7 @@ import (
 type Result struct {
 	NoteSlug       string   `json:"note_slug"`
 	Title          string   `json:"title"`
-	FilePath       string   `json:"file_path"`
+	FilePath       string   `json:"file_path,omitempty"`
 	Score          float64  `json:"score"`
 	IsPhantom      bool     `json:"is_phantom,omitempty"`
 	ChunkIndex     int      `json:"chunk_index,omitempty"`
@@ -1441,7 +1441,7 @@ func (s *Store) PopulateContext(ctx context.Context, results []Result, windowSiz
 		maxI := cIdx + windowSize
 		var ctxTexts []string
 		for _, fc := range fetched {
-			if fc.slug == slug && fc.index >= minI && fc.index <= maxI {
+			if fc.slug == slug && fc.index >= minI && fc.index <= maxI && fc.index != cIdx {
 				ctxTexts = append(ctxTexts, fc.text)
 			}
 		}

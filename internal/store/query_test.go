@@ -671,8 +671,11 @@ func TestGetChunkWindow(t *testing.T) {
 		{NoteSlug: "win", ChunkIndex: 1},
 	}
 	st.PopulateContext(ctx, res, 1)
-	if len(res[0].Context) != 3 {
-		t.Fatalf("Expected PopulateContext to fill 3 texts, got %d", len(res[0].Context))
+	if len(res[0].Context) != 2 {
+		t.Fatalf("Expected PopulateContext to fill 2 texts (excluding matched chunk), got %d: %v", len(res[0].Context), res[0].Context)
+	}
+	if res[0].Context[0] != "chunk zero" || res[0].Context[1] != "chunk two" {
+		t.Errorf("Unexpected context texts (expected surrounding chunks only): %v", res[0].Context)
 	}
 }
 

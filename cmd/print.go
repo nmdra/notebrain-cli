@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"strings"
 
@@ -32,7 +33,7 @@ func hyperlink(useLinks bool, uri, text string) string {
 }
 
 type jsonEnvelope struct {
-	Command string         `json:"command"`
+	Command string         `json:"command,omitempty"`
 	Query   string         `json:"query"`
 	Queries []string       `json:"queries,omitempty"`
 	Total   int            `json:"total"`
@@ -40,18 +41,30 @@ type jsonEnvelope struct {
 }
 
 // printResultsFormatted renders a list of results to stdout based on the requested format.
-func printResultsFormatted(commandName string, query string, results []store.Result, globals *Globals) {
-	printResultsFormattedToWriter(os.Stdout, commandName, query, results, globals)
+func printResultsFormatted(commandName string, headerQuery string, rawQuery string, results []store.Result, globals *Globals) {
+	printResultsFormattedToWriter(os.Stdout, commandName, headerQuery, rawQuery, results, globals)
 }
 
-func printResultsFormattedToWriter(w io.Writer, commandName string, query string, results []store.Result, globals *Globals) {
+func printResultsFormattedToWriter(w io.Writer, commandName string, headerQuery string, rawQuery string, results []store.Result, globals *Globals) {
 	initStyles()
 	filtered := filterResults(results, globals)
 
+	queryStr := headerQuery
+	if globals.Format != "text" || globals.JSONPath != "" {
+		if rawQuery != "" {
+			queryStr = rawQuery
+		}
+	}
+
+	cmdName := commandName
+	if globals.Compact {
+		cmdName = ""
+	}
+
 	if globals.JSONPath != "" {
 		env := jsonEnvelope{
-			Command: commandName,
-			Query:   query,
+			Command: cmdName,
+			Query:   queryStr,
 			Queries: globals.Queries,
 			Total:   len(filtered),
 			Results: filtered,
@@ -64,13 +77,13 @@ func printResultsFormattedToWriter(w io.Writer, commandName string, query string
 
 	switch globals.Format {
 	case "json":
-		printJSONResults(w, commandName, query, filtered, globals)
+		printJSONResults(w, cmdName, queryStr, filtered, globals)
 	case "ndjson":
 		printNDJSONResults(w, filtered)
 	case "tsv":
 		printTSVResults(w, filtered)
 	default: // "text"
-		printTextResults(w, commandName, query, filtered, globals)
+		printTextResults(w, commandName, headerQuery, filtered, globals)
 	}
 }
 
@@ -86,6 +99,10 @@ func filterResults(results []store.Result, globals *Globals) []store.Result {
 		if globals.HideTags {
 			r.Tags = nil
 		}
+		if globals.Compact {
+			r.FilePath = ""
+		}
+		r.Score = math.Round(r.Score*10000) / 10000
 		filtered = append(filtered, r)
 	}
 	return filtered

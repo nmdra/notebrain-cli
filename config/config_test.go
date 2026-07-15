@@ -95,6 +95,11 @@ func TestDefault_Fields(t *testing.T) {
 			want: true,
 		},
 		{
+			name: "Compact is false",
+			got:  func(c *Config) any { return c.Compact },
+			want: false,
+		},
+		{
 			name: "SkipPhantom is true",
 			got:  func(c *Config) any { return c.SkipPhantom },
 			want: true,

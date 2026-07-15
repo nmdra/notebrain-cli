@@ -32,6 +32,7 @@ type Globals struct {
 	SkipAttachments bool             `name:"skip-attachments" help:"exclude image/attachment links from graph edges" default:"true"`
 	SkipPhantom     bool             `name:"skip-phantom" help:"exclude phantom (uncreated) notes from results" default:"true"`
 	HideTags        bool             `name:"hide-tags" help:"hide tag names from output (use --hide-tags=false to show)" default:"true"`
+	Compact         bool             `name:"compact" help:"omit redundant fields (file_path, command) from JSON output for token-efficient LLM consumption" default:"false"`
 	Version         kong.VersionFlag `name:"version" help:"show version information"`
 
 	// Internal fields, not exposed as flags

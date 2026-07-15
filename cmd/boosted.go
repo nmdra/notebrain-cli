@@ -69,6 +69,6 @@ func (c *BoostedCmd) Run(globals *Globals) error {
 	}
 	st.PopulateContext(ctx, results, globals.ContextWindow)
 
-	printResultsFormatted("boosted", fmt.Sprintf("Graph-Boosted Search Results for: %q (seed: %s, boost: %.2f)", query, seedSlug, boost), results, globals)
+	printResultsFormatted("boosted", fmt.Sprintf("Graph-Boosted Search Results for: %q (seed: %s, boost: %.2f)", query, seedSlug, boost), query, results, globals)
 	return nil
 }

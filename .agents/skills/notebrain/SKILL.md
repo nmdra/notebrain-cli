@@ -9,23 +9,68 @@ allowed-tools: Bash(notebrain:*), Bash(./notebrain:*)
 
 NoteBrain indexes an Obsidian vault into local ChromaDB for semantic search, graph traversal, and note retrieval.
 
-## Chunk-Based Architecture & Retrieval Strategy
+## Session Caching & Reuse
 
-Why doesn't NoteBrain search whole notes at once? In Obsidian vaults, markdown files can be thousands of lines long. During ingestion, NoteBrain parses and splits notes into smaller semantic chunks (hierarchically by headings, paragraphs, task lists, and code blocks) and indexes each chunk as a distinct vector in ChromaDB (`nb_chunks`). This allows semantic search (`search`, `hidden`, `boosted`) to pinpoint the exact relevant paragraph or section (`chunk_index` and `heading_path`) without needing to load or process the entire document. This architecture is why `--context-window N` works so effectively—fetching $\pm N$ adjacent chunks around the matched index gives you the exact surrounding context needed while keeping your token footprint lean!
+If `backlinks`, `connections`, or `hidden` was already executed for a given note slug earlier in the conversation, reuse those results from context instead of re-querying, unless the user re-ingested the vault.
 
 ---
 
 ## Core Execution Principles
 
 1. **NoteBrain Only — No Generic Filesystem Search**: Never use `grep`, `find`, `ls`, or ad-hoc shell scripts against markdown files. Treat `notebrain` as the sole interface to the vault. If a query returns nothing, refine the query rather than falling back to bash.
+
 2. **Prioritize `--context-window N` + `--include-text` Over Blind `get`**: Never blindly run `notebrain get <slug>` after a search hit! In Obsidian vaults, full notes can be thousands of lines long; fetching entire notes floods your context window with irrelevant text and wastes massive tokens. Instead, pass `--context-window N` (e.g., `--context-window 1` or `2`) on your `search`, `hidden`, or `boosted` queries. This fetches ±N adjacent chunks around the match, giving you the exact surrounding context needed to answer the question without dumping the whole document into context. Only use `get` as a last resort when a task explicitly demands processing the entire note from start to finish.
+
 3. **Token-Efficient Extraction (`--jsonpath` & `tsv`)**: Make `--jsonpath` your default tool for extracting targeted data! Instead of loading bulky JSON envelopes into context, append `--jsonpath` to extract exact scalar strings or arrays directly:
    - Extract matching text snippets: `--jsonpath="$.results[*].text"`
    - Extract surrounding chunk context: `--jsonpath="$.results[*].context"`
    - Extract note slugs for graph mapping: `--jsonpath="$.results[*].note_slug"`
      When scanning tabular lists without text, use `--format tsv` to drop repeating JSON key names.
-4. **Non-Interactive Execution**: Always specify `--format json` (or `tsv`/`ndjson`/`--jsonpath`) on query commands to bypass the interactive TUI and receive structured data immediately.
-5. **Intelligent Query Splitting (`--split`)**: When researching compound questions, long queries, or orthogonal topics (e.g., comparing two technologies), split the query into distinct terms using positional arguments (`notebrain search "redis pubsub" "kafka brokers"`) or `--split` (`notebrain search "redis, kafka" --split`). **Why?** NoteBrain's multi-hit boosting automatically ranks bridging notes above single-topic matches. For simple lookups, keep the query intact.
+
+4. **Non-Interactive Execution**: Always specify `--format json` (or `tsv`/`--jsonpath`) on query commands to bypass the interactive TUI and receive structured data immediately.
+
+5. **Intelligent Query Splitting**: When researching compound questions or orthogonal topics (e.g., comparing two technologies), split the query into distinct terms. There are two ways to do this:
+   - **Positional arguments** (preferred when you know the exact terms): `notebrain search "redis pubsub" "kafka brokers" --limit 5 --format json`
+   - **`--split` flag** (preferred when splitting user-provided natural language by delimiters): `notebrain search "redis, kafka, rabbitmq" --split --limit 5 --format json`
+     Both activate multi-hit boosting, which automatically ranks bridging notes (notes matching multiple sub-queries) above single-topic matches. For simple single-topic lookups, keep the query intact.
+
+6. **Don't Chain Commands Unnecessarily**: A single `search` with `--context-window 1 --include-text` answers most questions. Only run follow-up commands (`backlinks`, `connections`, `hidden`) when the initial search is insufficient or the user explicitly asks for structural/graph exploration.
+   - **Don't do this**: `search → backlinks → connections → hidden → tags` for a simple "what do my notes say about X?"
+   - **Do this**: `search "X" --context-window 1 --limit 5 --include-text --format json` — check the results — stop if sufficient.
+
+---
+
+## JSON Output Schema & Token Efficiency
+
+When `--format json` is used, the output envelope looks like this (scores are automatically rounded to 4 decimal places and query decorations are stripped):
+
+```json
+{
+  "command": "search",
+  "query": "event driven architecture",
+  "total": 1,
+  "results": [
+    {
+      "note_slug": "architectureevent-driven-systems",
+      "title": "Event Driven Systems",
+      "file_path": "Architecture/Event Driven Systems.md",
+      "score": 0.8520,
+      "chunk_index": 2,
+      "heading_path": "Overview > Message Brokers",
+      "text": "Message brokers decouple producers from consumers...",
+      "context": [
+        "Producers publish events without knowing who consumes them...",
+        "Consumers process events at their own pace..."
+      ]
+    }
+  ]
+}
+```
+
+> [!TIP]
+> **Token Reduction with `--compact`**: For maximum token efficiency when outputs are ingested by LLMs, add the `--compact` flag (`notebrain search "..." --format json --compact`). This strips redundant envelope fields (`command`) and result fields (`file_path`), keeping only essential identification (`note_slug`, `title`, `score`, `text`).
+
+Key fields: `note_slug` (use as input to graph commands), `score` (0–1 similarity, 4 decimal places), `text` (only with `--include-text`), `context` (only with `--context-window N`). For the full field specification, see [references/schema.md](references/schema.md).
 
 ---
 
@@ -33,7 +78,7 @@ Why doesn't NoteBrain search whole notes at once? In Obsidian vaults, markdown f
 
 To prevent excessive tool calls and context bloat, follow a tiered retrieval strategy:
 
-1. **Start Lean**: Always begin with a targeted search. (adjust filters (context-window, include-text, limit) based on user need)
+1. **Start Lean**: Always begin with a targeted search. (adjust filters based on user need)
    ```bash
    notebrain search "event driven architecture" --top-k 2 --limit 5 --format json
    ```
@@ -48,21 +93,15 @@ To prevent excessive tool calls and context bloat, follow a tiered retrieval str
 
 ## Quick Command Map
 
-| User Intent                                         | Command       | Core Syntax Example                                                      |
-| --------------------------------------------------- | ------------- | ------------------------------------------------------------------------ |
-| "What do my notes say about X?"                     | `search`      | `notebrain search "topic" --context-window 1 --limit 3 --include-text`   |
-| "Read full note Y (Use sparingly; prefer context)"  | `get`         | `notebrain get "<slug-or-path>"`                                         |
-| "What links directly to this note?"                 | `backlinks`   | `notebrain backlinks "<slug>" --jsonpath="$.results[*].note_slug"`       |
-| "What is structurally nearby in the graph?"         | `connections` | `notebrain connections "<slug>" --hops 2 --format tsv`                   |
-| "What is related in meaning but NOT linked?"        | `hidden`      | `notebrain hidden "<slug>" --context-window 1 --limit 5 --include-text`  |
-| "What is related in meaning (including linked notes)?" | `hidden`   | `notebrain hidden "<slug>" --include-linked --context-window 1 --limit 5` |
-| "Find concepts related to X centered around note Y" | `boosted`     | `notebrain boosted --seed="<slug>" "query" --context-window 1 --limit 5` |
-| "What notes share tags with X?"                     | `tags`        | `notebrain tags "<slug>" --min-shared 1`                                 |
+| User Intent                                            | Command       | Core Syntax Example                                                       |
+| ------------------------------------------------------ | ------------- | ------------------------------------------------------------------------- |
+| "What do my notes say about X?"                        | `search`      | `notebrain search "topic" --context-window 1 --limit 3 --include-text`    |
+| "Read full note Y (Use sparingly; prefer context)"     | `get`         | `notebrain get "<slug-or-path>"`                                          |
+| "What links directly to this note?"                    | `backlinks`   | `notebrain backlinks "<slug>" --jsonpath="$.results[*].note_slug"`        |
+| "What is structurally nearby in the graph?"            | `connections` | `notebrain connections "<slug>" --hops 2 --format tsv`                    |
+| "What is related in meaning but NOT linked?"           | `hidden`      | `notebrain hidden "<slug>" --context-window 1 --limit 5 --include-text`   |
+| "What is related in meaning (including linked notes)?" | `hidden`      | `notebrain hidden "<slug>" --include-linked --context-window 1 --limit 5` |
+| "Find concepts related to X centered around note Y"    | `boosted`     | `notebrain boosted --seed="<slug>" "query" --context-window 1 --limit 5`  |
+| "What notes share tags with X?"                        | `tags`        | `notebrain tags "<slug>" --min-shared 1`                                  |
 
-> **Need specific flags or output schema?** Read [references/flags.md](file:///home/nimendra/Documents/Projects/obsidian-helper/.agents/skills/notebrain/references/flags.md) for full flag tables (filtering, top-k, context windows) and [references/schema.md](file:///home/nimendra/Documents/Projects/obsidian-helper/.agents/skills/notebrain/references/schema.md) for JSON envelope fields and TSV formatting.
-
----
-
-## Session Caching & Reuse
-
-If `backlinks`, `connections`, or `hidden` was already executed for a given note slug earlier in the conversation, reuse those results from context instead of re-querying, unless the user re-ingested the vault.
+> **Need specific flags or output schema?** Read [references/flags.md](references/flags.md) for full flag tables (filtering, top-k, context windows) and [references/schema.md](references/schema.md) for JSON envelope fields and TSV formatting.

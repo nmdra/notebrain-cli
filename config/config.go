@@ -43,6 +43,7 @@ type Config struct {
 	SkipAttachments bool
 	SkipPhantom     bool
 	HideTags        bool
+	Compact         bool
 }
 
 // Default returns a Config with sensible defaults.
@@ -67,6 +68,7 @@ func Default() *Config {
 		SkipAttachments: true,
 		SkipPhantom:     true,
 		HideTags:        true,
+		Compact:         false,
 	}
 }
 

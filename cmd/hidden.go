@@ -67,7 +67,7 @@ func (c *HiddenCmd) Run(globals *Globals) error {
 			cmdName = "hidden --deep --include-linked"
 			title = fmt.Sprintf("Deep chunk-by-chunk related connections (including linked) for: %q (slug: %s) [%d target chunks analyzed]", targetNote, targetSlug, len(seedChunks))
 		}
-		printResultsFormatted(cmdName, title, results, globals)
+		printResultsFormatted(cmdName, title, targetSlug, results, globals)
 		return nil
 	}
 
@@ -94,6 +94,6 @@ func (c *HiddenCmd) Run(globals *Globals) error {
 		cmdName = "hidden --include-linked"
 		title = fmt.Sprintf("Related connections (including linked) for: %q (slug: %s)", targetNote, targetSlug)
 	}
-	printResultsFormatted(cmdName, title, results, globals)
+	printResultsFormatted(cmdName, title, targetSlug, results, globals)
 	return nil
 }

@@ -51,6 +51,6 @@ func (c *TagsCmd) Run(globals *Globals) error {
 		return err
 	}
 
-	printResultsFormatted("tags", fmt.Sprintf("Notes sharing tags with: %q (slug: %s) [Min Shared: %d]", targetNote, targetSlug, minShared), nodes, globals)
+	printResultsFormatted("tags", fmt.Sprintf("Notes sharing tags with: %q (slug: %s) [Min Shared: %d]", targetNote, targetSlug, minShared), targetSlug, nodes, globals)
 	return nil
 }

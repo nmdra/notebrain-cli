@@ -21,7 +21,7 @@ func TestPrintResultsFormatted_Phantom(t *testing.T) {
 		SkipPhantom: true,
 	}
 
-	printResultsFormattedToWriter(&buf, "test", "query", results, globals)
+	printResultsFormattedToWriter(&buf, "test", "query", "query", results, globals)
 	out := buf.String()
 
 	if !strings.Contains(out, "Real Note") {
@@ -34,7 +34,7 @@ func TestPrintResultsFormatted_Phantom(t *testing.T) {
 	// Now test SkipPhantom = false
 	buf.Reset()
 	globals.SkipPhantom = false
-	printResultsFormattedToWriter(&buf, "test", "query", results, globals)
+	printResultsFormattedToWriter(&buf, "test", "query", "query", results, globals)
 	out2 := buf.String()
 
 	if !strings.Contains(out2, "Real Note") || !strings.Contains(out2, "Phantom Note") {
@@ -56,7 +56,7 @@ func TestPrintResultsFormatted_ChunkDisambiguationAndFooter(t *testing.T) {
 		Format: "text",
 	}
 
-	printResultsFormattedToWriter(&buf, "search", "query", results, globals)
+	printResultsFormattedToWriter(&buf, "search", "query", "query", results, globals)
 	out := buf.String()
 
 	if !strings.Contains(out, "OpenChoreo (§ Architecture > Overview)") {
@@ -89,7 +89,7 @@ func TestPrintResultsFormatted_Truncation(t *testing.T) {
 		Format: "text",
 	}
 
-	printResultsFormattedToWriter(&buf, "search", "query", results, globals)
+	printResultsFormattedToWriter(&buf, "search", "query", "query", results, globals)
 	out := buf.String()
 
 	if !strings.Contains(out, "…") {
@@ -121,7 +121,7 @@ func TestPrintResultsFormatted_MultiQuery(t *testing.T) {
 		Queries: []string{"redis", "broker"},
 	}
 
-	printResultsFormattedToWriter(&buf, "search", "redis | broker", results, globals)
+	printResultsFormattedToWriter(&buf, "search", "redis | broker", "redis | broker", results, globals)
 	out := buf.String()
 
 	if !strings.Contains(out, `[hits: "redis", "broker"]`) {
@@ -140,7 +140,7 @@ func TestPrintResultsFormatted_HideTags(t *testing.T) {
 		HideTags: true,
 	}
 
-	printResultsFormattedToWriter(&buf, "test", "query", results, globals)
+	printResultsFormattedToWriter(&buf, "test", "query", "query", results, globals)
 	out := buf.String()
 
 	if strings.Contains(out, "#Database/Redis") || strings.Contains(out, "#Backend") {
@@ -153,7 +153,7 @@ func TestPrintResultsFormatted_HideTags(t *testing.T) {
 	// Now test HideTags = false
 	buf.Reset()
 	globals.HideTags = false
-	printResultsFormattedToWriter(&buf, "test", "query", results, globals)
+	printResultsFormattedToWriter(&buf, "test", "query", "query", results, globals)
 	out2 := buf.String()
 
 	if !strings.Contains(out2, "#Database/Redis") || !strings.Contains(out2, "#Backend") {
@@ -180,7 +180,7 @@ func TestPrintResultsFormatted_Deep(t *testing.T) {
 		IncludeText: true,
 	}
 
-	printResultsFormattedToWriter(&buf, "hidden --deep", "query", results, globals)
+	printResultsFormattedToWriter(&buf, "hidden --deep", "query", "query", results, globals)
 	out := buf.String()
 
 	if !strings.Contains(out, "├─ Matched target sections (2):") || !strings.Contains(out, "\"§ Ownership\", \"§ Lifetimes\"") {
@@ -210,7 +210,7 @@ func TestPrintResultsFormatted_Deep_SmartCapping(t *testing.T) {
 		Verbose: false,
 	}
 
-	printResultsFormattedToWriter(&buf, "hidden --deep", "query", results, globals)
+	printResultsFormattedToWriter(&buf, "hidden --deep", "query", "query", results, globals)
 	out := buf.String()
 
 	if !strings.Contains(out, "└─ Matched target sections (5):") || !strings.Contains(out, "\"§ Methodologies\", \"§ Latency\", \"§ Queueing\"") || !strings.Contains(out, "(+2 more)") {
@@ -220,7 +220,7 @@ func TestPrintResultsFormatted_Deep_SmartCapping(t *testing.T) {
 	// Now verify --verbose shows all 5
 	buf.Reset()
 	globals.Verbose = true
-	printResultsFormattedToWriter(&buf, "hidden --deep", "query", results, globals)
+	printResultsFormattedToWriter(&buf, "hidden --deep", "query", "query", results, globals)
 	out2 := buf.String()
 
 	if !strings.Contains(out2, "└─ Matched target sections (5):") || !strings.Contains(out2, "\"§ Methodologies\", \"§ Latency\", \"§ Queueing\", \"§ Profiling\", \"§ Caching\"") {
@@ -283,7 +283,7 @@ func TestPrintResultsFormatted_Formats(t *testing.T) {
 
 	// Test JSON format
 	globals := &Globals{Format: "json"}
-	printResultsFormattedToWriter(&buf, "search", "query", results, globals)
+	printResultsFormattedToWriter(&buf, "search", "query", "query", results, globals)
 	if !strings.Contains(buf.String(), `"note_slug": "json-note"`) && !strings.Contains(buf.String(), `"note_slug":"json-note"`) {
 		t.Errorf("Expected json output containing note_slug, got %q", buf.String())
 	}
@@ -291,7 +291,7 @@ func TestPrintResultsFormatted_Formats(t *testing.T) {
 	// Test TSV format
 	buf.Reset()
 	globals.Format = "tsv"
-	printResultsFormattedToWriter(&buf, "search", "query", results, globals)
+	printResultsFormattedToWriter(&buf, "search", "query", "query", results, globals)
 	outTSV := buf.String()
 	if !strings.Contains(outTSV, "slug\ttitle\tfile_path") || !strings.Contains(outTSV, "json-note\tJSON Note") {
 		t.Errorf("Expected tsv header and row, got %q", outTSV)
@@ -300,7 +300,7 @@ func TestPrintResultsFormatted_Formats(t *testing.T) {
 	// Test NDJSON format
 	buf.Reset()
 	globals.Format = "ndjson"
-	printResultsFormattedToWriter(&buf, "search", "query", results, globals)
+	printResultsFormattedToWriter(&buf, "search", "query", "query", results, globals)
 	outNDJSON := buf.String()
 	if !strings.Contains(outNDJSON, `"note_slug":"json-note"`) && !strings.Contains(outNDJSON, `"note_slug": "json-note"`) {
 		t.Errorf("Expected ndjson output containing note_slug, got %q", outNDJSON)
@@ -319,7 +319,7 @@ func TestPrintResultsFormatted_MinScore(t *testing.T) {
 		MinScore: 0.5,
 	}
 
-	printResultsFormattedToWriter(&buf, "search", "query", results, globals)
+	printResultsFormattedToWriter(&buf, "search", "query", "query", results, globals)
 	out := buf.String()
 
 	if !strings.Contains(out, "High Score Note") {
@@ -327,5 +327,77 @@ func TestPrintResultsFormatted_MinScore(t *testing.T) {
 	}
 	if strings.Contains(out, "Low Score Note") {
 		t.Errorf("Did not expect low score note in output when MinScore=0.5, got %q", out)
+	}
+}
+
+func TestPrintResultsFormatted_ScoreRounding(t *testing.T) {
+	var buf bytes.Buffer
+	results := []store.Result{
+		{NoteSlug: "test-note", Title: "Test Note", Score: 0.7655627727508545},
+	}
+	globals := &Globals{Format: "json"}
+	printResultsFormattedToWriter(&buf, "search", "query", "query", results, globals)
+	out := buf.String()
+	if !strings.Contains(out, "0.7656") {
+		t.Errorf("Expected rounded score 0.7656 in json output, got %q", out)
+	}
+	if strings.Contains(out, "0.765562") {
+		t.Errorf("Expected score not to have long decimals in json output, got %q", out)
+	}
+}
+
+func TestPrintResultsFormatted_RawQuery(t *testing.T) {
+	var buf bytes.Buffer
+	results := []store.Result{
+		{NoteSlug: "test-note", Title: "Test Note", Score: 0.9},
+	}
+	globals := &Globals{Format: "json"}
+	printResultsFormattedToWriter(&buf, "search", "Semantic Search: \"my query\"", "my query", results, globals)
+	out := buf.String()
+	if !strings.Contains(out, `"query": "my query"`) {
+		t.Errorf("Expected raw query in json output, got %q", out)
+	}
+	if strings.Contains(out, "Semantic Search:") {
+		t.Errorf("Did not expect decorated header in json query field, got %q", out)
+	}
+
+	// But in text format, decorated header should be used
+	buf.Reset()
+	globals.Format = "text"
+	printResultsFormattedToWriter(&buf, "search", "Semantic Search: \"my query\"", "my query", results, globals)
+	outText := buf.String()
+	if !strings.Contains(outText, "Semantic Search:") {
+		t.Errorf("Expected decorated header in text output, got %q", outText)
+	}
+}
+
+func TestPrintResultsFormatted_Compact(t *testing.T) {
+	var buf bytes.Buffer
+	results := []store.Result{
+		{NoteSlug: "test-note", Title: "Test Note", FilePath: "notes/test.md", Score: 0.9},
+	}
+	globals := &Globals{Format: "json", Compact: true}
+	printResultsFormattedToWriter(&buf, "search", "query", "query", results, globals)
+	out := buf.String()
+	if strings.Contains(out, `"command":`) {
+		t.Errorf("Did not expect command field when Compact=true, got %q", out)
+	}
+	if strings.Contains(out, `"file_path":`) {
+		t.Errorf("Did not expect file_path field when Compact=true, got %q", out)
+	}
+	if !strings.Contains(out, `"note_slug": "test-note"`) {
+		t.Errorf("Expected note_slug field when Compact=true, got %q", out)
+	}
+
+	// Verify Compact=false includes both
+	buf.Reset()
+	globals.Compact = false
+	printResultsFormattedToWriter(&buf, "search", "query", "query", results, globals)
+	outFull := buf.String()
+	if !strings.Contains(outFull, `"command": "search"`) {
+		t.Errorf("Expected command field when Compact=false, got %q", outFull)
+	}
+	if !strings.Contains(outFull, `"file_path": "notes/test.md"`) {
+		t.Errorf("Expected file_path field when Compact=false, got %q", outFull)
 	}
 }

@@ -163,7 +163,7 @@ func (c *SearchCmd) Run(globals *Globals) error {
 			return err
 		}
 		st.PopulateContext(ctx, results, globals.ContextWindow)
-		printResultsFormatted("search", fmt.Sprintf("Tag Search: %q", c.Tag), results, globals)
+		printResultsFormatted("search", fmt.Sprintf("Tag Search: %q", c.Tag), c.Tag, results, globals)
 		return nil
 	}
 
@@ -183,7 +183,7 @@ func (c *SearchCmd) Run(globals *Globals) error {
 			quoted = append(quoted, fmt.Sprintf("%q", q))
 		}
 		header := fmt.Sprintf("Semantic Search (%d split queries): %s", len(resolved), strings.Join(quoted, " | "))
-		printResultsFormatted("search", header, results, globals)
+		printResultsFormatted("search", header, strings.Join(resolved, " | "), results, globals)
 		return nil
 	}
 
@@ -198,7 +198,7 @@ func (c *SearchCmd) Run(globals *Globals) error {
 	}
 	st.PopulateContext(ctx, results, globals.ContextWindow)
 
-	printResultsFormatted("search", fmt.Sprintf("Semantic Search: %q", resolved[0]), results, globals)
+	printResultsFormatted("search", fmt.Sprintf("Semantic Search: %q", resolved[0]), resolved[0], results, globals)
 	return nil
 }
 
