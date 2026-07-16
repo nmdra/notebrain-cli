@@ -83,22 +83,57 @@ To prevent excessive tool calls and context bloat, follow a tiered retrieval str
 3. **Escalate Conditionally**: Only execute follow-up commands if the initial findings require it:
    - **Graph structure / nearby notes** → run `connections "<slug>" --hops 2 --jsonpath="$.results[*].note_slug"` (no `--include-text`).
    - **Incoming citations / what links here** → run `backlinks "<slug>" --format tsv`.
-   - **Exploratory / conceptual bridges** → run `hidden "<slug>" --context-window 1 --limit 5 --include-text`.
+   - **Exploratory / conceptual bridges** → run `hidden "<slug>" --limit 5`.
 4. **Avoid Blanket Chaining**: Never run all four commands (`search → backlinks → connections → hidden`) unless the user explicitly requests a comprehensive vault-wide audit of a topic.
 
 ---
 
+## Response Format
+
+Match the response shape to the query type.
+
+### Direct Questions
+
+1. Answer the question first, in plain language.
+2. List supporting notes underneath:
+   **From the vault**
+   - Note Title
+
+### Exploratory Questions
+
+("what do I know about X", "find notes related to Y", "what connects to Z")
+
+Structure the response as:
+
+- **Themes** — major ideas surfaced across the results
+- **Relationships** — how the notes connect to each other (shared tags, backlinks, graph proximity)
+- **Supporting notes** — Note Title, one line each
+- **Follow-up searches** — 1–2 suggested queries to go deeper
+
+### No Relevant Results
+
+If `search`, `hidden`, or `boosted` returns nothing above a usable score:
+
+- Say so plainly — don't pad the answer or overstate weak matches.
+- Suggest 1–2 reformulated queries (synonyms, broader/narrower phrasing) instead of falling back to filesystem search.
+
+### General Rules
+
+- Every factual claim must trace to a retrieved `note_slug` / `text` / `context` field — never invent titles, paths, or quoted text.
+- Distinguish retrieved fact from your own inference explicitly (e.g., "Your notes suggest..." vs. "This looks like it connects to...").
+- Cite every note referenced in the answer, even in a short direct-question response.
+
 ## Quick Command Map
 
-| User Intent                                            | Command       | Core Syntax Example                                                       |
-| ------------------------------------------------------ | ------------- | ------------------------------------------------------------------------- |
-| "What do my notes say about X?"                        | `search`      | `notebrain search "topic" --context-window 1 --limit 3 --include-text`    |
-| "Read full note Y (Use sparingly; prefer context)"     | `get`         | `notebrain get "<slug-or-path>"`                                          |
-| "What links directly to this note?"                    | `backlinks`   | `notebrain backlinks "<slug>" --jsonpath="$.results[*].note_slug"`        |
-| "What is structurally nearby in the graph?"            | `connections` | `notebrain connections "<slug>" --hops 2 --format tsv`                    |
-| "What is related in meaning but NOT linked?"           | `hidden`      | `notebrain hidden "<slug>" --context-window 1 --limit 5 --include-text`   |
-| "What is related in meaning (including linked notes)?" | `hidden`      | `notebrain hidden "<slug>" --include-linked --context-window 1 --limit 5` |
-| "Find concepts related to X centered around note Y"    | `boosted`     | `notebrain boosted --seed="<slug>" "query" --context-window 1 --limit 5`  |
-| "What notes share tags with X?"                        | `tags`        | `notebrain tags "<slug>" --min-shared 1`                                  |
+| User Intent                                            | Command       | Core Syntax Example                                                                       |
+| ------------------------------------------------------ | ------------- | ----------------------------------------------------------------------------------------- |
+| "What do my notes say about X?"                        | `search`      | `notebrain search "topic" --context-window 1 --limit 3 --include-text`                    |
+| "Read full note Y (Use sparingly; prefer context)"     | `get`         | `notebrain get "<slug-or-path>"`                                                          |
+| "What links directly to this note?"                    | `backlinks`   | `notebrain backlinks "<slug>" --jsonpath="$.results[*].note_slug"`                        |
+| "What is structurally nearby in the graph?"            | `connections` | `notebrain connections "<slug>" --hops 2 --format tsv`                                    |
+| "What is related in meaning but NOT linked?"           | `hidden`      | `notebrain hidden "<slug>" --limit 5` (use `--deep` flag to chunk by chunk deep analysis) |
+| "What is related in meaning (including linked notes)?" | `hidden`      | `notebrain hidden "<slug>" --include-linked --limit 5`                                    |
+| "Find concepts related to X centered around note Y"    | `boosted`     | `notebrain boosted --seed="<slug>" "query" --context-window 1 --limit 5`                  |
+| "What notes share tags with X?"                        | `tags`        | `notebrain tags "<slug>" --min-shared 1`                                                  |
 
 > **Need specific flags or output schema?** Read [references/flags.md](references/flags.md) for full flag tables (filtering, top-k, context windows) and [references/schema.md](references/schema.md) for JSON envelope fields and TSV formatting.

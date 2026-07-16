@@ -1,6 +1,6 @@
 # AI Agent Skill Usage
 
-NoteBrain includes an optimized, built-in AI agent skill (`notebrain-assistant`) designed for AI coding assistants and autonomous agents (such as Google Antigravity / Gemini / Pi). This skill equips agents with seamless semantic search and knowledge graph traversal across your Obsidian vault.
+NoteBrain includes an optimized, built-in AI agent skill (`notebrain-assistant`) designed for AI coding assistants and autonomous agents (such as Google Antigravity / Opencode / Claude Code / Pi). This skill equips agents with seamless semantic search and knowledge graph traversal across your Obsidian vault.
 
 ## Where the Skill Lives
 
