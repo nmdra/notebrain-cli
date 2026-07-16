@@ -170,6 +170,13 @@ notebrain search "machine learning" \
   --compact
 ```
 
+### Find note Slug only
+
+```bash
+notebrain search "<query>" \
+  --jsonpath="$.results[*].note_slug"
+```
+
 ### Incoming links
 
 ```bash
@@ -180,6 +187,7 @@ notebrain backlinks "<slug>" \
 ### Related semantic neighbors (Hidden Connections)
 
 ```bash
+
 notebrain hidden "<slug>" \
   --limit 5 \
   --deep
