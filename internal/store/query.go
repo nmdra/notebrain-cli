@@ -71,7 +71,7 @@ func (s *Store) semanticSearch(ctx context.Context, queryVec []float32, limit in
 	if err != nil {
 		return nil, fmt.Errorf("semantic search: %w", wrapChromaErr(err))
 	}
-	return deduplicateByNote(res, limit, topKPerNote), nil
+	return deduplicateByNote(res, limit, topKPerNote, includeText), nil
 }
 
 // MultiSemanticSearch executes semantic searches across multiple query vectors, merging results
@@ -822,7 +822,7 @@ func (s *Store) TagSearch(ctx context.Context, tag string, limit int, whereFilte
 		return nil, fmt.Errorf("tag search: %w", wrapChromaErr(err))
 	}
 
-	return getResultToResults(res, limit), nil
+	return getResultToResults(res, limit, includeText), nil
 }
 
 // ─── Graph-Boosted Search ─────────────────────────────────────────
@@ -860,7 +860,7 @@ func (s *Store) GraphBoostedSearch(ctx context.Context, queryVec []float32, seed
 
 // deduplicateByNote retains up to topKPerNote chunks per note,
 // sorted overall by highest similarity score.
-func deduplicateByNote(res chroma.QueryResult, limit int, topKPerNote int) []Result {
+func deduplicateByNote(res chroma.QueryResult, limit int, topKPerNote int, includeText bool) []Result {
 	if topKPerNote <= 0 {
 		topKPerNote = 3
 	}
@@ -898,7 +898,7 @@ func deduplicateByNote(res chroma.QueryResult, limit int, topKPerNote int) []Res
 			dist = float32(dists[i])
 		}
 		txt := ""
-		if len(texts) > i && texts[i] != nil {
+		if includeText && len(texts) > i && texts[i] != nil {
 			txt = texts[i].ContentString()
 		}
 
@@ -921,7 +921,7 @@ func deduplicateByNote(res chroma.QueryResult, limit int, topKPerNote int) []Res
 	return out
 }
 
-func getResultToResults(res chroma.GetResult, limit int) []Result {
+func getResultToResults(res chroma.GetResult, limit int, includeText bool) []Result {
 	metas := res.GetMetadatas()
 	if len(metas) == 0 {
 		return nil
@@ -945,7 +945,7 @@ func getResultToResults(res chroma.GetResult, limit int) []Result {
 		}
 		if _, ok := seen[slug]; !ok {
 			txt := ""
-			if len(texts) > i && texts[i] != nil {
+			if includeText && len(texts) > i && texts[i] != nil {
 				txt = texts[i].ContentString()
 			}
 			seen[slug] = &best{

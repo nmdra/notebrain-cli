@@ -401,3 +401,29 @@ func TestPrintResultsFormatted_Compact(t *testing.T) {
 		t.Errorf("Expected file_path field when Compact=false, got %q", outFull)
 	}
 }
+
+func TestFilterResults_IncludeText(t *testing.T) {
+	results := []store.Result{
+		{NoteSlug: "test-note", Title: "Test Note", Text: "some long chunk text", Score: 0.9},
+	}
+
+	// Test IncludeText = false clears Text
+	globals := &Globals{IncludeText: false}
+	filtered := filterResults(results, globals)
+	if len(filtered) != 1 {
+		t.Fatalf("Expected 1 result, got %d", len(filtered))
+	}
+	if filtered[0].Text != "" {
+		t.Errorf("Expected Text to be empty when IncludeText=false, got %q", filtered[0].Text)
+	}
+
+	// Test IncludeText = true preserves Text
+	globalsTrue := &Globals{IncludeText: true}
+	filteredTrue := filterResults(results, globalsTrue)
+	if len(filteredTrue) != 1 {
+		t.Fatalf("Expected 1 result, got %d", len(filteredTrue))
+	}
+	if filteredTrue[0].Text != "some long chunk text" {
+		t.Errorf("Expected Text to be preserved when IncludeText=true, got %q", filteredTrue[0].Text)
+	}
+}

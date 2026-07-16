@@ -102,6 +102,9 @@ func filterResults(results []store.Result, globals *Globals) []store.Result {
 		if globals.Compact {
 			r.FilePath = ""
 		}
+		if !globals.IncludeText {
+			r.Text = ""
+		}
 		r.Score = math.Round(r.Score*10000) / 10000
 		filtered = append(filtered, r)
 	}

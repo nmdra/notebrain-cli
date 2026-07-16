@@ -380,6 +380,49 @@ func TestMultiSemanticSearch_WithText(t *testing.T) {
 	}
 }
 
+func TestSemanticSearch_WithoutText(t *testing.T) {
+	ctx := context.Background()
+	st := newTestStore(t)
+
+	chunks := []store.ChunkRecord{
+		{
+			ID:         "no-text:0",
+			NoteSlug:   "no-text",
+			Title:      "No Text Note",
+			FilePath:   "no-text.md",
+			ChunkIndex: 0,
+			Text:       "this text should not be included when includeText is false",
+			Embedding:  []float32{1.0, 0.0, 0.0},
+		},
+	}
+	if err := st.UpsertChunks(ctx, chunks); err != nil {
+		t.Fatalf("UpsertChunks failed: %v", err)
+	}
+
+	res, err := st.SemanticSearch(ctx, []float32{1.0, 0.0, 0.0}, 10, 1, nil, false)
+	if err != nil {
+		t.Fatalf("SemanticSearch without text failed: %v", err)
+	}
+	if len(res) == 0 {
+		t.Fatalf("Expected results, got none")
+	}
+	for _, r := range res {
+		if r.Text != "" {
+			t.Errorf("Expected empty Text when includeText is false, got %q", r.Text)
+		}
+	}
+
+	multiRes, err := st.MultiSemanticSearch(ctx, [][]float32{{1.0, 0.0, 0.0}}, []string{"query 1"}, 10, 1, nil, false)
+	if err != nil {
+		t.Fatalf("MultiSemanticSearch without text failed: %v", err)
+	}
+	for _, r := range multiRes {
+		if r.Text != "" {
+			t.Errorf("Expected empty Text when includeText is false across MultiSemanticSearch, got %q", r.Text)
+		}
+	}
+}
+
 func TestCombineWhereFilters(t *testing.T) {
 	var nilFilter chroma.WhereFilter
 	wc1 := chroma.EqString("note_slug", "note-a")
