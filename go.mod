@@ -12,7 +12,7 @@ require (
 	github.com/charmbracelet/x/ansi v0.11.7
 	github.com/charmbracelet/x/term v0.2.2
 	github.com/pelletier/go-toml/v2 v2.4.3
-	github.com/yuin/goldmark v1.8.2
+	github.com/yuin/goldmark v1.8.4
 	github.com/yuin/goldmark-meta v1.1.0
 	go.abhg.dev/goldmark/hashtag v0.4.0
 	go.abhg.dev/goldmark/wikilink v0.6.0
