@@ -23,7 +23,7 @@ github.com/PaesslerAG/gval
 # github.com/PaesslerAG/jsonpath v0.1.1
 ## explicit
 github.com/PaesslerAG/jsonpath
-# github.com/alecthomas/kong v1.15.0
+# github.com/alecthomas/kong v1.16.0
 ## explicit; go 1.20
 github.com/alecthomas/kong
 # github.com/amikos-tech/chroma-go v0.4.1
