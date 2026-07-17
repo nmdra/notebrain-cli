@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.5.0] - 2026-07-17
+
+### Added
+- **Suppress text from search results (`--include-text=false`)**: Integrated a toggle parameter `includeText` throughout the ChromaDB query layer (`internal/store`) to suppress loading the `text` field at the storage query level, and cleared `r.Text` during CLI output filtering (`cmd/print`) to ensure lean payload formatting and conserve model tokens (`feat(store,cmd)`).
+
+### Changed
+- **Decluttered and Restructured Agent Skills**: Redesigned the Progressive Retrieval Workflow inside `.agents/skills/notebrain/SKILL.md` and `wiki/Notebrain-Chat.md` to prevent duplication, outlining a clear 4-step progressive search strategy with dedicated example commands and a scannable quick command map (`docs(skill,wiki)`).
+
 ## [v2.4.0] - 2026-07-15
 
 ### Added
