@@ -365,6 +365,96 @@ func TestParse_ASTStructure(t *testing.T) {
 	}
 }
 
+func TestParse_ExternalLinks(t *testing.T) {
+	body := `# Resources
+
+Check out [Context Caching](https://api-docs.deepseek.com/guides/kv_cache/) for details.
+
+Also see [Prompt Caching Video](https://youtu.be/u57EnkQaUTY) for an overview.
+`
+	res := Parse(body, "test-links", 2000, 0, false)
+	if len(res.Chunks) == 0 {
+		t.Fatal("expected at least 1 chunk")
+	}
+	c := res.Chunks[0]
+
+	// Text (embeddings): plain prose, no URLs
+	if strings.Contains(c.Text, "https://") {
+		t.Errorf("Text should NOT contain URLs: got %q", c.Text)
+	}
+	if !strings.Contains(c.Text, "Context Caching") {
+		t.Errorf("Text should contain anchor text: got %q", c.Text)
+	}
+
+	// RichText (display): full Markdown link syntax
+	if !strings.Contains(c.RichText, "[Context Caching](https://api-docs.deepseek.com/guides/kv_cache/)") {
+		t.Errorf("RichText should contain full link: got %q", c.RichText)
+	}
+	if !strings.Contains(c.RichText, "[Prompt Caching Video](https://youtu.be/u57EnkQaUTY)") {
+		t.Errorf("RichText should contain full link: got %q", c.RichText)
+	}
+}
+
+func TestParse_WikilinkPreserved(t *testing.T) {
+	body := "# Notes\n\nSee [[Apache Kafka]] and [[System Design|SD]] for more.\n"
+	res := Parse(body, "test-wl", 2000, 0, false)
+	c := res.Chunks[0]
+
+	if !strings.Contains(c.RichText, "[[Apache Kafka]]") {
+		t.Errorf("RichText should preserve wikilink: got %q", c.RichText)
+	}
+	if !strings.Contains(c.RichText, "[[System Design|SD]]") {
+		t.Errorf("RichText should preserve aliased wikilink: got %q", c.RichText)
+	}
+	// Plain text: just the display text
+	if !strings.Contains(c.Text, "Apache Kafka") {
+		t.Errorf("Text should contain wikilink text: got %q", c.Text)
+	}
+	if strings.Contains(c.Text, "[[") {
+		t.Errorf("Text should NOT contain [[ brackets: got %q", c.Text)
+	}
+}
+
+func TestParse_EmphasisPreserved(t *testing.T) {
+	body := "# Style\n\nThis is **bold** and *italic* and `code` and ~~struck~~.\n"
+	res := Parse(body, "test-em", 2000, 0, false)
+	c := res.Chunks[0]
+
+	if !strings.Contains(c.RichText, "**bold**") {
+		t.Errorf("RichText should preserve bold: got %q", c.RichText)
+	}
+	if !strings.Contains(c.RichText, "*italic*") {
+		t.Errorf("RichText should preserve italic: got %q", c.RichText)
+	}
+	if !strings.Contains(c.RichText, "`code`") {
+		t.Errorf("RichText should preserve inline code: got %q", c.RichText)
+	}
+	if !strings.Contains(c.RichText, "~~struck~~") {
+		t.Errorf("RichText should preserve strikethrough: got %q", c.RichText)
+	}
+
+	// Plain text: no formatting markers
+	if strings.Contains(c.Text, "**") || strings.Contains(c.Text, "~~") {
+		t.Errorf("Text should NOT contain formatting markers: got %q", c.Text)
+	}
+	if !strings.Contains(c.Text, "bold") && !strings.Contains(c.Text, "italic") {
+		t.Errorf("Text should contain prose words: got %q", c.Text)
+	}
+}
+
+func TestParse_BlockquoteWithLinks(t *testing.T) {
+	body := "# Refs\n\n> See [API Docs](https://example.com/api) for details.\n"
+	res := Parse(body, "test-bq-link", 2000, 0, false)
+	c := res.Chunks[0]
+
+	if !strings.Contains(c.RichText, "[API Docs](https://example.com/api)") {
+		t.Errorf("RichText in blockquote should preserve link: got %q", c.RichText)
+	}
+	if strings.Contains(c.Text, "https://") {
+		t.Errorf("Text in blockquote should NOT contain URL: got %q", c.Text)
+	}
+}
+
 func BenchmarkParse(b *testing.B) {
 	body := `---
 title: "Benchmark Note"
