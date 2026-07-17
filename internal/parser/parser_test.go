@@ -6,6 +6,7 @@ package parser
 
 import (
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -452,6 +453,147 @@ func TestParse_BlockquoteWithLinks(t *testing.T) {
 	}
 	if strings.Contains(c.Text, "https://") {
 		t.Errorf("Text in blockquote should NOT contain URL: got %q", c.Text)
+	}
+}
+
+func TestParse_ListComprehensive(t *testing.T) {
+	body := `# List Test
+
+- [ ] Unchecked task with [external link](https://example.com)
+- [x] Checked task with **bold text** and *italics*
+- Regular item with [[WikiNote#section|Alias]] and ` + "`code`" + ` and ~~strikethrough~~
+- Nested list parent:
+  - Nested child item 1
+  - Nested child item 2 with http://autolink.com
+1. Ordered item 1 with #hashtag
+2. Ordered item 2
+`
+	res := Parse(body, "test-list-comp", 2000, 0, false)
+	if len(res.Chunks) == 0 {
+		t.Fatal("Expected chunk")
+	}
+	c := res.Chunks[0]
+	if !strings.Contains(c.RichText, "[ ] Unchecked task with [external link](https://example.com)") {
+		t.Errorf("RichText missing unchecked task: %q", c.RichText)
+	}
+	if !strings.Contains(c.RichText, "[x] Checked task with **bold text**") {
+		t.Errorf("RichText missing checked task: %q", c.RichText)
+	}
+	if !strings.Contains(c.RichText, "[[WikiNote#section|Alias]]") {
+		t.Errorf("RichText missing wikilink in list: %q", c.RichText)
+	}
+	if !strings.Contains(c.Text, "Unchecked task with external link") {
+		t.Errorf("Text missing clean unchecked task: %q", c.Text)
+	}
+	if !strings.Contains(c.Text, "Ordered item 1 with hashtag") {
+		t.Errorf("Text missing ordered item: %q", c.Text)
+	}
+}
+
+func TestParse_BlockquoteComprehensive(t *testing.T) {
+	body := `# Blockquote Test
+
+> # Nested Heading
+> Introductory text with **bold** and ~~strikethrough~~ and ` + "`code`" + ` and http://example.com/auto.
+> - List item 1 inside blockquote
+> - [x] Task inside blockquote with [Link](https://test.org)
+> > Double nested blockquote
+> ` + "```python\nprint('hello from blockquote')\n```" + `
+> | Col 1 | Col 2 |
+> | --- | --- |
+> | A | B |
+`
+	res := Parse(body, "test-bq-comp", 2000, 0, false)
+	if len(res.Chunks) == 0 {
+		t.Fatal("Expected chunk")
+	}
+	c := res.Chunks[0]
+	if !strings.Contains(c.RichText, "> Introductory text with **bold**") {
+		t.Errorf("RichText missing blockquote intro: %q", c.RichText)
+	}
+	if !strings.Contains(c.RichText, "> - List item 1 inside blockquote") {
+		t.Errorf("RichText missing blockquote list: %q", c.RichText)
+	}
+	if !strings.Contains(c.RichText, "print('hello from blockquote')") {
+		t.Errorf("RichText missing blockquote code block: %q", c.RichText)
+	}
+	if !strings.Contains(c.Text, "Introductory text with bold") {
+		t.Errorf("Text missing clean blockquote text: %q", c.Text)
+	}
+}
+
+func TestParse_NestedInlineFormatting(t *testing.T) {
+	body := `# Nested Inline
+
+Here is [**Bold Link**](https://example.com/bold) and [*Italic Link*](https://example.com/italic) and [Link with ` + "`code`" + `](https://example.com/code) and [Link with ~~struck~~](https://example.com/struck) and [Link with #hashtag](https://example.com/tag).
+Also **bold with [nested link](https://example.com/nested)** and *italic with ` + "`nested code`" + `*.
+`
+	res := Parse(body, "test-nested-inline", 2000, 0, false)
+	if len(res.Chunks) == 0 {
+		t.Fatal("Expected chunk")
+	}
+	c := res.Chunks[0]
+	if !strings.Contains(c.RichText, "[**Bold Link**](https://example.com/bold)") {
+		t.Errorf("RichText missing bold link: %q", c.RichText)
+	}
+	if !strings.Contains(c.RichText, "[*Italic Link*](https://example.com/italic)") {
+		t.Errorf("RichText missing italic link: %q", c.RichText)
+	}
+	if !strings.Contains(c.RichText, "[Link with `code`](https://example.com/code)") {
+		t.Errorf("RichText missing code span link: %q", c.RichText)
+	}
+	if !strings.Contains(c.RichText, "[Link with ~~struck~~](https://example.com/struck)") {
+		t.Errorf("RichText missing strikethrough link: %q", c.RichText)
+	}
+	if !strings.Contains(c.RichText, "[Link with #hashtag](https://example.com/tag)") {
+		t.Errorf("RichText missing hashtag link: %q", c.RichText)
+	}
+	if !strings.Contains(c.Text, "Bold Link") || strings.Contains(c.Text, "https://") {
+		t.Errorf("Text should be clean without URLs: %q", c.Text)
+	}
+}
+
+func TestParse_FrontmatterTagFormats(t *testing.T) {
+	tests := []struct {
+		name     string
+		body     string
+		expected []string
+	}{
+		{
+			name:     "yaml_list_tags",
+			body:     "---\ntitle: Test\ntags:\n  - ai\n  - llm\n  - golang\n---\n# Content\nText.\n",
+			expected: []string{"ai", "llm", "golang"},
+		},
+		{
+			name:     "yaml_array_tags",
+			body:     "---\ntitle: Test\ntags: [ai, llm, golang]\n---\n# Content\nText.\n",
+			expected: []string{"ai", "llm", "golang"},
+		},
+		{
+			name:     "comma_separated_tags",
+			body:     "---\ntitle: Test\ntags: \"ai, llm, golang\"\n---\n# Content\nText.\n",
+			expected: []string{"ai", "llm", "golang"},
+		},
+		{
+			name:     "single_tag",
+			body:     "---\ntitle: Test\ntags: ai\n---\n# Content\nText.\n",
+			expected: []string{"ai"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res := Parse(tt.body, "test-tags", 2000, 0, false)
+			slices.Sort(tt.expected)
+			if len(res.Tags) != len(tt.expected) {
+				t.Fatalf("Expected %d tags, got %d: %v", len(tt.expected), len(res.Tags), res.Tags)
+			}
+			for i, expected := range tt.expected {
+				if res.Tags[i] != expected {
+					t.Errorf("Tag[%d] = %q, expected %q", i, res.Tags[i], expected)
+				}
+			}
+		})
 	}
 }
 

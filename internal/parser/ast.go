@@ -105,10 +105,13 @@ func Parse(body, noteSlug string, maxChunkRunes, overlapRunes int, skipAttachmen
 	for t := range tagsSet {
 		tags = append(tags, t)
 	}
+	slices.Sort(tags)
+
 	links := make([]string, 0, len(linksSet))
 	for l := range linksSet {
 		links = append(links, l)
 	}
+	slices.Sort(links)
 
 	// Extract chunks using section logic
 	var inlineRegistry []inlineInfo
@@ -551,98 +554,106 @@ func extractInlineContent(n ast.Node, src []byte, registry *[]inlineInfo) (strin
 	return plainBuf.String(), richBuf.String()
 }
 
+func handleInlineNode(node ast.Node, entering bool, src []byte, registry *[]inlineInfo, buf *bytes.Buffer, breakChar byte) (ast.WalkStatus, bool) {
+	switch nTyped := node.(type) {
+	case *ast.Link:
+		if entering {
+			plain, rich := extractInlineContent(nTyped, src, registry)
+			richLink := "[" + rich + "](" + string(nTyped.Destination) + ")"
+			idx := len(*registry)
+			*registry = append(*registry, inlineInfo{plain: plain, rich: richLink})
+			_, _ = fmt.Fprintf(buf, "\x00INLINE:%d\x00", idx)
+			return ast.WalkSkipChildren, true
+		}
+	case *ast.AutoLink:
+		if entering {
+			url := string(nTyped.URL(src))
+			idx := len(*registry)
+			*registry = append(*registry, inlineInfo{plain: url, rich: url})
+			_, _ = fmt.Fprintf(buf, "\x00INLINE:%d\x00", idx)
+			return ast.WalkSkipChildren, true
+		}
+	case *wikilink.Node:
+		if entering {
+			plain := extractPlainText(nTyped, src)
+			rich := "[[" + string(nTyped.Target)
+			if len(nTyped.Fragment) > 0 {
+				rich += "#" + string(nTyped.Fragment)
+			}
+			targetWithFragment := string(nTyped.Target)
+			if len(nTyped.Fragment) > 0 {
+				targetWithFragment += "#" + string(nTyped.Fragment)
+			}
+			if plain != targetWithFragment && plain != "" {
+				rich += "|" + plain
+			}
+			rich += "]]"
+			if nTyped.Embed {
+				rich = "!" + rich
+			}
+
+			idx := len(*registry)
+			*registry = append(*registry, inlineInfo{plain: plain, rich: rich})
+			_, _ = fmt.Fprintf(buf, "\x00INLINE:%d\x00", idx)
+			return ast.WalkSkipChildren, true
+		}
+	case *ast.Emphasis:
+		if entering {
+			plain, rich := extractInlineContent(nTyped, src, registry)
+			marker := "*"
+			if nTyped.Level == 2 {
+				marker = "**"
+			}
+			richEmp := marker + rich + marker
+			idx := len(*registry)
+			*registry = append(*registry, inlineInfo{plain: plain, rich: richEmp})
+			_, _ = fmt.Fprintf(buf, "\x00INLINE:%d\x00", idx)
+			return ast.WalkSkipChildren, true
+		}
+	case *ast.CodeSpan:
+		if entering {
+			plain := extractPlainText(nTyped, src)
+			rich := "`" + plain + "`"
+			idx := len(*registry)
+			*registry = append(*registry, inlineInfo{plain: plain, rich: rich})
+			_, _ = fmt.Fprintf(buf, "\x00INLINE:%d\x00", idx)
+			return ast.WalkSkipChildren, true
+		}
+	case *extast.Strikethrough:
+		if entering {
+			plain, rich := extractInlineContent(nTyped, src, registry)
+			richStrikethrough := "~~" + rich + "~~"
+			idx := len(*registry)
+			*registry = append(*registry, inlineInfo{plain: plain, rich: richStrikethrough})
+			_, _ = fmt.Fprintf(buf, "\x00INLINE:%d\x00", idx)
+			return ast.WalkSkipChildren, true
+		}
+	case *hashtag.Node:
+		if entering {
+			tag := string(nTyped.Tag)
+			idx := len(*registry)
+			*registry = append(*registry, inlineInfo{plain: tag, rich: "#" + tag})
+			_, _ = fmt.Fprintf(buf, "\x00INLINE:%d\x00", idx)
+			return ast.WalkSkipChildren, true
+		}
+	case *ast.Text:
+		if entering {
+			val := nTyped.Segment.Value(src)
+			buf.Write(val)
+			if nTyped.SoftLineBreak() || nTyped.HardLineBreak() {
+				buf.WriteByte(breakChar)
+			}
+		}
+		return ast.WalkContinue, true
+	}
+	return ast.WalkContinue, false
+}
+
 func extractText(n ast.Node, src []byte, registry *[]inlineInfo) string {
 	var buf bytes.Buffer
 	_ = ast.Walk(n, func(node ast.Node, entering bool) (ast.WalkStatus, error) {
-		switch nTyped := node.(type) {
-		case *ast.Link:
-			if entering {
-				plain, rich := extractInlineContent(nTyped, src, registry)
-				richLink := "[" + rich + "](" + string(nTyped.Destination) + ")"
-				idx := len(*registry)
-				*registry = append(*registry, inlineInfo{plain: plain, rich: richLink})
-				_, _ = fmt.Fprintf(&buf, "\x00INLINE:%d\x00", idx)
-				return ast.WalkSkipChildren, nil
-			}
-		case *ast.AutoLink:
-			if entering {
-				url := string(nTyped.URL(src))
-				idx := len(*registry)
-				*registry = append(*registry, inlineInfo{plain: url, rich: url})
-				_, _ = fmt.Fprintf(&buf, "\x00INLINE:%d\x00", idx)
-				return ast.WalkSkipChildren, nil
-			}
-		case *wikilink.Node:
-			if entering {
-				plain := extractPlainText(nTyped, src)
-				rich := "[[" + string(nTyped.Target)
-				if len(nTyped.Fragment) > 0 {
-					rich += "#" + string(nTyped.Fragment)
-				}
-				targetWithFragment := string(nTyped.Target)
-				if len(nTyped.Fragment) > 0 {
-					targetWithFragment += "#" + string(nTyped.Fragment)
-				}
-				if plain != targetWithFragment && plain != "" {
-					rich += "|" + plain
-				}
-				rich += "]]"
-				if nTyped.Embed {
-					rich = "!" + rich
-				}
-
-				idx := len(*registry)
-				*registry = append(*registry, inlineInfo{plain: plain, rich: rich})
-				_, _ = fmt.Fprintf(&buf, "\x00INLINE:%d\x00", idx)
-				return ast.WalkSkipChildren, nil
-			}
-		case *ast.Emphasis:
-			if entering {
-				plain, rich := extractInlineContent(nTyped, src, registry)
-				marker := "*"
-				if nTyped.Level == 2 {
-					marker = "**"
-				}
-				richEmp := marker + rich + marker
-				idx := len(*registry)
-				*registry = append(*registry, inlineInfo{plain: plain, rich: richEmp})
-				_, _ = fmt.Fprintf(&buf, "\x00INLINE:%d\x00", idx)
-				return ast.WalkSkipChildren, nil
-			}
-		case *ast.CodeSpan:
-			if entering {
-				plain := extractPlainText(nTyped, src)
-				rich := "`" + plain + "`"
-				idx := len(*registry)
-				*registry = append(*registry, inlineInfo{plain: plain, rich: rich})
-				_, _ = fmt.Fprintf(&buf, "\x00INLINE:%d\x00", idx)
-				return ast.WalkSkipChildren, nil
-			}
-		case *extast.Strikethrough:
-			if entering {
-				plain, rich := extractInlineContent(nTyped, src, registry)
-				richStrikethrough := "~~" + rich + "~~"
-				idx := len(*registry)
-				*registry = append(*registry, inlineInfo{plain: plain, rich: richStrikethrough})
-				_, _ = fmt.Fprintf(&buf, "\x00INLINE:%d\x00", idx)
-				return ast.WalkSkipChildren, nil
-			}
-		case *hashtag.Node:
-			if entering {
-				tag := string(nTyped.Tag)
-				idx := len(*registry)
-				*registry = append(*registry, inlineInfo{plain: tag, rich: "#" + tag})
-				_, _ = fmt.Fprintf(&buf, "\x00INLINE:%d\x00", idx)
-				return ast.WalkSkipChildren, nil
-			}
-		case *ast.Text:
-			if entering {
-				val := nTyped.Segment.Value(src)
-				buf.Write(val)
-				if nTyped.SoftLineBreak() || nTyped.HardLineBreak() {
-					buf.WriteByte(' ')
-				}
-			}
+		if status, handled := handleInlineNode(node, entering, src, registry, &buf, ' '); handled {
+			return status, nil
 		}
 		return ast.WalkContinue, nil
 	})
@@ -857,96 +868,8 @@ func extractItemText(n ast.Node, src []byte, registry *[]inlineInfo) (string, bo
 			}
 			return ast.WalkContinue, nil
 		}
-
-		switch nTyped := node.(type) {
-		case *ast.Link:
-			if entering {
-				plain, rich := extractInlineContent(nTyped, src, registry)
-				richLink := "[" + rich + "](" + string(nTyped.Destination) + ")"
-				idx := len(*registry)
-				*registry = append(*registry, inlineInfo{plain: plain, rich: richLink})
-				_, _ = fmt.Fprintf(&buf, "\x00INLINE:%d\x00", idx)
-				return ast.WalkSkipChildren, nil
-			}
-		case *ast.AutoLink:
-			if entering {
-				url := string(nTyped.URL(src))
-				idx := len(*registry)
-				*registry = append(*registry, inlineInfo{plain: url, rich: url})
-				_, _ = fmt.Fprintf(&buf, "\x00INLINE:%d\x00", idx)
-				return ast.WalkSkipChildren, nil
-			}
-		case *wikilink.Node:
-			if entering {
-				plain := extractPlainText(nTyped, src)
-				rich := "[[" + string(nTyped.Target)
-				if len(nTyped.Fragment) > 0 {
-					rich += "#" + string(nTyped.Fragment)
-				}
-				targetWithFragment := string(nTyped.Target)
-				if len(nTyped.Fragment) > 0 {
-					targetWithFragment += "#" + string(nTyped.Fragment)
-				}
-				if plain != targetWithFragment && plain != "" {
-					rich += "|" + plain
-				}
-				rich += "]]"
-				if nTyped.Embed {
-					rich = "!" + rich
-				}
-
-				idx := len(*registry)
-				*registry = append(*registry, inlineInfo{plain: plain, rich: rich})
-				_, _ = fmt.Fprintf(&buf, "\x00INLINE:%d\x00", idx)
-				return ast.WalkSkipChildren, nil
-			}
-		case *ast.Emphasis:
-			if entering {
-				plain, rich := extractInlineContent(nTyped, src, registry)
-				marker := "*"
-				if nTyped.Level == 2 {
-					marker = "**"
-				}
-				richEmp := marker + rich + marker
-				idx := len(*registry)
-				*registry = append(*registry, inlineInfo{plain: plain, rich: richEmp})
-				_, _ = fmt.Fprintf(&buf, "\x00INLINE:%d\x00", idx)
-				return ast.WalkSkipChildren, nil
-			}
-		case *ast.CodeSpan:
-			if entering {
-				plain := extractPlainText(nTyped, src)
-				rich := "`" + plain + "`"
-				idx := len(*registry)
-				*registry = append(*registry, inlineInfo{plain: plain, rich: rich})
-				_, _ = fmt.Fprintf(&buf, "\x00INLINE:%d\x00", idx)
-				return ast.WalkSkipChildren, nil
-			}
-		case *extast.Strikethrough:
-			if entering {
-				plain, rich := extractInlineContent(nTyped, src, registry)
-				richStrikethrough := "~~" + rich + "~~"
-				idx := len(*registry)
-				*registry = append(*registry, inlineInfo{plain: plain, rich: richStrikethrough})
-				_, _ = fmt.Fprintf(&buf, "\x00INLINE:%d\x00", idx)
-				return ast.WalkSkipChildren, nil
-			}
-		case *hashtag.Node:
-			if entering {
-				tag := string(nTyped.Tag)
-				idx := len(*registry)
-				*registry = append(*registry, inlineInfo{plain: tag, rich: "#" + tag})
-				_, _ = fmt.Fprintf(&buf, "\x00INLINE:%d\x00", idx)
-				return ast.WalkSkipChildren, nil
-			}
-		case *ast.Text:
-			if entering {
-				val := nTyped.Segment.Value(src)
-				buf.Write(val)
-				if nTyped.SoftLineBreak() || nTyped.HardLineBreak() {
-					buf.WriteByte(' ')
-				}
-			}
+		if status, handled := handleInlineNode(node, entering, src, registry, &buf, ' '); handled {
+			return status, nil
 		}
 		return ast.WalkContinue, nil
 	})
@@ -1031,95 +954,8 @@ func extractBlockquoteText(bq *ast.Blockquote, src []byte, indent int, registry 
 func extractBlockquoteChildText(n ast.Node, src []byte, registry *[]inlineInfo) string {
 	var buf bytes.Buffer
 	_ = ast.Walk(n, func(node ast.Node, entering bool) (ast.WalkStatus, error) {
-		switch nTyped := node.(type) {
-		case *ast.Link:
-			if entering {
-				plain, rich := extractInlineContent(nTyped, src, registry)
-				richLink := "[" + rich + "](" + string(nTyped.Destination) + ")"
-				idx := len(*registry)
-				*registry = append(*registry, inlineInfo{plain: plain, rich: richLink})
-				_, _ = fmt.Fprintf(&buf, "\x00INLINE:%d\x00", idx)
-				return ast.WalkSkipChildren, nil
-			}
-		case *ast.AutoLink:
-			if entering {
-				url := string(nTyped.URL(src))
-				idx := len(*registry)
-				*registry = append(*registry, inlineInfo{plain: url, rich: url})
-				_, _ = fmt.Fprintf(&buf, "\x00INLINE:%d\x00", idx)
-				return ast.WalkSkipChildren, nil
-			}
-		case *wikilink.Node:
-			if entering {
-				plain := extractPlainText(nTyped, src)
-				rich := "[[" + string(nTyped.Target)
-				if len(nTyped.Fragment) > 0 {
-					rich += "#" + string(nTyped.Fragment)
-				}
-				targetWithFragment := string(nTyped.Target)
-				if len(nTyped.Fragment) > 0 {
-					targetWithFragment += "#" + string(nTyped.Fragment)
-				}
-				if plain != targetWithFragment && plain != "" {
-					rich += "|" + plain
-				}
-				rich += "]]"
-				if nTyped.Embed {
-					rich = "!" + rich
-				}
-
-				idx := len(*registry)
-				*registry = append(*registry, inlineInfo{plain: plain, rich: rich})
-				_, _ = fmt.Fprintf(&buf, "\x00INLINE:%d\x00", idx)
-				return ast.WalkSkipChildren, nil
-			}
-		case *ast.Emphasis:
-			if entering {
-				plain, rich := extractInlineContent(nTyped, src, registry)
-				marker := "*"
-				if nTyped.Level == 2 {
-					marker = "**"
-				}
-				richEmp := marker + rich + marker
-				idx := len(*registry)
-				*registry = append(*registry, inlineInfo{plain: plain, rich: richEmp})
-				_, _ = fmt.Fprintf(&buf, "\x00INLINE:%d\x00", idx)
-				return ast.WalkSkipChildren, nil
-			}
-		case *ast.CodeSpan:
-			if entering {
-				plain := extractPlainText(nTyped, src)
-				rich := "`" + plain + "`"
-				idx := len(*registry)
-				*registry = append(*registry, inlineInfo{plain: plain, rich: rich})
-				_, _ = fmt.Fprintf(&buf, "\x00INLINE:%d\x00", idx)
-				return ast.WalkSkipChildren, nil
-			}
-		case *extast.Strikethrough:
-			if entering {
-				plain, rich := extractInlineContent(nTyped, src, registry)
-				richStrikethrough := "~~" + rich + "~~"
-				idx := len(*registry)
-				*registry = append(*registry, inlineInfo{plain: plain, rich: richStrikethrough})
-				_, _ = fmt.Fprintf(&buf, "\x00INLINE:%d\x00", idx)
-				return ast.WalkSkipChildren, nil
-			}
-		case *hashtag.Node:
-			if entering {
-				tag := string(nTyped.Tag)
-				idx := len(*registry)
-				*registry = append(*registry, inlineInfo{plain: tag, rich: "#" + tag})
-				_, _ = fmt.Fprintf(&buf, "\x00INLINE:%d\x00", idx)
-				return ast.WalkSkipChildren, nil
-			}
-		case *ast.Text:
-			if entering {
-				val := nTyped.Segment.Value(src)
-				buf.Write(val)
-				if nTyped.SoftLineBreak() || nTyped.HardLineBreak() {
-					buf.WriteByte('\n')
-				}
-			}
+		if status, handled := handleInlineNode(node, entering, src, registry, &buf, '\n'); handled {
+			return status, nil
 		}
 		return ast.WalkContinue, nil
 	})
