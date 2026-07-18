@@ -139,7 +139,11 @@ func (r *chunkRenderer) renderNode(w io.Writer, n ast.Node, source []byte) {
 		}
 
 	case *hashtag.Node:
-		_, _ = w.Write([]byte("#" + string(node.Tag)))
+		if r.rich {
+			_, _ = w.Write([]byte("#" + string(node.Tag)))
+		} else {
+			_, _ = w.Write([]byte(string(node.Tag)))
+		}
 
 	case *wikilink.Node:
 		var labelBuf bytes.Buffer
