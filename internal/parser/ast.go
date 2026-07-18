@@ -235,6 +235,20 @@ func extractSections(doc ast.Node, src []byte, registry *[]inlineInfo) []section
 			})
 			return ast.WalkSkipChildren, nil
 
+		case *mermaid.Block:
+			ensureCurrent()
+			var code strings.Builder
+			for i := 0; i < node.Lines().Len(); i++ {
+				line := node.Lines().At(i)
+				code.Write(line.Value(src))
+			}
+			current.blocks = append(current.blocks, block{
+				kind:     "code",
+				codeText: code.String(),
+				language: "mermaid",
+			})
+			return ast.WalkSkipChildren, nil
+
 		case *ast.Paragraph:
 			ensureCurrent()
 			if isOnlyHashtags(node, src) {
