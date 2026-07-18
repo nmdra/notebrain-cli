@@ -59,8 +59,46 @@ var mdParser = goldmark.New(
 		parser.WithInlineParsers(
 			util.Prioritized(latex.InlineMathParser, 500),
 		),
+		parser.WithASTTransformers(
+			util.Prioritized(&metadataTransformer{}, 100),
+		),
 	),
 )
+
+var (
+	tagsContextKey     = parser.NewContextKey()
+	linksContextKey    = parser.NewContextKey()
+	skipAttachmentsKey = parser.NewContextKey()
+)
+
+type metadataTransformer struct{}
+
+func (t *metadataTransformer) Transform(node *ast.Document, reader text.Reader, pc parser.Context) {
+	tagsSet := make(map[string]struct{})
+	linksSet := make(map[string]struct{})
+
+	skipAttachments, _ := pc.Get(skipAttachmentsKey).(bool)
+
+	_ = ast.Walk(node, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+		if !entering {
+			return ast.WalkContinue, nil
+		}
+
+		switch nTyped := n.(type) {
+		case *hashtag.Node:
+			tagsSet[string(nTyped.Tag)] = struct{}{}
+		case *wikilink.Node:
+			target := string(nTyped.Target)
+			if !skipAttachments || !IsAttachmentLink(target) {
+				linksSet[target] = struct{}{}
+			}
+		}
+		return ast.WalkContinue, nil
+	})
+
+	pc.Set(tagsContextKey, tagsSet)
+	pc.Set(linksContextKey, linksSet)
+}
 
 // Parse parses body text into Chunks, extracting wikilinks, tags, and frontmatter.
 // maxChunkRunes controls the maximum rune length per chunk. overlapRunes controls how many
@@ -69,7 +107,10 @@ var mdParser = goldmark.New(
 func Parse(body, noteSlug string, maxChunkRunes, overlapRunes int, skipAttachments bool) Result {
 	src := []byte(body)
 	reader := text.NewReader(src)
-	doc := mdParser.Parser().Parse(reader)
+	pc := parser.NewContext()
+	pc.Set(skipAttachmentsKey, skipAttachments)
+
+	doc := mdParser.Parser().Parse(reader, parser.WithContext(pc))
 
 	// Extract frontmatter metadata stored by goldmark-meta
 	var frontmatter map[string]any
@@ -77,28 +118,14 @@ func Parse(body, noteSlug string, maxChunkRunes, overlapRunes int, skipAttachmen
 		frontmatter = md
 	}
 
-	// Walk AST to collect Tags and Links
-	tagsSet := make(map[string]struct{})
-	linksSet := make(map[string]struct{})
-
-	if err := ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
-		if !entering {
-			return ast.WalkContinue, nil
-		}
-
-		switch node := n.(type) {
-		case *hashtag.Node:
-			tagsSet[string(node.Tag)] = struct{}{}
-		case *wikilink.Node:
-			target := string(node.Target)
-			if !skipAttachments || !IsAttachmentLink(target) {
-				linksSet[target] = struct{}{}
-			}
-		}
-
-		return ast.WalkContinue, nil
-	}); err != nil {
-		slog.Warn("ast walk encountered error during tag/link extraction", "err", err)
+	// Retrieve tags and links collected by metadataTransformer
+	tagsSet, _ := pc.Get(tagsContextKey).(map[string]struct{})
+	if tagsSet == nil {
+		tagsSet = make(map[string]struct{})
+	}
+	linksSet, _ := pc.Get(linksContextKey).(map[string]struct{})
+	if linksSet == nil {
+		linksSet = make(map[string]struct{})
 	}
 
 	fmTags := extractFrontmatterTags(frontmatter)
