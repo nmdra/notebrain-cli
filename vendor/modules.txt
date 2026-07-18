@@ -147,6 +147,9 @@ github.com/rivo/uniseg
 # github.com/sahilm/fuzzy v0.1.3
 ## explicit; go 1.24.5
 github.com/sahilm/fuzzy
+# github.com/soypat/goldmark-latex v0.1.4
+## explicit; go 1.19
+github.com/soypat/goldmark-latex
 # github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e
 ## explicit; go 1.19
 github.com/xo/terminfo
@@ -167,6 +170,9 @@ github.com/yuin/goldmark-meta
 # go.abhg.dev/goldmark/hashtag v0.4.0
 ## explicit; go 1.22
 go.abhg.dev/goldmark/hashtag
+# go.abhg.dev/goldmark/mermaid v0.6.0
+## explicit; go 1.24
+go.abhg.dev/goldmark/mermaid
 # go.abhg.dev/goldmark/wikilink v0.6.0
 ## explicit; go 1.20
 go.abhg.dev/goldmark/wikilink

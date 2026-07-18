@@ -14,9 +14,12 @@ import (
 	extast "github.com/yuin/goldmark/extension/ast"
 	"github.com/yuin/goldmark/parser"
 	"github.com/yuin/goldmark/text"
+	"github.com/yuin/goldmark/util"
 
+	latex "github.com/soypat/goldmark-latex"
 	meta "github.com/yuin/goldmark-meta"
 	"go.abhg.dev/goldmark/hashtag"
+	"go.abhg.dev/goldmark/mermaid"
 	"go.abhg.dev/goldmark/wikilink"
 )
 
@@ -39,18 +42,23 @@ type Result struct {
 	Frontmatter map[string]any
 }
 
-// mdParser is the shared goldmark instance configured with GFM, hashtags, wikilinks, and metadata.
+// mdParser is the shared goldmark instance configured with GFM, hashtags, wikilinks, metadata, footnotes, mermaid, and LaTeX.
 var mdParser = goldmark.New(
 	goldmark.WithExtensions(
 		extension.GFM,
+		extension.Footnote,
 		&hashtag.Extender{
 			Variant: hashtag.ObsidianVariant,
 		},
 		&wikilink.Extender{},
+		&mermaid.Extender{},
 		meta.New(meta.WithStoresInDocument()),
 	),
 	goldmark.WithParserOptions(
 		parser.WithAutoHeadingID(),
+		parser.WithInlineParsers(
+			util.Prioritized(latex.InlineMathParser, 500),
+		),
 	),
 )
 
