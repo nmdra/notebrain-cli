@@ -597,6 +597,21 @@ func TestParse_FrontmatterTagFormats(t *testing.T) {
 	}
 }
 
+func TestParse_Extensions(t *testing.T) {
+	body := `# Math and Diagrams
+Here is some math: $E=mc^2$ and a footnote[^1].
+
+[^1]: This is a footnote.
+
+And a mermaid diagram:
+` + "```mermaid\ngraph TD;\n    A-->B;\n```" + `
+`
+	res := Parse(body, "test-note", 800, 100, false)
+	if len(res.Chunks) == 0 {
+		t.Fatal("expected chunks, got 0")
+	}
+}
+
 func BenchmarkParse(b *testing.B) {
 	body := `---
 title: "Benchmark Note"

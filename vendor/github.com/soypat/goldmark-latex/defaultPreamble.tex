@@ -1,0 +1,48 @@
+\documentclass{article}
+
+\usepackage{graphicx}
+\usepackage[dvipsnames]{xcolor}
+\usepackage{listings}
+\usepackage[margin=1in]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{verbatim}
+\usepackage[normalem]{ulem}
+\usepackage{hyperref}
+\usepackage{textcomp} % Required for lstlisting to render `'` as is using upquote=true.
+\usepackage{framed} % For block quotes.
+
+\hypersetup{colorlinks,%
+  citecolor=black,%
+  filecolor=black,%
+  linkcolor=blue,%
+  urlcolor=blue,%
+  pdfstartview=FitH,%
+  breaklinks=true,%
+  pdfauthor={github.com/soypat/goldmark-latex}}
+
+\newcommand{\HRule}{\rule{\linewidth}{0.5mm}}
+\addtolength{\parskip}{0.5\baselineskip}
+\parindent=0pt
+
+\lstset{
+  numberstyle=\tiny, 
+  stepnumber=2, 
+  numbersep=5pt,
+  keywordstyle=\color{blue}\bfseries, 
+  stringstyle=\color{OliveGreen}, 
+  frame=single,
+  backgroundcolor=\color{gray!10},
+  inputencoding=utf8,
+  extendedchars=true,
+  literate={-}{-}1 {*}{*}1 {á}{{\'a}}1 {é}{{\'e}}1 {í}{{\'i}}1 {ó}{{\'o}}1 {ú}{{\'u}}1 {ü}{{\:u}}1,
+  breaklines=true, 
+  basicstyle=\ttfamily, 
+  columns=fullflexible, 
+  keepspaces=true, 
+  showstringspaces=false,
+  upquote=true,
+}
+
+\renewcommand{\familydefault}{\sfdefault}
+\usepackage[scaled=1]{helvet}
