@@ -10,6 +10,8 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/yuin/goldmark/text"
 )
 
 func TestSlugify(t *testing.T) {
@@ -609,6 +611,41 @@ And a mermaid diagram:
 	res := Parse(body, "test-note", 800, 100, false)
 	if len(res.Chunks) == 0 {
 		t.Fatal("expected chunks, got 0")
+	}
+}
+
+func TestChunkRenderer(t *testing.T) {
+	body := `# Heading 1
+This is **bold** and *italic* text with a [[WikiLink|Label]].
+
+- List item 1
+- List item 2
+
+> Blockquote line 1
+> Blockquote line 2
+
+` + "```python\nprint('hello')\n```" + `
+`
+	src := []byte(body)
+	doc := mdParser.Parser().Parse(text.NewReader(src))
+
+	cleanR := newChunkRenderer(false)
+	cleanText := cleanR.render(doc, src)
+
+	richR := newChunkRenderer(true)
+	richText := richR.render(doc, src)
+
+	if !strings.Contains(cleanText, "This is bold and italic text with a Label") {
+		t.Errorf("cleanText unexpected: %q", cleanText)
+	}
+	if !strings.Contains(richText, "This is **bold** and *italic* text with a [[WikiLink|Label]]") {
+		t.Errorf("richText unexpected: %q", richText)
+	}
+	if !strings.Contains(richText, "- List item 1") {
+		t.Errorf("richText missing list item: %q", richText)
+	}
+	if !strings.Contains(richText, "> Blockquote line 1") {
+		t.Errorf("richText missing blockquote: %q", richText)
 	}
 }
 
