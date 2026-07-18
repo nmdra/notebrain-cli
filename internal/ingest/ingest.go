@@ -341,8 +341,6 @@ func (p *Pipeline) processFile(ctx context.Context, vaultPath string, filePath s
 			HasLinks:     len(astRes.Links) > 0,
 			HeadingPath:  c.HeadingPath,
 			HeadingLevel: c.Level,
-			CodeBlocks:   c.CodeBlocks,
-			HasTable:     c.HasTable,
 			HasTask:      c.HasTask,
 			ModifiedMs:   modTime.UnixMilli(),
 			ContentHash:  hash,

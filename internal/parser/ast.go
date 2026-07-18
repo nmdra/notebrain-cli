@@ -28,10 +28,7 @@ type Chunk struct {
 	RichText    string // full text with actual code inline (for storage/retrieval)
 	HeadingPath string // e.g. "Architecture > Data Flow > Ingest"
 	Level       int    // depth of the deepest heading in this chunk (1-6)
-	CodeBlocks  int    // number of fenced code blocks in this chunk
-	HasTable    bool
 	HasTask     bool
-	WordCount   int
 }
 
 // Result is the output from parsing the full document, containing the chunks and metadata.
@@ -370,10 +367,7 @@ func buildChunks(sections []section, noteSlug string, maxRunes, overlapRunes int
 				RichText:    richText,
 				HeadingPath: sec.headingPath,
 				Level:       sec.level,
-				CodeBlocks:  codeCount,
-				HasTable:    hasTable,
 				HasTask:     hasTask,
-				WordCount:   len(strings.Fields(cleanText)),
 			})
 			idx++
 			continue
@@ -391,10 +385,7 @@ func buildChunks(sections []section, noteSlug string, maxRunes, overlapRunes int
 				RichText:    subRich,
 				HeadingPath: sec.headingPath,
 				Level:       sec.level,
-				CodeBlocks:  codeCount,
-				HasTable:    hasTable,
 				HasTask:     hasTask,
-				WordCount:   len(strings.Fields(subClean)),
 			})
 			idx++
 		}

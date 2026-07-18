@@ -240,7 +240,7 @@ func TestBuildChunks_CodeOnlyChunk(t *testing.T) {
 
 	found := false
 	for _, c := range res.Chunks {
-		if c.CodeBlocks > 0 {
+		if strings.Contains(c.RichText, "def hello") {
 			found = true
 			if c.RichText == "" {
 				t.Error("code chunk should have non-empty RichText")

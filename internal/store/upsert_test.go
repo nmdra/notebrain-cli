@@ -99,45 +99,6 @@ func TestUpsertLinks(t *testing.T) {
 	}
 }
 
-func TestIngestNote(t *testing.T) {
-	ctx := context.Background()
-	st := newTestStore(t)
-
-	chunks := []store.ChunkRecord{
-		{ID: "test-note:0", NoteSlug: "test-note", ChunkIndex: 0, Text: "chunk 0", Embedding: []float32{0.1}},
-		{ID: "test-note:1", NoteSlug: "test-note", ChunkIndex: 1, Text: "chunk 1", Embedding: []float32{0.2}},
-		{ID: "test-note:2", NoteSlug: "test-note", ChunkIndex: 2, Text: "chunk 2", Embedding: []float32{0.3}},
-	}
-	links := []string{"link-a", "link-b"}
-
-	// Initial ingest
-	err := st.IngestNote(ctx, "test-note", chunks, links)
-	if err != nil {
-		t.Fatalf("Initial IngestNote failed: %v", err)
-	}
-
-	stats, _ := st.Stats(ctx)
-	if stats["chunks"] != 3 || stats["links"] != 2 {
-		t.Errorf("Expected 3 chunks, 2 links, got %v", stats)
-	}
-
-	// Re-ingest with fewer chunks and different links to trigger cleanup
-	chunks2 := []store.ChunkRecord{
-		{ID: "test-note:0", NoteSlug: "test-note", ChunkIndex: 0, Text: "chunk 0 updated", Embedding: []float32{0.1}},
-	}
-	links2 := []string{"link-c"}
-
-	err = st.IngestNote(ctx, "test-note", chunks2, links2)
-	if err != nil {
-		t.Fatalf("Second IngestNote failed: %v", err)
-	}
-
-	stats, _ = st.Stats(ctx)
-	if stats["chunks"] != 1 || stats["links"] != 1 {
-		t.Errorf("Expected 1 chunk, 1 link after shrinking, got %v", stats)
-	}
-}
-
 func TestBatchIngest(t *testing.T) {
 	ctx := context.Background()
 	st := newTestStore(t)

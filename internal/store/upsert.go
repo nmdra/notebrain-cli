@@ -23,32 +23,10 @@ type ChunkRecord struct {
 	HasLinks     bool
 	HeadingPath  string
 	HeadingLevel int
-	CodeBlocks   int
-	HasTable     bool
 	HasTask      bool
 	ModifiedMs   int64
 	ContentHash  string
 	Embedding    []float32
-}
-
-// IngestNote atomically replaces all chunks and links for a single note.
-// It holds the store mutex for the entire Delete→UpsertChunks→UpsertLinks
-// sequence to prevent concurrent hnswlib modifications that corrupt the
-// HNSW graph (assertion: inbound_connections_num[i] > 0).
-func (s *Store) IngestNote(ctx context.Context, noteSlug string, chunks []ChunkRecord, links []string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	// 1. Upsert chunks (replaces existing by ID, adds new)
-	if err := s.upsertChunks(ctx, chunks); err != nil {
-		return err
-	}
-	// 2. Clean up any stale chunks (if new version has fewer chunks)
-	if err := s.cleanupNoteChunks(ctx, noteSlug, len(chunks)); err != nil {
-		return err
-	}
-	// 3. Sync links (upserts new/existing, deletes stale)
-	return s.upsertLinks(ctx, noteSlug, links, s.buildLinkTargetResolver(ctx))
 }
 
 type BatchIngestData struct {
@@ -220,18 +198,6 @@ func (s *Store) DeleteNoteLinks(ctx context.Context, noteSlug string) error {
 	)
 }
 
-// cleanupNoteChunks deletes chunks for a note with an index >= validCount.
-// This removes stale chunks when a note shrinks, without dropping and recreating
-// the valid ones (which triggers an hnswlib race condition/bug).
-func (s *Store) cleanupNoteChunks(ctx context.Context, noteSlug string, validCount int) error {
-	return s.chunks.Delete(ctx,
-		chroma.WithWhere(chroma.And(
-			chroma.EqString("note_slug", noteSlug),
-			chroma.GteInt("chunk_index", validCount),
-		)),
-	)
-}
-
 // UpsertLinks replaces all outgoing links for a note.
 func (s *Store) UpsertLinks(ctx context.Context, noteSlug string, links []string) error {
 	s.mu.Lock()
@@ -369,14 +335,10 @@ func buildChunkMeta(c ChunkRecord) map[string]any {
 		"title":         c.Title,
 		"file_path":     c.FilePath,
 		"chunk_index":   c.ChunkIndex,
-		"word_count":    len(strings.Fields(c.Text)),
 		"has_links":     c.HasLinks,
 		"heading_path":  c.HeadingPath,
 		"heading_level": c.HeadingLevel,
-		"has_table":     c.HasTable,
 		"has_task":      c.HasTask,
-		"code_blocks":   c.CodeBlocks,
-		"has_code":      c.CodeBlocks > 0,
 		"modified_ms":   c.ModifiedMs,
 		"content_hash":  c.ContentHash,
 		"tag_count":     len(c.Tags),
