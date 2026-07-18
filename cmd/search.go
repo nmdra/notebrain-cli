@@ -105,56 +105,58 @@ func (c *SearchCmd) Run(globals *Globals) error {
 	}
 	defer func() { _ = emb.Close() }()
 
-	// ── Interactive live-search TUI ────────────────────────────────────────
 	if c.Interactive {
-		if !term.IsTerminal(os.Stdout.Fd()) || os.Getenv("TERM") == "dumb" {
-			return fmt.Errorf("interactive mode requires a TTY terminal; use --format json or remove --interactive")
-		}
-		// Build the chroma where-filter once (same logic as static path).
-		whereFilter := c.buildWhereFilter(true)
+		return c.runInteractive(ctx, globals, st, emb, resolved, queryStr)
+	}
+	return c.runStatic(ctx, globals, st, emb, resolved)
+}
 
-		limit := c.Limit
-		topK := c.TopKPerNote
-		searchFn := func(ctx context.Context, query string) ([]store.Result, error) {
-			var results []store.Result
-			var err error
-			tui.SuppressOutputs(func() {
-				resQueries := resolveQueries([]string{query}, c.Split, c.SplitBy)
-				if len(resQueries) > 1 {
-					var qVecs [][]float32
-					qVecs, err = emb.EmbedBatch(ctx, resQueries)
-					if err != nil {
-						err = fmt.Errorf("embed queries: %w", err)
-						return
-					}
+func (c *SearchCmd) runInteractive(ctx context.Context, globals *Globals, st *store.Store, emb *embedder.LocalEmbedder, resolved []string, queryStr string) error {
+	if !term.IsTerminal(os.Stdout.Fd()) || os.Getenv("TERM") == "dumb" {
+		return fmt.Errorf("interactive mode requires a TTY terminal; use --format json or remove --interactive")
+	}
+	whereFilter := c.buildWhereFilter(true)
+	limit := c.Limit
+	topK := c.TopKPerNote
+
+	searchFn := func(ctx context.Context, query string) ([]store.Result, error) {
+		var results []store.Result
+		var err error
+		tui.SuppressOutputs(func() {
+			resQueries := resolveQueries([]string{query}, c.Split, c.SplitBy)
+			if len(resQueries) > 1 {
+				var qVecs [][]float32
+				qVecs, err = emb.EmbedBatch(ctx, resQueries)
+				if err == nil {
 					results, err = st.MultiSemanticSearch(ctx, qVecs, resQueries, limit, topK, whereFilter, false)
-				} else {
-					var qVec []float32
-					qVec, err = emb.Embed(ctx, query)
-					if err != nil {
-						err = fmt.Errorf("embed query: %w", err)
-						return
-					}
+				}
+			} else {
+				var qVec []float32
+				qVec, err = emb.Embed(ctx, query)
+				if err == nil {
 					results, err = st.SemanticSearch(ctx, qVec, limit, topK, whereFilter, false)
 				}
-				if err == nil {
-					st.PopulateContext(ctx, results, globals.ContextWindow)
-				}
-			})
-			return results, err
-		}
-
-		model := tui.NewLiveSearch(searchFn, globals.VaultPath, limit, queryStr, globals.UseEditor)
-		p := tea.NewProgram(model)
-		var runErr error
-		// Suppress ChromaDB/hnswlib integrity-check noise from polluting the TUI.
-		tui.SuppressStderr(func() {
-			_, runErr = p.Run()
+			}
+			if err == nil {
+				st.PopulateContext(ctx, results, globals.ContextWindow)
+			}
 		})
-		return runErr
+		if err != nil {
+			return nil, err
+		}
+		return results, nil
 	}
 
-	// ── Static non-interactive search ──────────────────────────────────────
+	model := tui.NewLiveSearch(searchFn, globals.VaultPath, limit, queryStr, globals.UseEditor)
+	p := tea.NewProgram(model)
+	var runErr error
+	tui.SuppressStderr(func() {
+		_, runErr = p.Run()
+	})
+	return runErr
+}
+
+func (c *SearchCmd) runStatic(ctx context.Context, globals *Globals, st *store.Store, emb *embedder.LocalEmbedder, resolved []string) error {
 	whereFilter := c.buildWhereFilter(len(resolved) > 0)
 
 	if len(resolved) == 0 {

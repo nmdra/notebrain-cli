@@ -174,154 +174,179 @@ type block struct {
 }
 
 func extractSections(doc ast.Node, src []byte, registry *[]inlineInfo) []section {
-	headingStack := make([]string, 7) // index = heading level 1-6
-	var sections []section
-	var current *section
-
-	ensureCurrent := func() {
-		if current == nil {
-			current = &section{headingPath: "", level: 0}
-		}
+	e := &sectionExtractor{
+		src:          src,
+		registry:     registry,
+		headingStack: make([]string, 7),
 	}
-
-	if err := ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
-		if !entering {
-			return ast.WalkContinue, nil
-		}
-
-		switch node := n.(type) {
-		case *ast.Heading:
-			if current != nil && len(current.blocks) > 0 {
-				sections = append(sections, *current)
-			}
-			headingText := extractPlainText(node, src)
-			lvl := node.Level
-			headingStack[lvl] = headingText
-			for i := lvl + 1; i <= 6; i++ {
-				headingStack[i] = ""
-			}
-			parts := make([]string, 0, lvl)
-			for i := 1; i <= lvl; i++ {
-				if headingStack[i] != "" {
-					parts = append(parts, headingStack[i])
-				}
-			}
-			current = &section{
-				headingPath: strings.Join(parts, " > "),
-				level:       lvl,
-			}
-			return ast.WalkSkipChildren, nil
-
-		case *ast.FencedCodeBlock:
-			ensureCurrent()
-			lang := ""
-			if node.Info != nil {
-				lang = string(node.Info.Segment.Value(src))
-				if fields := strings.Fields(lang); len(fields) > 0 {
-					lang = fields[0] // strip trailing options
-				} else {
-					lang = ""
-				}
-			}
-			var code strings.Builder
-			for i := 0; i < node.Lines().Len(); i++ {
-				line := node.Lines().At(i)
-				code.Write(line.Value(src))
-			}
-			current.blocks = append(current.blocks, block{
-				kind:     "code",
-				codeText: code.String(),
-				language: lang,
-			})
-			return ast.WalkSkipChildren, nil
-
-		case *mermaid.Block:
-			ensureCurrent()
-			var code strings.Builder
-			for i := 0; i < node.Lines().Len(); i++ {
-				line := node.Lines().At(i)
-				code.Write(line.Value(src))
-			}
-			current.blocks = append(current.blocks, block{
-				kind:     "code",
-				codeText: code.String(),
-				language: "mermaid",
-			})
-			return ast.WalkSkipChildren, nil
-
-		case *ast.Paragraph:
-			ensureCurrent()
-			if isOnlyHashtags(node, src) {
-				return ast.WalkSkipChildren, nil
-			}
-			t := extractText(node, src, registry)
-			if t == "" {
-				return ast.WalkSkipChildren, nil
-			}
-			kind := "paragraph"
-			if containsTaskList(node) {
-				kind = "task_list"
-			}
-			current.blocks = append(current.blocks, block{
-				kind: kind,
-				text: t,
-			})
-			return ast.WalkSkipChildren, nil
-
-		case *ast.List:
-			ensureCurrent()
-			t, isTask := extractListText(node, src, 0, registry)
-			if t == "" {
-				return ast.WalkSkipChildren, nil
-			}
-			kind := "list"
-			if isTask {
-				kind = "task_list"
-			}
-			current.blocks = append(current.blocks, block{
-				kind: kind,
-				text: t,
-			})
-			return ast.WalkSkipChildren, nil
-
-		case *extast.Table:
-			ensureCurrent()
-			t := extractTableText(node, src, registry)
-			if t == "" {
-				return ast.WalkSkipChildren, nil
-			}
-			current.blocks = append(current.blocks, block{
-				kind: "table",
-				text: t,
-			})
-			return ast.WalkSkipChildren, nil
-
-		case *ast.Blockquote:
-			ensureCurrent()
-			t := extractBlockquoteText(node, src, 0, registry)
-			if t == "" {
-				return ast.WalkSkipChildren, nil
-			}
-			current.blocks = append(current.blocks, block{
-				kind: "blockquote",
-				text: t,
-			})
-			return ast.WalkSkipChildren, nil
-		}
-
-		return ast.WalkContinue, nil
-	}); err != nil {
+	if err := ast.Walk(doc, e.walk); err != nil {
 		slog.Warn("ast walk encountered error during section extraction", "err", err)
 	}
-
-	if current != nil && len(current.blocks) > 0 {
-		sections = append(sections, *current)
+	if e.current != nil && len(e.current.blocks) > 0 {
+		e.sections = append(e.sections, *e.current)
 	}
+	return e.sections
+}
 
-	if len(sections) == 0 {
-		return []section{{headingPath: "", level: 0}}
+type sectionExtractor struct {
+	src          []byte
+	registry     *[]inlineInfo
+	headingStack []string
+	sections     []section
+	current      *section
+}
+
+func (e *sectionExtractor) ensureCurrent() {
+	if e.current == nil {
+		e.current = &section{headingPath: "", level: 0}
 	}
-	return sections
+}
+
+func (e *sectionExtractor) walk(n ast.Node, entering bool) (ast.WalkStatus, error) {
+	if !entering {
+		return ast.WalkContinue, nil
+	}
+	switch node := n.(type) {
+	case *ast.Heading:
+		return e.processHeading(node)
+	case *ast.FencedCodeBlock:
+		return e.processFencedCode(node)
+	case *mermaid.Block:
+		return e.processMermaid(node)
+	case *ast.Paragraph:
+		return e.processParagraph(node)
+	case *ast.List:
+		return e.processList(node)
+	case *extast.Table:
+		return e.processTable(node)
+	case *ast.Blockquote:
+		return e.processBlockquote(node)
+	}
+	return ast.WalkContinue, nil
+}
+
+func (e *sectionExtractor) processHeading(node *ast.Heading) (ast.WalkStatus, error) {
+	if e.current != nil && len(e.current.blocks) > 0 {
+		e.sections = append(e.sections, *e.current)
+	}
+	headingText := extractPlainText(node, e.src)
+	lvl := node.Level
+	e.headingStack[lvl] = headingText
+	for i := lvl + 1; i <= 6; i++ {
+		e.headingStack[i] = ""
+	}
+	parts := make([]string, 0, lvl)
+	for i := 1; i <= lvl; i++ {
+		if e.headingStack[i] != "" {
+			parts = append(parts, e.headingStack[i])
+		}
+	}
+	e.current = &section{
+		headingPath: strings.Join(parts, " > "),
+		level:       lvl,
+	}
+	return ast.WalkSkipChildren, nil
+}
+
+func (e *sectionExtractor) processFencedCode(node *ast.FencedCodeBlock) (ast.WalkStatus, error) {
+	e.ensureCurrent()
+	lang := ""
+	if node.Info != nil {
+		infoSeg := node.Info.Segment
+		lang = string(infoSeg.Value(e.src))
+		if fields := strings.Fields(lang); len(fields) > 0 {
+			lang = fields[0]
+		}
+	}
+	var code strings.Builder
+	for i := 0; i < node.Lines().Len(); i++ {
+		line := node.Lines().At(i)
+		code.Write(line.Value(e.src))
+	}
+	e.current.blocks = append(e.current.blocks, block{
+		kind:     "code",
+		codeText: code.String(),
+		language: lang,
+	})
+	return ast.WalkSkipChildren, nil
+}
+
+func (e *sectionExtractor) processMermaid(node *mermaid.Block) (ast.WalkStatus, error) {
+	e.ensureCurrent()
+	var code strings.Builder
+	for i := 0; i < node.Lines().Len(); i++ {
+		line := node.Lines().At(i)
+		code.Write(line.Value(e.src))
+	}
+	e.current.blocks = append(e.current.blocks, block{
+		kind:     "code",
+		codeText: code.String(),
+		language: "mermaid",
+	})
+	return ast.WalkSkipChildren, nil
+}
+
+func (e *sectionExtractor) processParagraph(node *ast.Paragraph) (ast.WalkStatus, error) {
+	e.ensureCurrent()
+	if isOnlyHashtags(node, e.src) {
+		return ast.WalkSkipChildren, nil
+	}
+	t := extractText(node, e.src, e.registry)
+	if t == "" {
+		return ast.WalkSkipChildren, nil
+	}
+	kind := "paragraph"
+	if containsTaskList(node) {
+		kind = "task_list"
+	}
+	e.current.blocks = append(e.current.blocks, block{
+		kind: kind,
+		text: t,
+	})
+	return ast.WalkSkipChildren, nil
+}
+
+func (e *sectionExtractor) processList(node *ast.List) (ast.WalkStatus, error) {
+	e.ensureCurrent()
+	t, isTask := extractListText(node, e.src, 0, e.registry)
+	if t == "" {
+		return ast.WalkSkipChildren, nil
+	}
+	kind := "list"
+	if isTask {
+		kind = "task_list"
+	}
+	e.current.blocks = append(e.current.blocks, block{
+		kind: kind,
+		text: t,
+	})
+	return ast.WalkSkipChildren, nil
+}
+
+func (e *sectionExtractor) processTable(node *extast.Table) (ast.WalkStatus, error) {
+	e.ensureCurrent()
+	t := extractTableText(node, e.src, e.registry)
+	if t == "" {
+		return ast.WalkSkipChildren, nil
+	}
+	e.current.blocks = append(e.current.blocks, block{
+		kind: "table",
+		text: t,
+	})
+	return ast.WalkSkipChildren, nil
+}
+
+func (e *sectionExtractor) processBlockquote(node *ast.Blockquote) (ast.WalkStatus, error) {
+	e.ensureCurrent()
+	t := extractBlockquoteText(node, e.src, 0, e.registry)
+	if t == "" {
+		return ast.WalkSkipChildren, nil
+	}
+	e.current.blocks = append(e.current.blocks, block{
+		kind: "blockquote",
+		text: t,
+	})
+	return ast.WalkSkipChildren, nil
 }
 
 type codeBlockInfo struct {

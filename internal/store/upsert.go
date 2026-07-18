@@ -223,26 +223,7 @@ func (s *Store) upsertLinks(ctx context.Context, noteSlug string, links []string
 		if linkBase == "" {
 			continue
 		}
-		targetSlug := ""
-		if resolver != nil {
-			if s, ok := resolver[linkBase]; ok && s != "" {
-				targetSlug = s
-			} else if s, ok := resolver[strings.ToLower(linkBase)]; ok && s != "" {
-				targetSlug = s
-			} else if s, ok := resolver[parser.Slugify(linkBase)]; ok && s != "" {
-				targetSlug = s
-			}
-		}
-		if targetSlug == "" {
-			if ctx != nil && resolver == nil {
-				if resolved, err := s.ResolveNoteSlug(ctx, linkBase); err == nil && resolved != "" {
-					targetSlug = resolved
-				}
-			}
-			if targetSlug == "" || targetSlug == linkBase {
-				targetSlug = parser.Slugify(linkBase)
-			}
-		}
+		targetSlug := s.resolveTargetSlug(ctx, linkBase, resolver)
 		if targetSlug == "" {
 			continue
 		}
@@ -328,6 +309,30 @@ func (s *Store) upsertLinks(ctx context.Context, noteSlug string, links []string
 }
 
 // ─── Metadata helpers ────────────────────────────────────────────
+
+func (s *Store) resolveTargetSlug(ctx context.Context, linkBase string, resolver map[string]string) string {
+	if resolver != nil {
+		if val, ok := resolver[linkBase]; ok && val != "" {
+			return val
+		}
+		if val, ok := resolver[strings.ToLower(linkBase)]; ok && val != "" {
+			return val
+		}
+		if val, ok := resolver[parser.Slugify(linkBase)]; ok && val != "" {
+			return val
+		}
+	}
+	targetSlug := ""
+	if ctx != nil && resolver == nil {
+		if resolved, err := s.ResolveNoteSlug(ctx, linkBase); err == nil && resolved != "" {
+			targetSlug = resolved
+		}
+	}
+	if targetSlug == "" || targetSlug == linkBase {
+		targetSlug = parser.Slugify(linkBase)
+	}
+	return targetSlug
+}
 
 func buildChunkMeta(c ChunkRecord) map[string]any {
 	meta := map[string]any{

@@ -99,50 +99,12 @@ func (s *Store) MultiSemanticSearch(ctx context.Context, queryVecs [][]float32, 
 	fetchLimit := max(limit*2, 20)
 	fetchTopK := max(topKPerNote*2, 6)
 
-	type mergedChunk struct {
-		res     Result
-		queries map[string]float32
-	}
 	chunkMap := make(map[string]*mergedChunk)
 	noteQueryScores := make(map[string]map[string]float32)
 
 	for i, vec := range queryVecs {
-		qStr := fmt.Sprintf("query_%d", i+1)
-		if i < len(queries) && queries[i] != "" {
-			qStr = queries[i]
-		}
-		subRes, err := s.semanticSearch(ctx, vec, fetchLimit, fetchTopK, whereFilter, false)
-		if err != nil {
-			return nil, fmt.Errorf("semantic search for query %q: %w", qStr, wrapChromaErr(err))
-		}
-		for _, r := range subRes {
-			if r.Score <= 0.0 {
-				continue
-			}
-			qs, ok := noteQueryScores[r.NoteSlug]
-			if !ok {
-				qs = make(map[string]float32)
-				noteQueryScores[r.NoteSlug] = qs
-			}
-			if float32(r.Score) > qs[qStr] {
-				qs[qStr] = float32(r.Score)
-			}
-
-			key := fmt.Sprintf("%s:%d", r.NoteSlug, r.ChunkIndex)
-			existing, ok := chunkMap[key]
-			if !ok {
-				chunkMap[key] = &mergedChunk{
-					res:     r,
-					queries: map[string]float32{qStr: float32(r.Score)},
-				}
-			} else {
-				if oldScore, seen := existing.queries[qStr]; !seen || float32(r.Score) > oldScore {
-					existing.queries[qStr] = float32(r.Score)
-				}
-				if r.Score > existing.res.Score {
-					existing.res.Score = r.Score
-				}
-			}
+		if err := s.processQueryVec(ctx, i, vec, queries, fetchLimit, fetchTopK, whereFilter, chunkMap, noteQueryScores); err != nil {
+			return nil, err
 		}
 	}
 
@@ -196,6 +158,52 @@ func (s *Store) populateTextLocked(ctx context.Context, results []Result) {
 			}
 		}
 	}
+}
+
+type mergedChunk struct {
+	res     Result
+	queries map[string]float32
+}
+
+func (s *Store) processQueryVec(ctx context.Context, i int, vec []float32, queries []string, fetchLimit, fetchTopK int, whereFilter chroma.WhereFilter, chunkMap map[string]*mergedChunk, noteQueryScores map[string]map[string]float32) error {
+	qStr := fmt.Sprintf("query_%d", i+1)
+	if i < len(queries) && queries[i] != "" {
+		qStr = queries[i]
+	}
+	subRes, err := s.semanticSearch(ctx, vec, fetchLimit, fetchTopK, whereFilter, false)
+	if err != nil {
+		return fmt.Errorf("semantic search for query %q: %w", qStr, wrapChromaErr(err))
+	}
+	for _, r := range subRes {
+		if r.Score <= 0.0 {
+			continue
+		}
+		qs, ok := noteQueryScores[r.NoteSlug]
+		if !ok {
+			qs = make(map[string]float32)
+			noteQueryScores[r.NoteSlug] = qs
+		}
+		if float32(r.Score) > qs[qStr] {
+			qs[qStr] = float32(r.Score)
+		}
+
+		key := fmt.Sprintf("%s:%d", r.NoteSlug, r.ChunkIndex)
+		existing, ok := chunkMap[key]
+		if !ok {
+			chunkMap[key] = &mergedChunk{
+				res:     r,
+				queries: map[string]float32{qStr: float32(r.Score)},
+			}
+		} else {
+			if oldScore, seen := existing.queries[qStr]; !seen || float32(r.Score) > oldScore {
+				existing.queries[qStr] = float32(r.Score)
+			}
+			if r.Score > existing.res.Score {
+				existing.res.Score = r.Score
+			}
+		}
+	}
+	return nil
 }
 
 func filterMatchedQueries(qsMap map[string]float32, bestNoteScore float32) []string {
@@ -488,53 +496,11 @@ func (s *Store) Connections(ctx context.Context, seedSlug string, maxHops int) (
 	for hop := 1; hop <= maxHops && len(frontier) > 0; hop++ {
 		var next []string
 		for _, src := range frontier {
-			// Outgoing links
-			out, err := s.links.Get(ctx,
-				chroma.WithWhere(chroma.EqString("source_slug", src)),
-				chroma.WithInclude(chroma.IncludeMetadatas),
-			)
-			if err != nil {
-				return nil, fmt.Errorf("connections out: %w", wrapChromaErr(err))
+			if err := s.processOutgoingLinks(ctx, src, hop, resolver, visited, &next); err != nil {
+				return nil, err
 			}
-			if out != nil {
-				for _, meta := range out.GetMetadatas() {
-					if s.SkipAttachments && (parser.IsAttachmentLink(metaString(meta, "target_path")) || parser.IsAttachmentLink(metaString(meta, "display_text"))) {
-						continue
-					}
-					tgt := metaString(meta, "target_slug")
-					if canon, ok := resolver[tgt]; ok && canon != "" {
-						tgt = canon
-					} else if canon, ok := resolver[metaString(meta, "target_path")]; ok && canon != "" {
-						tgt = canon
-					}
-					if _, ok := visited[tgt]; !ok {
-						visited[tgt] = hop
-						next = append(next, tgt)
-					}
-				}
-			}
-			// Incoming links (bidirectional)
-			in, err := s.links.Get(ctx,
-				chroma.WithWhere(s.linkWhereFilters(ctx, src, resolver)),
-				chroma.WithInclude(chroma.IncludeMetadatas),
-			)
-			if err != nil {
-				return nil, fmt.Errorf("connections in: %w", wrapChromaErr(err))
-			}
-			if in != nil {
-				for _, meta := range in.GetMetadatas() {
-					if s.SkipAttachments && (parser.IsAttachmentLink(metaString(meta, "target_path")) || parser.IsAttachmentLink(metaString(meta, "display_text"))) {
-						continue
-					}
-					tgt := metaString(meta, "source_slug")
-					if canon, ok := resolver[tgt]; ok && canon != "" {
-						tgt = canon
-					}
-					if _, ok := visited[tgt]; !ok {
-						visited[tgt] = hop
-						next = append(next, tgt)
-					}
-				}
+			if err := s.processIncomingLinks(ctx, src, hop, resolver, visited, &next); err != nil {
+				return nil, err
 			}
 		}
 		frontier = next
@@ -560,6 +526,60 @@ func (s *Store) Connections(ctx context.Context, seedSlug string, maxHops int) (
 		return out[i].Title < out[j].Title
 	})
 	return out, nil
+}
+
+func (s *Store) processOutgoingLinks(ctx context.Context, src string, hop int, resolver map[string]string, visited map[string]int, next *[]string) error {
+	out, err := s.links.Get(ctx,
+		chroma.WithWhere(chroma.EqString("source_slug", src)),
+		chroma.WithInclude(chroma.IncludeMetadatas),
+	)
+	if err != nil {
+		return fmt.Errorf("connections out: %w", wrapChromaErr(err))
+	}
+	if out != nil {
+		for _, meta := range out.GetMetadatas() {
+			if s.SkipAttachments && (parser.IsAttachmentLink(metaString(meta, "target_path")) || parser.IsAttachmentLink(metaString(meta, "display_text"))) {
+				continue
+			}
+			tgt := metaString(meta, "target_slug")
+			if canon, ok := resolver[tgt]; ok && canon != "" {
+				tgt = canon
+			} else if canon, ok := resolver[metaString(meta, "target_path")]; ok && canon != "" {
+				tgt = canon
+			}
+			if _, ok := visited[tgt]; !ok {
+				visited[tgt] = hop
+				*next = append(*next, tgt)
+			}
+		}
+	}
+	return nil
+}
+
+func (s *Store) processIncomingLinks(ctx context.Context, src string, hop int, resolver map[string]string, visited map[string]int, next *[]string) error {
+	in, err := s.links.Get(ctx,
+		chroma.WithWhere(s.linkWhereFilters(ctx, src, resolver)),
+		chroma.WithInclude(chroma.IncludeMetadatas),
+	)
+	if err != nil {
+		return fmt.Errorf("connections in: %w", wrapChromaErr(err))
+	}
+	if in != nil {
+		for _, meta := range in.GetMetadatas() {
+			if s.SkipAttachments && (parser.IsAttachmentLink(metaString(meta, "target_path")) || parser.IsAttachmentLink(metaString(meta, "display_text"))) {
+				continue
+			}
+			tgt := metaString(meta, "source_slug")
+			if canon, ok := resolver[tgt]; ok && canon != "" {
+				tgt = canon
+			}
+			if _, ok := visited[tgt]; !ok {
+				visited[tgt] = hop
+				*next = append(*next, tgt)
+			}
+		}
+	}
+	return nil
 }
 
 // ─── Hidden Connections ───────────────────────────────────────────
@@ -1131,37 +1151,7 @@ func (s *Store) ResolveNoteSlug(ctx context.Context, input string) (string, erro
 		return slug, nil
 	}
 
-	var titleMatches []string
-	var pathMatches []string
-	var suffixMatches []string
-
-	for _, m := range metas {
-		mSlug := metaString(m, "note_slug")
-		mTitle := metaString(m, "title")
-		mPath := metaString(m, "file_path")
-		if mSlug == "" {
-			continue
-		}
-
-		if strings.EqualFold(mTitle, cleanInput) {
-			titleMatches = append(titleMatches, mSlug)
-			continue
-		}
-
-		if strings.EqualFold(mPath, cleanInput) || strings.EqualFold(mPath, cleanInput+".md") {
-			pathMatches = append(pathMatches, mSlug)
-			continue
-		}
-		if strings.HasSuffix(strings.ToLower(mPath), "/"+strings.ToLower(cleanInput)) ||
-			strings.HasSuffix(strings.ToLower(mPath), "/"+strings.ToLower(cleanInput+".md")) {
-			pathMatches = append(pathMatches, mSlug)
-			continue
-		}
-
-		if slug != "" && strings.HasSuffix(mSlug, slug) {
-			suffixMatches = append(suffixMatches, mSlug)
-		}
-	}
+	pathMatches, titleMatches, suffixMatches := findSlugMatches(metas, cleanInput, slug)
 
 	if len(pathMatches) == 1 {
 		return pathMatches[0], nil
@@ -1449,6 +1439,37 @@ func (s *Store) PopulateContext(ctx context.Context, results []Result, windowSiz
 			results[i].Context = ctxTexts
 		}
 	}
+}
+
+func findSlugMatches(metas []chroma.DocumentMetadata, cleanInput, slug string) (pathMatches, titleMatches, suffixMatches []string) {
+	for _, m := range metas {
+		mSlug := metaString(m, "note_slug")
+		mTitle := metaString(m, "title")
+		mPath := metaString(m, "file_path")
+		if mSlug == "" {
+			continue
+		}
+
+		if strings.EqualFold(mTitle, cleanInput) {
+			titleMatches = append(titleMatches, mSlug)
+			continue
+		}
+
+		if strings.EqualFold(mPath, cleanInput) || strings.EqualFold(mPath, cleanInput+".md") {
+			pathMatches = append(pathMatches, mSlug)
+			continue
+		}
+		if strings.HasSuffix(strings.ToLower(mPath), "/"+strings.ToLower(cleanInput)) ||
+			strings.HasSuffix(strings.ToLower(mPath), "/"+strings.ToLower(cleanInput+".md")) {
+			pathMatches = append(pathMatches, mSlug)
+			continue
+		}
+
+		if slug != "" && strings.HasSuffix(mSlug, slug) {
+			suffixMatches = append(suffixMatches, mSlug)
+		}
+	}
+	return
 }
 
 // wrapChromaErr annotates ChromaDB decoding errors caused by the embedded FFI 1 MiB string limit.
