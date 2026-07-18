@@ -93,8 +93,7 @@ func (r *chunkRenderer) renderBlock(w io.Writer, n ast.Node, source []byte) bool
 		}
 		content := strings.TrimSpace(buf.String())
 		if r.rich {
-			lines := strings.Split(content, "\n")
-			for _, line := range lines {
+			for line := range strings.SplitSeq(content, "\n") {
 				_, _ = w.Write([]byte("> " + line + "\n"))
 			}
 		} else {
