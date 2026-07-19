@@ -45,7 +45,7 @@ To prevent excessive tool calls, token bloat, and redundant queries, follow a ti
    If you have identified a candidate note but require the full markdown chunk or surrounding paragraphs (`±N` chunks) to verify the details before answering or escalating.
 
    ```bash
-   notebrain search "<query>" --format=json --compact --hide-tags --include-text=true --top-k 2 --context-window 1
+   notebrain search "<query>" --format=json --compact --include-text=true --top-k 2 --context-window 1
    ```
 
 | Flag                 | Purpose                                                                                                                                                                                         | example value |

@@ -23,12 +23,6 @@ Ships with an [AI agent skill](wiki/Skill_Usage.md) and [OpenCode Agent Configur
 >
 > > _I don't use Windows or macOS, so those versions aren't shipped directly, but you can compile the binary using the source code._
 
-## Prerequisites
-
-- **Go 1.26.4+**
-- **CGO-enabled toolchain**
-- Linux (macOS and Windows binaries are untested)
-
 ## Features
 
 - **Semantic Search** — Find notes by meaning, not just keywords, using the offline `all-MiniLM-L6-v2` ONNX embedding model.
@@ -54,6 +48,12 @@ Ships with an [AI agent skill](wiki/Skill_Usage.md) and [OpenCode Agent Configur
 - **Incremental Ingestion** — SHA-256 content hashing skips unmodified notes in milliseconds on re-runs.
 
 > _See the [Architecture](wiki/Architecture.md) guide for more details._
+
+## Prerequisites
+
+- **Go 1.26.4+**
+- **CGO-enabled toolchain**
+- Linux (macOS and Windows binaries are untested)
 
 ## Installation
 
@@ -129,12 +129,14 @@ notebrain get "$SLUG" --jsonpath="$.text"
 
 **7. Integration with AI Agents**
 
-Use the built-in [AI agent skill](wiki/Skill_Usage.md) and [OpenCode Agent Configuration](wiki/OpenCode_Integration.md) for sandboxed, autonomous knowledge retrieval.
+Use the built-in [AI agent skill](wiki/Skill_Usage.md) and [OpenCode Agent Configuration](wiki/OpenCode_Integration.md) for knowledge retrieval.
 
 > [!tip]
 > I highly recommend using the [Pi Agent](wiki/Pi_Agent.md) with the provided skill. It delivers higher-quality results, even with low cost models such as [DeepSeek Flash](https://www.deepseek.com/), without consuming unnecessary tokens. It also improves cache hit rates, helping reduce overall costs.
 >
 > For LLM models, use the default or **medium** thinking mode for fast responses.
+
+[![asciicast](https://asciinema.org/a/1261133.svg)](https://asciinema.org/a/1261133)
 
 ## Configuration
 
@@ -150,8 +152,8 @@ cp config.example.toml ~/.notebrain/config/config.toml
 Key settings ([full reference](./config.example.toml)):
 
 ```toml
-vault-path = "/path/to/Second Brain 2.0"
-vault-name = "Second Brain 2.0"
+vault-path = "/path/to/Second-Brain"
+vault-name = "Second-Brain"
 format     = "text"              # "text", "json", "tsv", "ndjson"
 
 skip-attachments = true          # ignore image/file links in graph
