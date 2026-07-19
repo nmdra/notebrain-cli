@@ -20,7 +20,6 @@ NoteBrain indexes an Obsidian vault into local ChromaDB for semantic search, gra
 4. **Token-Efficient Extraction (`--jsonpath` & `tsv`)**: Make `--jsonpath` your default tool for extracting targeted data without loading bulky JSON envelopes into context:
    - Matching text snippets: `--jsonpath="$.results[*].text"`
    - Surrounding chunk context: `--jsonpath="$.results[*].context"`
-   - Note slugs for graph mapping: `--jsonpath="$.results[*].note_slug"`
      When scanning tabular lists without text, use `--format tsv` to drop repeating JSON key names. Always add `--compact` when outputting full JSON.
 
 5. **Intelligent Query Splitting**: When researching compound questions or orthogonal topics (e.g., comparing two technologies), split the query into distinct terms to activate multi-hit boosting:
@@ -99,6 +98,8 @@ If `search`, `hidden`, or `boosted` returns nothing above a usable score (`score
 ## Example Commands
 
 ### Find note Slug only
+
+Use the following command to find the note slug by searching for a query. Run this command before using any command (hidden, connections, tags, or backlinks) that requires a note slug as input.
 
 ```bash
 notebrain search "<query>" \
