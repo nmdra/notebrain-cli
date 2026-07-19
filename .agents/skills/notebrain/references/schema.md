@@ -1,48 +1,64 @@
 # NoteBrain Output Schema & Format Guide
 
-When executing NoteBrain queries non-interactively, selecting the right format and understanding the response structure saves tokens and prevents parsing errors.
+This reference documents the structure of NoteBrain's output in each format. Read this when you need to understand JSON field meanings, parse `tsv` columns, or write `--jsonpath` expressions.
 
 ## Output Formats (`--format`)
 
-- **`json` (Default Recommendation)**: Returns a structured JSON envelope containing a `results` array and metadata. Best when using `--jsonpath` or when inspecting complex multi-field objects.
-- **`tsv` (Token-Optimized for Scan-Only Steps)**: Returns tab-separated values without repeating JSON key names (`note_slug`, `title`, `file_path`, `score`, `tags`) on every row. Highly recommended when scanning lists of notes (e.g., mapping backlinks or graph connections without `--include-text`).
+| Format   | When to Use                                                                                             |
+| -------- | ------------------------------------------------------------------------------------------------------- |
+| `json`   | Default for agents. Structured envelope with `results` array. Pair with `--compact` to cut token bloat. |
+| `tsv`    | Token-optimized for scan-only steps — no repeating key names. Good for backlinks, connections, tags.    |
+| `ndjson` | One JSON object per line (no envelope). Useful for streaming or line-by-line parsing.                   |
+| `text`   | Rich TUI output for human reading. Not useful for agents — avoid in automated workflows.                |
 
-## JSON Envelope Field Specification
+## JSON Envelope Structure
 
-When `--format=json` is used, each item in the `results` array conforms to the following schema:
-
-| Field             | Present When                    | Description                                                                                  |
-| ----------------- | ------------------------------- | -------------------------------------------------------------------------------------------- |
-| `note_slug`       | Always                          | URL-safe unique identifier derived from the file path. Used as input for graph/get commands. |
-| `title`           | Always                          | Note title extracted from frontmatter or filename.                                           |
-| `file_path`       | Always (unless `--compact`)     | Relative file path within the Obsidian vault. Omitted when `--compact` is active.           |
-| `score`           | Always                          | Similarity score (0–1, rounded to 4 decimal places) for semantic search; hop count for graph connections. |
-| `chunk_index`     | Search, hidden, boosted         | Which chunk of the note matched the query (0-indexed).                                       |
-| `tags`            | When note has tags              | Array of tag strings associated with the note.                                               |
-| `heading_path`    | When chunk is under a heading   | Breadcrumb path hierarchy like `"Section > Subsection"`.                                     |
-| `text`            | When `--include-text` is passed | The matched chunk's full markdown text, with code blocks and formatting preserved.           |
-| `context`         | When `--context-window N` > 0   | Array of ±N adjacent chunk texts around the match (specifically excluding the matched chunk `text` itself to prevent token redundancy). |
-| `extra`           | Connections, tags, boosted      | Command-specific metadata string (e.g., `"2 hop(s)"`, `"graph-boosted"`).                    |
-| `is_phantom`      | When `--skip-phantom=false`     | Boolean (`true`) if the note is an uncreated phantom link without a `.md` file on disk.      |
-| `matched_queries` | When results match queries      | Array of queries or initial note section headings (`§ <HeadingPath>`) that matched this candidate note (`hidden --deep` attribution). |
-
-## Example JSON Output Schemas
-
-### 1. Semantic Search (`search`, `hidden`, `boosted`)
-
-When `--format=json`, `--include-text`, and `--context-window 1` are passed:
+When `--format=json` is used, the response has this top-level shape:
 
 ```json
 {
   "command": "search",
-  "query": "event driven architecture",
+  "query": "...",
+  "total": N,
+  "results": [...]
+}
+```
+
+With `--compact`, the `command` and `query` envelope fields are stripped, leaving only `total` and `results`.
+
+### Result Fields
+
+Each item in the `results` array may contain:
+
+| Field             | Present When                    | Description                                                                                               |
+| ----------------- | ------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `note_slug`       | Always                          | URL-safe unique identifier derived from the file path. Used as input for graph/get commands.              |
+| `title`           | Always                          | Note title extracted from frontmatter or filename.                                                        |
+| `file_path`       | Unless `--compact`              | Relative file path within the vault. Omitted when `--compact` is active.                                  |
+| `score`           | Always                          | Similarity score (0–1) for semantic search; hop count for graph connections. Rounded to 4 decimal places. |
+| `chunk_index`     | search, hidden, boosted         | Which chunk of the note matched the query (0-indexed).                                                    |
+| `tags`            | When note has tags              | Array of tag strings (e.g., `["#Architecture", "#Go"]`).                                                  |
+| `heading_path`    | When chunk is under a heading   | Breadcrumb path hierarchy (e.g., `"Section > Subsection"`).                                               |
+| `text`            | When `--include-text` is passed | The matched chunk's full markdown text, preserving code blocks and formatting.                            |
+| `context`         | When `--context-window N` > 0   | Array of ±N adjacent chunk texts around the match (excluding the matched chunk itself).                   |
+| `extra`           | connections, tags, boosted      | Command-specific metadata (e.g., `"2 hop(s)"`, `"graph-boosted"`).                                        |
+| `is_phantom`      | When `--skip-phantom=false`     | `true` if the note is an uncreated phantom link without a `.md` file on disk.                             |
+| `matched_queries` | hidden `--deep`, multi-query    | Array of queries or section headings (`§ <HeadingPath>`) that matched this candidate.                     |
+
+## Example Outputs
+
+### Semantic Search (compact, with text and context)
+
+`notebrain search "event driven architecture" --format=json --compact --include-text --context-window 1`
+
+```json
+{
   "total": 1,
   "results": [
     {
       "note_slug": "architecture/event-driven-systems",
       "title": "Event Driven Systems",
-      "file_path": "Architecture/Event Driven Systems.md",
-      "score": 0.8520,
+      "score": 0.852,
       "chunk_index": 2,
       "tags": ["#Architecture", "#DistributedSystems"],
       "heading_path": "Overview > Message Brokers",
@@ -57,38 +73,67 @@ When `--format=json`, `--include-text`, and `--context-window 1` are passed:
 }
 ```
 
-### 2. Graph & Structure Mapping (`connections`, `backlinks`, `tags`)
+### Graph & Structure Mapping (compact)
 
-When `--format=json` is passed without text:
+`notebrain connections "architecture/event-driven-systems" --hops 1 --format=json --compact`
 
 ```json
 {
+  "total": 1,
   "results": [
     {
       "note_slug": "database/redis-streams",
       "title": "Redis Streams",
-      "file_path": "Database/Redis Streams.md",
       "score": 1.0,
       "tags": ["#Database", "#Redis"],
-      "extra": "1 hop(s)",
-      "is_phantom": false
+      "extra": "1 hop(s)"
     }
-  ],
-  "total": 1
+  ]
 }
 ```
 
+### TSV Format
+
+`notebrain backlinks "architecture/event-driven-systems" --format=tsv`
+
+```
+note_slug	title	file_path	score	tags
+database/redis-streams	Redis Streams	Database/Redis Streams.md	1.0000	#Database, #Redis
+messaging/kafka-intro	Kafka Introduction	Messaging/Kafka Introduction.md	1.0000	#Messaging
+```
+
+First line is the header row. Columns are tab-separated. Tags are comma-joined into a single cell.
+
+### Stats
+
+`notebrain stats --format=json --compact`
+
+```json
+{
+  "chunks": 8993,
+  "links": 1255,
+  "notes": 783
+}
+```
+
+Use this for pre-flight checks — if `chunks` is `0`, the vault hasn't been indexed yet.
+
 ## Extracting Fields via `--jsonpath`
 
-To avoid loading full JSON envelopes into context, append `--jsonpath` to extract exact scalar values or arrays directly:
+Use `--jsonpath` to extract exactly the fields you need without loading the full JSON envelope into context:
 
 ```bash
-# Extract only note slugs as a clean newline-separated list
+# Note slugs only (newline-separated)
 notebrain search "event driven architecture" --limit 5 --jsonpath="$.results[*].note_slug"
 
-# Extract the full text of the top matching chunk
+# Full text of the top matching chunk
 notebrain search "jwt authentication" --limit 1 --include-text --jsonpath="$.results[0].text"
 
-# Extract database stats
+# Just the chunk count from stats
 notebrain stats --format=json --jsonpath="$.chunks"
+
+# All scores to assess result quality
+notebrain search "kubernetes" --limit 5 --jsonpath="$.results[*].score"
 ```
+
+`--jsonpath` outputs raw values (no JSON envelope), one per line. When extracting a single scalar (e.g., `$.results[0].text`), the output is the bare value with no surrounding quotes or brackets.
