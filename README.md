@@ -31,26 +31,26 @@ Ships with an [AI agent skill](wiki/Skill_Usage.md) and [OpenCode Agent Configur
 
 ## Features
 
-- **Semantic Search** — Find notes by meaning, not just keywords. Uses the [`all-MiniLM-L6-v2`](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) ONNX model for fully offline inference.
-- **Multi-Query Support** — Search using multiple queries. This enables AI agents to search more accurately by separating searches that contain distinct topics.
-- **Graph Traversal** — Walk your Obsidian wikilink graph (`[[Note]]`) via BFS: `backlinks` (canonicalized path resolution), `connections` (multi-hop), `tags` (shared tag neighbors).
-- **Hidden Connections** — Discover notes that are semantically similar but not explicitly linked (`notebrain hidden`). Supports `--deep` chunk-by-chunk analysis across sections and `--include-linked` to evaluate semantically related notes that are already linked.
-- **Graph-Boosted Search** — Combine semantic similarity scores with structural graph proximity for richer results.
-- **Interactive TUI & Guidance** — Navigate search results with fuzzy-finding powered by Bubble Tea, plus intelligent, context-aware empty state hints when terminal queries return zero results.
-- **Advanced Filtering** — Narrow searches by `--section`, `--has-code`, `--has-tasks`, or `--tag`.
-- **Full Note Retrieval** — Reconstruct complete note content dynamically from indexed chunks (`notebrain get`).
-- **Machine-Readable Output** — Structured JSON, TSV via `--format` flags, plus built-in `--jsonpath` extraction (no `jq` needed).
-- **AI & OpenCode Agent Integration** — Ships with a built-in AI agent skill (`.agents/skills/notebrain/`) and dedicated [OpenCode Agent Configuration](wiki/OpenCode_Integration.md) (`notebrain-chat`) for sandboxed, autonomous knowledge retrieval.
-- **OSC 8 Hyperlinks** — Clickable `obsidian://open` links directly in your terminal. Works in [alacritty](https://github.com/alacritty/alacritty), [WezTerm](https://wezfurlong.org/wezterm/), [kitty](https://sw.kovidgoyal.net/kitty/) and others supporting the [OSC 8 spec](https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda).
-- **Editor Integration** — Open matched notes in `$EDITOR` or Obsidian directly from the TUI.
-- **Obsidian-Aware Ingestion** — Honors `userIgnoreFilters` and `attachmentFolderPath` from your Obsidian config. Optionally skip phantom links and attachment references.
+- **Semantic Search** — Find notes by meaning, not just keywords, using the offline `all-MiniLM-L6-v2` ONNX embedding model.
+- **Multi-Query Search** — Search with multiple independent queries to improve retrieval for complex topics and AI agent workflows.
+- **Knowledge Graph Traversal** — Explore your Obsidian wikilink graph through backlinks, multi-hop connections, and shared tag relationships.
+- **Hidden Connections** — Discover semantically related notes that aren't explicitly linked, with optional deep section-level analysis.
+- **Graph-Boosted Ranking** — Improve search relevance by combining semantic similarity with graph relationships.
+- **Interactive Terminal UI** — Browse results with a fuzzy-search interface, plus intelligent guidance when searches return no matches.
+- **Advanced Filtering** — Refine results by sections, tags, code blocks, tasks, and other note metadata.
+- **Full Note Retrieval** — Reconstruct complete notes on demand from indexed content.
+- **Structured Output** — Export results as JSON or TSV, with built-in JSONPath querying for easy automation.
+- **AI Agent Integration** — Includes a built-in AI agent skill and dedicated for autonomous knowledge retrieval.
+- **Terminal Hyperlinks** — Open notes directly from supported terminals using OSC 8 hyperlinks.
+- **Editor Integration** — Open search results instantly in your preferred editor or directly in Obsidian.
+- **Obsidian-Aware Indexing** — Respects your Obsidian configuration, including ignored files, attachment folders, and optional exclusion of empty-note references.
 
 > _Note: Currently, this tool focuses on Markdown text only and does not support PDF or image OCR._
 
 ### Under the Hood
 
 - **Goldmark AST-Aware Chunking** — Splits markdown by header hierarchy rather than arbitrary character offsets, strictly preserving lists, GFM tables, blockquotes/callouts, and code blocks.
-- **Embedded ChromaDB** — Stores vectors directly on disk via [`chroma-go`](https://github.com/amikos-tech/chroma-go) v0.4.x (no external database server required).
+- **Embedded ChromaDB** — Stores vectors directly on disk via [`chroma-go`](https://github.com/amikos-tech/chroma-go).
 - **Incremental Ingestion** — SHA-256 content hashing skips unmodified notes in milliseconds on re-runs.
 
 > _See the [Architecture](wiki/Architecture.md) guide for more details._
@@ -127,6 +127,15 @@ notebrain get "$SLUG" --jsonpath="$.text"
 
 **6. Automate indexing** with a cron job or systemd timer so your index stays fresh (see [Scheduled Ingestion](wiki/Scheduled_Ingestion.md)).
 
+**7. Integration with AI Agents**
+
+Use the built-in [AI agent skill](wiki/Skill_Usage.md) and [OpenCode Agent Configuration](wiki/OpenCode_Integration.md) for sandboxed, autonomous knowledge retrieval.
+
+> [!tip]
+> I highly recommend using the [Pi Agent](wiki/Pi_Agent.md) with the provided skill. It delivers higher-quality results, even with low cost models such as [DeepSeek Flash](https://www.deepseek.com/), without consuming unnecessary tokens. It also improves cache hit rates, helping reduce overall costs.
+>
+> For LLM models, use the default or **medium** thinking mode for fast responses.
+
 ## Configuration
 
 NoteBrain reads configuration from a TOML file at `~/.notebrain/config/config.toml` (or pass `--config=/path/to/config.toml`). CLI flags always override TOML values.
@@ -163,15 +172,15 @@ To fully uninstall, remove the `notebrain` binary and delete `~/.notebrain/`.
 
 ## Documentation
 
-| Guide                                                | Description                                                |
-| ---------------------------------------------------- | ---------------------------------------------------------- |
-| [Installation](wiki/Installation.md)                 | Prerequisites, pre-built binaries, building from source    |
-| [Commands Reference](wiki/Commands.md)               | Full CLI command and flag documentation                    |
-| [Architecture](wiki/Architecture.md)                 | Internals: chunking pipeline, embedding, ChromaDB schema   |
-| [Scheduled Ingestion](wiki/Scheduled_Ingestion.md)   | Cron and systemd timer setup for background indexing       |
-| [AI Agent Skill Usage](wiki/Skill_Usage.md)          | Using the built-in AI agent skill for autonomous retrieval |
-| [OpenCode Agent Integration](wiki/OpenCode_Integration.md) | Configuring NoteBrain as an OpenCode AI coding assistant (`notebrain-chat`) |
-| [DeepWiki](https://deepwiki.com/nmdra/notebrain-cli) | AI-generated codebase documentation                        |
+| Guide                                                      | Description                                                |
+| ---------------------------------------------------------- | ---------------------------------------------------------- |
+| [Installation](wiki/Installation.md)                       | Prerequisites, pre-built binaries, building from source    |
+| [Commands Reference](wiki/Commands.md)                     | Full CLI command and flag documentation                    |
+| [Architecture](wiki/Architecture.md)                       | Internals: chunking pipeline, embedding, ChromaDB schema   |
+| [Scheduled Ingestion](wiki/Scheduled_Ingestion.md)         | Cron and systemd timer setup for background indexing       |
+| [AI Agent Skill Usage](wiki/Skill_Usage.md)                | Using the built-in AI agent skill for autonomous retrieval |
+| [OpenCode Agent Integration](wiki/OpenCode_Integration.md) | Configuring NoteBrain as an OpenCode AI coding assistant   |
+| [DeepWiki](https://deepwiki.com/nmdra/notebrain-cli)       | AI-generated codebase documentation                        |
 
 ## Contributing
 
