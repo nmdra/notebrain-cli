@@ -23,17 +23,17 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 )
 
 type TagsCmd struct {
-	Note      string `arg:"" help:"note slug, title, or file path (auto-resolved)"`
-	MinShared int    `help:"minimum shared tags required to include a result" default:"1"`
+	Query     string `arg:"" help:"Tag name to search for (e.g. 'kubernetes'), or note slug/title if --shared is used."`
+	Shared    bool   `help:"Find notes sharing tags with the given note instead of searching by tag name." default:"false"`
+	Children  bool   `help:"Include child tags in the hierarchy (e.g. 'kubernetes' also matches 'kubernetes/cka')." default:"false"`
+	MinShared int    `help:"Minimum shared tags to include a result (only with --shared)." default:"1"`
 }
 
 func (c *TagsCmd) Run(globals *Globals) error {
-	targetNote := c.Note
-	minShared := c.MinShared
-
 	ctx := globals.Ctx
 	st, err := openStore(ctx, globals)
 	if err != nil {
@@ -41,16 +41,39 @@ func (c *TagsCmd) Run(globals *Globals) error {
 	}
 	defer func() { _ = st.Close() }()
 
-	targetSlug, err := st.ResolveNoteSlug(ctx, targetNote)
+	if c.Shared {
+		targetSlug, err := st.ResolveNoteSlug(ctx, c.Query)
+		if err != nil {
+			return err
+		}
+
+		nodes, err := st.SharedTags(ctx, targetSlug, c.MinShared)
+		if err != nil {
+			return err
+		}
+
+		printResultsFormatted("tags --shared", fmt.Sprintf("Notes sharing tags with: %q (slug: %s) [Min Shared: %d]", c.Query, targetSlug, c.MinShared), targetSlug, nodes, globals)
+		return nil
+	}
+
+	// Direct tag search (default)
+	normalizedTag := normalizeTagInput(c.Query)
+	nodes, err := st.TagSearch(ctx, normalizedTag, 999999, c.Children, nil, globals.IncludeText)
 	if err != nil {
 		return err
 	}
 
-	nodes, err := st.SharedTags(ctx, targetSlug, minShared)
-	if err != nil {
-		return err
+	commandName := "tags"
+	title := fmt.Sprintf("Notes containing tag: %q", c.Query)
+	if c.Children {
+		commandName = "tags --children"
+		title = fmt.Sprintf("Notes containing tag: %q (and children tags)", c.Query)
 	}
 
-	printResultsFormatted("tags", fmt.Sprintf("Notes sharing tags with: %q (slug: %s) [Min Shared: %d]", targetNote, targetSlug, minShared), targetSlug, nodes, globals)
+	printResultsFormatted(commandName, title, "", nodes, globals)
 	return nil
+}
+
+func normalizeTagInput(input string) string {
+	return strings.ToLower(strings.TrimPrefix(strings.TrimSpace(input), "#"))
 }
