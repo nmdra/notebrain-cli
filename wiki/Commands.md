@@ -304,29 +304,37 @@ notebrain hidden "SPIFFE" --deep --limit 3
 
 ### `tags`
 
-Finds notes sharing tags with a given note, ranked by the number of shared tags.
+Finds notes by tag name (default), or finds notes sharing tags with a given note (when using `--shared`).
 
 #### Usage
 
 ```bash
-notebrain tags <note> [flags]
+notebrain tags <query> [flags]
 ```
 
 #### Arguments
 
-- `<note>` _(required)_: The target note slug or title.
+- `<query>` _(required)_: The tag name to search for (e.g. `#kubernetes` or `kubernetes`), or a note slug/title if `--shared` is used.
 
 #### Command-Specific Flags
 
-| Flag           | Type      | Default | Description                                        |
-| :------------- | :-------- | :------ | :------------------------------------------------- |
-| `--min-shared` | `integer` | `1`     | Minimum number of shared tags to include a result. |
+| Flag            | Type      | Default | Description                                                                                                   |
+| :-------------- | :-------- | :------ | :------------------------------------------------------------------------------------------------------------ |
+| `--shared`      | `boolean` | `false` | Treat the query as a note slug/title to find other notes sharing its tags.                                    |
+| `--children`    | `boolean` | `false` | Include child tags in hierarchical structure (e.g. searching 'kubernetes' also matches 'kubernetes/cka').     |
+| `--min-shared`  | `integer` | `1`     | Minimum number of shared tags to include a result (only applies when --shared is active).                      |
 
 #### Examples
 
 ```bash
-# Find notes sharing at least 2 tags with "Redis"
-notebrain tags "Redis" --min-shared 2
+# Find all notes tagged with #kubernetes (auto-normalizes casing and # prefix)
+notebrain tags "#Kubernetes"
+
+# Find all notes tagged with #kubernetes and its child tags (e.g. #kubernetes/cka)
+notebrain tags "kubernetes" --children
+
+# Find notes sharing at least 2 tags with the note "redis-cluster"
+notebrain tags "redis-cluster" --shared --min-shared 2
 ```
 
 ---
