@@ -13,6 +13,16 @@ import (
 	"github.com/nmdra/notebrain-cli/v2/internal/parser"
 )
 
+// ffiSafePageSize is the maximum number of records per ChromaDB Get() call.
+// The embedded ChromaDB FFI bridge has a 1 MiB response ceiling. With typical
+// metadata payloads (~500-800 bytes per chunk including tags, heading paths,
+// file paths), 200 records stays safely under the limit.
+const ffiSafePageSize = 200
+
+// ffiSafeSemanticLimit caps Query() NResults to stay under the 1 MiB FFI ceiling.
+// Query results include distances + metadata, so we cap lower than Get().
+const ffiSafeSemanticLimit = 100
+
 // Result is one row returned by any query.
 type Result struct {
 	NoteSlug       string   `json:"note_slug"`
@@ -57,6 +67,9 @@ func (s *Store) semanticSearch(ctx context.Context, queryVec []float32, limit in
 	}
 
 	fetchCount := max(limit*3, limit*topKPerNote)
+	if fetchCount > ffiSafeSemanticLimit {
+		fetchCount = ffiSafeSemanticLimit
+	}
 
 	opts := []chroma.QueryOption{
 		chroma.WithQueryEmbeddings(embeddings.NewEmbeddingFromFloat32(queryVec)),
@@ -296,12 +309,11 @@ func (s *Store) GetNoteHashes(ctx context.Context) (map[string]string, error) {
 func (s *Store) paginatedZeroIndexMetadatas(ctx context.Context) ([]chroma.DocumentMetadata, error) {
 	var all []chroma.DocumentMetadata
 	offset := 0
-	const pageSize = 1000
 	for {
 		res, err := s.chunks.Get(ctx,
 			chroma.WithWhere(chroma.EqInt("chunk_index", 0)),
 			chroma.WithInclude(chroma.IncludeMetadatas),
-			chroma.WithLimit(pageSize),
+			chroma.WithLimit(ffiSafePageSize),
 			chroma.WithOffset(offset),
 		)
 		if err != nil {
@@ -312,10 +324,10 @@ func (s *Store) paginatedZeroIndexMetadatas(ctx context.Context) ([]chroma.Docum
 			break
 		}
 		all = append(all, metas...)
-		if len(metas) < pageSize {
+		if len(metas) < ffiSafePageSize {
 			break
 		}
-		offset += pageSize
+		offset += ffiSafePageSize
 	}
 	return all, nil
 }
@@ -325,12 +337,11 @@ func (s *Store) paginatedDistinctSlugs(ctx context.Context, where chroma.WhereFi
 	var slugs []string
 	seen := make(map[string]bool)
 	offset := 0
-	const pageSize = 1000
 	for {
 		res, err := s.chunks.Get(ctx,
 			chroma.WithWhere(where),
 			chroma.WithInclude(chroma.IncludeMetadatas),
-			chroma.WithLimit(pageSize),
+			chroma.WithLimit(ffiSafePageSize),
 			chroma.WithOffset(offset),
 		)
 		if err != nil {
@@ -347,10 +358,10 @@ func (s *Store) paginatedDistinctSlugs(ctx context.Context, where chroma.WhereFi
 				slugs = append(slugs, slug)
 			}
 		}
-		if len(metas) < pageSize {
+		if len(metas) < ffiSafePageSize {
 			break
 		}
-		offset += pageSize
+		offset += ffiSafePageSize
 	}
 	return slugs, nil
 }
@@ -893,15 +904,48 @@ func (s *Store) TagSearch(ctx context.Context, tag string, limit int, hierarchic
 		includes = append(includes, chroma.IncludeDocuments)
 	}
 
-	res, err := s.chunks.Get(ctx,
-		chroma.WithWhere(filter),
-		chroma.WithInclude(includes...),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("tag search: %w", wrapChromaErr(err))
+	var allMerged []Result
+	offset := 0
+	for {
+		res, err := s.chunks.Get(ctx,
+			chroma.WithWhere(filter),
+			chroma.WithInclude(includes...),
+			chroma.WithLimit(ffiSafePageSize),
+			chroma.WithOffset(offset),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("tag search: %w", wrapChromaErr(err))
+		}
+		if res.Count() == 0 {
+			break
+		}
+		page := getResultToResults(res, 999999, includeText)
+		allMerged = mergeDeduplicatedResults(allMerged, page)
+		if res.Count() < ffiSafePageSize {
+			break
+		}
+		offset += ffiSafePageSize
 	}
+	sort.Slice(allMerged, func(i, j int) bool { return allMerged[i].Title < allMerged[j].Title })
+	if len(allMerged) > limit {
+		allMerged = allMerged[:limit]
+	}
+	return allMerged, nil
+}
 
-	return getResultToResults(res, limit, includeText), nil
+// mergeDeduplicatedResults merges new results into existing, deduplicating by NoteSlug.
+func mergeDeduplicatedResults(existing, incoming []Result) []Result {
+	seen := make(map[string]bool, len(existing))
+	for _, r := range existing {
+		seen[r.NoteSlug] = true
+	}
+	for _, r := range incoming {
+		if !seen[r.NoteSlug] {
+			seen[r.NoteSlug] = true
+			existing = append(existing, r)
+		}
+	}
+	return existing
 }
 
 // ─── Graph-Boosted Search ─────────────────────────────────────────
