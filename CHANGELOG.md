@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.6.0] - 2026-07-20
+
+### Added
+- **Rich Text & Formatting Preservation**: Added a custom `chunkRenderer` to reconstruct inline text chunks while preserving formatting like emphasis, strikethrough, code spans, inline math, and external links in rich-text mode (`feat(parser)`).
+- **Expanded Goldmark Extensions (Latex, Mermaid, Footnotes)**: Initialized and extended the Goldmark parser to parse inline LaTeX math, Mermaid diagrams (with plain-text and diagram fallbacks), and footnotes during document traversal (`feat(parser)`).
+- **Metadata Transformer for Tags and Links**: Implemented a unified AST walker context (`metadataTransformer`) to gather tags (including frontmatter tags) and outgoing wikilinks early in parsing (`feat(parser)`).
+
+### Changed
+- **Deduplicated AST Walking & Simplified Renderer**: Consolidated AST traversal logic, separated block and inline rendering routines into clean components, and enhanced test coverage of inline elements (`refactor(parser)`).
+- **Reduced Cyclomatic Complexity**: Restructured and simplified core parsing functions and control paths across core packages to improve maintainability (`refactor`).
+- **Eliminated Dead Code**: Cleaned up obsolete metadata structures and dead code branches (`refactor`).
+- **Agent Skill Optimization**: Heavily refined `SKILL.md`, `references/flags.md`, and `references/schema.md` to improve instruction clarity, format consistency (e.g. `--compact` by default), command maps, boundaries, and pre-flight verifications (`docs(skill)`).
+
+### Performance
+- **Allocation-Free Iteration**: Switched from line slice allocations to Go 1.23 `strings.SplitSeq` sequence iteration in list, blockquote, and code-block rendering paths to reduce memory overhead (`perf(parser)`).
+
 ## [v2.5.0] - 2026-07-17
 
 ### Added
