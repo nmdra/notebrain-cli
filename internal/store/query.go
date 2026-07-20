@@ -155,15 +155,32 @@ func (s *Store) populateTextLocked(ctx context.Context, results []Result) {
 		ids[i] = chroma.DocumentID(idStr)
 		idToIndex[idStr] = i
 	}
-	res, err := s.chunks.Get(ctx,
-		chroma.WithIDs(ids...),
-		chroma.WithInclude(chroma.IncludeDocuments),
-	)
-	if err != nil || len(res.GetDocuments()) == 0 {
+	var resIDs []chroma.DocumentID
+	var resDocs chroma.Documents
+	offset := 0
+	for {
+		res, err := s.chunks.Get(ctx,
+			chroma.WithIDs(ids...),
+			chroma.WithInclude(chroma.IncludeDocuments),
+			chroma.WithLimit(ffiSafePageSize),
+			chroma.WithOffset(offset),
+		)
+		if err != nil {
+			break
+		}
+		if res.Count() == 0 {
+			break
+		}
+		resIDs = append(resIDs, res.GetIDs()...)
+		resDocs = append(resDocs, res.GetDocuments()...)
+		if res.Count() < ffiSafePageSize {
+			break
+		}
+		offset += ffiSafePageSize
+	}
+	if len(resDocs) == 0 {
 		return
 	}
-	resIDs := res.GetIDs()
-	resDocs := res.GetDocuments()
 	for j, id := range resIDs {
 		if j < len(resDocs) && resDocs[j] != nil {
 			if idx, ok := idToIndex[string(id)]; ok {
@@ -662,18 +679,32 @@ func (s *Store) HiddenConnectionsDeep(ctx context.Context, seedSlug string, limi
 	linked[seedSlug] = true
 
 	// 2. Fetch all stored chunks and embeddings for the seed note
-	res, err := s.chunks.Get(ctx,
-		chroma.WithWhere(chroma.EqString("note_slug", seedSlug)),
-		chroma.WithInclude(chroma.IncludeMetadatas, chroma.IncludeEmbeddings),
-	)
+	var embs embeddings.Embeddings
+	var metas []chroma.DocumentMetadata
+	offset := 0
+	for {
+		res, err := s.chunks.Get(ctx,
+			chroma.WithWhere(chroma.EqString("note_slug", seedSlug)),
+			chroma.WithInclude(chroma.IncludeMetadatas, chroma.IncludeEmbeddings),
+			chroma.WithLimit(ffiSafePageSize),
+			chroma.WithOffset(offset),
+		)
+		if err != nil {
+			s.mu.RUnlock()
+			return nil, nil, fmt.Errorf("hidden connections deep: get seed chunks: %w", wrapChromaErr(err))
+		}
+		if res.Count() == 0 {
+			break
+		}
+		embs = append(embs, res.GetEmbeddings()...)
+		metas = append(metas, res.GetMetadatas()...)
+		if res.Count() < ffiSafePageSize {
+			break
+		}
+		offset += ffiSafePageSize
+	}
 	s.mu.RUnlock()
 
-	if err != nil {
-		return nil, nil, fmt.Errorf("hidden connections deep: get seed chunks: %w", wrapChromaErr(err))
-	}
-
-	embs := res.GetEmbeddings()
-	metas := res.GetMetadatas()
 	if len(embs) == 0 || len(metas) == 0 {
 		return nil, nil, fmt.Errorf("note %q has no indexed chunks (required for --deep chunk analysis); run 'notebrain ingest' first", seedSlug)
 	}
@@ -1276,19 +1307,34 @@ func (s *Store) GetNote(ctx context.Context, slugOrPath string) (*NoteContent, e
 	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	res, err := s.chunks.Get(ctx,
-		chroma.WithWhere(chroma.Or(
-			chroma.EqString("note_slug", resolved),
-			chroma.EqString("file_path", slugOrPath),
-		)),
-		chroma.WithInclude(chroma.IncludeMetadatas, chroma.IncludeDocuments),
+	var metas []chroma.DocumentMetadata
+	var texts chroma.Documents
+	offset := 0
+	whereFilter := chroma.Or(
+		chroma.EqString("note_slug", resolved),
+		chroma.EqString("file_path", slugOrPath),
 	)
-	if err != nil {
-		return nil, fmt.Errorf("get note: %w", wrapChromaErr(err))
+	for {
+		res, err := s.chunks.Get(ctx,
+			chroma.WithWhere(whereFilter),
+			chroma.WithInclude(chroma.IncludeMetadatas, chroma.IncludeDocuments),
+			chroma.WithLimit(ffiSafePageSize),
+			chroma.WithOffset(offset),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("get note: %w", wrapChromaErr(err))
+		}
+		if res.Count() == 0 {
+			break
+		}
+		metas = append(metas, res.GetMetadatas()...)
+		texts = append(texts, res.GetDocuments()...)
+		if res.Count() < ffiSafePageSize {
+			break
+		}
+		offset += ffiSafePageSize
 	}
 
-	metas := res.GetMetadatas()
-	texts := res.GetDocuments()
 	if len(metas) == 0 {
 		return nil, fmt.Errorf("note not found: %s", slugOrPath)
 	}
@@ -1471,11 +1517,31 @@ func (s *Store) PopulateContext(ctx context.Context, results []Result, windowSiz
 
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	res, err := s.chunks.Get(ctx,
-		chroma.WithWhere(whereFilter),
-		chroma.WithInclude(chroma.IncludeMetadatas, chroma.IncludeDocuments),
-	)
-	if err != nil || len(res.GetMetadatas()) == 0 {
+	var metas []chroma.DocumentMetadata
+	var texts chroma.Documents
+	offset := 0
+	for {
+		res, err := s.chunks.Get(ctx,
+			chroma.WithWhere(whereFilter),
+			chroma.WithInclude(chroma.IncludeMetadatas, chroma.IncludeDocuments),
+			chroma.WithLimit(ffiSafePageSize),
+			chroma.WithOffset(offset),
+		)
+		if err != nil {
+			break
+		}
+		if res.Count() == 0 {
+			break
+		}
+		metas = append(metas, res.GetMetadatas()...)
+		texts = append(texts, res.GetDocuments()...)
+		if res.Count() < ffiSafePageSize {
+			break
+		}
+		offset += ffiSafePageSize
+	}
+
+	if len(metas) == 0 {
 		return
 	}
 
@@ -1485,8 +1551,6 @@ func (s *Store) PopulateContext(ctx context.Context, results []Result, windowSiz
 		text  string
 	}
 	var fetched []chunkInfo
-	metas := res.GetMetadatas()
-	texts := res.GetDocuments()
 	for i, m := range metas {
 		slug := metaString(m, "note_slug")
 		idx := metaInt(m, "chunk_index")
