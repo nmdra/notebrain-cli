@@ -66,10 +66,7 @@ func (s *Store) semanticSearch(ctx context.Context, queryVec []float32, limit in
 		includes = append(includes, chroma.IncludeDocuments)
 	}
 
-	fetchCount := max(limit*3, limit*topKPerNote)
-	if fetchCount > ffiSafeSemanticLimit {
-		fetchCount = ffiSafeSemanticLimit
-	}
+	fetchCount := min(max(limit*3, limit*topKPerNote), ffiSafeSemanticLimit)
 
 	opts := []chroma.QueryOption{
 		chroma.WithQueryEmbeddings(embeddings.NewEmbeddingFromFloat32(queryVec)),
