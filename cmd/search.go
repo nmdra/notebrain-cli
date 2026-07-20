@@ -160,7 +160,7 @@ func (c *SearchCmd) runStatic(ctx context.Context, globals *Globals, st *store.S
 	whereFilter := c.buildWhereFilter(len(resolved) > 0)
 
 	if len(resolved) == 0 {
-		results, err := st.TagSearch(ctx, c.Tag, c.Limit, whereFilter, globals.IncludeText)
+		results, err := st.TagSearch(ctx, c.Tag, c.Limit, false, whereFilter, globals.IncludeText)
 		if err != nil {
 			return err
 		}

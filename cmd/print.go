@@ -160,7 +160,13 @@ func emptyResultHint(commandName string) string {
 		return "No hidden connections found. All semantically similar notes may already be linked. Try --include-linked to include them."
 	}
 	if strings.HasPrefix(commandName, "tags") {
-		return "No notes share tags with this note. The note may have no tags, or try lowering --min-shared."
+		if strings.Contains(commandName, "--shared") {
+			return "No notes share tags with this note. The note may have no tags, or try lowering --min-shared."
+		}
+		if strings.Contains(commandName, "--children") {
+			return "No notes found with this tag or its children. Check that the tag is correct or that the vault is indexed: notebrain ingest"
+		}
+		return "No notes found with this tag. Try enabling hierarchical search with --children, or check that the vault is indexed: notebrain ingest"
 	}
 	if strings.HasPrefix(commandName, "search") {
 		return "No matching notes found. Try broadening your query, or check that the vault is indexed: notebrain ingest"
