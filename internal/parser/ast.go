@@ -128,13 +128,18 @@ func Parse(body, noteSlug string, maxChunkRunes, overlapRunes int, skipAttachmen
 		linksSet = make(map[string]struct{})
 	}
 
-	fmTags := extractFrontmatterTags(frontmatter)
-	for _, t := range fmTags {
-		tagsSet[t] = struct{}{}
+	finalTagsSet := make(map[string]struct{})
+	for t := range tagsSet {
+		finalTagsSet[strings.ToLower(t)] = struct{}{}
 	}
 
-	tags := make([]string, 0, len(tagsSet))
-	for t := range tagsSet {
+	fmTags := extractFrontmatterTags(frontmatter)
+	for _, t := range fmTags {
+		finalTagsSet[strings.ToLower(t)] = struct{}{}
+	}
+
+	tags := make([]string, 0, len(finalTagsSet))
+	for t := range finalTagsSet {
 		tags = append(tags, t)
 	}
 	slices.Sort(tags)
