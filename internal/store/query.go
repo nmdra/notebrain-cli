@@ -824,11 +824,70 @@ func TagWhereClause(tag string) chroma.WhereClause {
 }
 
 // TagSearch finds notes that match a specific tag name.
-func (s *Store) TagSearch(ctx context.Context, tag string, limit int, whereFilter chroma.WhereFilter, includeText bool) ([]Result, error) {
+func (s *Store) TagSearch(ctx context.Context, tag string, limit int, hierarchical bool, whereFilter chroma.WhereFilter, includeText bool) ([]Result, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	filter := CombineWhereFilters(TagWhereClause(tag), whereFilter)
 
+	if hierarchical {
+		// Since ChromaDB doesn't support prefix/contains queries on metadata fields natively,
+		// we fetch all chunk metadata (applying whereFilter if provided) and filter in Go.
+		includes := []chroma.Include{chroma.IncludeMetadatas}
+		if includeText {
+			includes = append(includes, chroma.IncludeDocuments)
+		}
+
+		qLower := strings.ToLower(tag)
+		var filtered []Result
+		const pageSize = 200
+		offset := 0
+
+		for {
+			var opts []chroma.GetOption
+			if whereFilter != nil {
+				opts = append(opts, chroma.WithWhere(whereFilter))
+			}
+			opts = append(opts, chroma.WithInclude(includes...))
+			opts = append(opts, chroma.WithLimit(pageSize), chroma.WithOffset(offset))
+
+			res, err := s.chunks.Get(ctx, opts...)
+			if err != nil {
+				return nil, fmt.Errorf("tag search: %w", wrapChromaErr(err))
+			}
+
+			if res.Count() == 0 {
+				break
+			}
+
+			results := getResultToResults(res, 999999, includeText)
+			for _, r := range results {
+				match := false
+				for _, t := range r.Tags {
+					tLower := strings.ToLower(t)
+					if tLower == qLower || strings.HasPrefix(tLower, qLower+"/") {
+						match = true
+						break
+					}
+				}
+				if match {
+					filtered = append(filtered, r)
+				}
+			}
+
+			if len(filtered) >= limit {
+				filtered = filtered[:limit]
+				break
+			}
+
+			if res.Count() < pageSize {
+				break
+			}
+			offset += pageSize
+		}
+		return filtered, nil
+	}
+
+	// Exact match mode (fully optimized at the database level)
+	filter := CombineWhereFilters(TagWhereClause(tag), whereFilter)
 	includes := []chroma.Include{chroma.IncludeMetadatas}
 	if includeText {
 		includes = append(includes, chroma.IncludeDocuments)
