@@ -50,7 +50,7 @@ func (s *Store) BatchIngest(ctx context.Context, data []BatchIngestData, staleSl
 
 	if len(slugsToClean) > 0 {
 		// 2. Fetch and delete existing chunks and links for these slugs in batches of 100
-		const batchSize = 100
+		const batchSize = 20
 		for i := 0; i < len(slugsToClean); i += batchSize {
 			end := min(i+batchSize, len(slugsToClean))
 			batchSlugs := slugsToClean[i:end]
