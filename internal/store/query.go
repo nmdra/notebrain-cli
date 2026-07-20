@@ -306,12 +306,13 @@ func (s *Store) GetNoteHashes(ctx context.Context) (map[string]string, error) {
 	return hashes, nil
 }
 
-func (s *Store) paginatedZeroIndexMetadatas(ctx context.Context) ([]chroma.DocumentMetadata, error) {
+// paginatedGetMetadatas is a helper to fetch metadata from any collection safely across FFI limits.
+func paginatedGetMetadatas(ctx context.Context, col chroma.Collection, where chroma.WhereFilter) ([]chroma.DocumentMetadata, error) {
 	var all []chroma.DocumentMetadata
 	offset := 0
 	for {
-		res, err := s.chunks.Get(ctx,
-			chroma.WithWhere(chroma.EqInt("chunk_index", 0)),
+		res, err := col.Get(ctx,
+			chroma.WithWhere(where),
 			chroma.WithInclude(chroma.IncludeMetadatas),
 			chroma.WithLimit(ffiSafePageSize),
 			chroma.WithOffset(offset),
@@ -332,36 +333,24 @@ func (s *Store) paginatedZeroIndexMetadatas(ctx context.Context) ([]chroma.Docum
 	return all, nil
 }
 
+func (s *Store) paginatedZeroIndexMetadatas(ctx context.Context) ([]chroma.DocumentMetadata, error) {
+	return paginatedGetMetadatas(ctx, s.chunks, chroma.EqInt("chunk_index", 0))
+}
+
 // paginatedDistinctSlugs returns distinct note_slug values matching the given where filter across paginated queries.
 func (s *Store) paginatedDistinctSlugs(ctx context.Context, where chroma.WhereFilter) ([]string, error) {
 	var slugs []string
 	seen := make(map[string]bool)
-	offset := 0
-	for {
-		res, err := s.chunks.Get(ctx,
-			chroma.WithWhere(where),
-			chroma.WithInclude(chroma.IncludeMetadatas),
-			chroma.WithLimit(ffiSafePageSize),
-			chroma.WithOffset(offset),
-		)
-		if err != nil {
-			return nil, fmt.Errorf("paginated distinct slugs: %w", wrapChromaErr(err))
+	metas, err := paginatedGetMetadatas(ctx, s.chunks, where)
+	if err != nil {
+		return nil, fmt.Errorf("paginated distinct slugs: %w", wrapChromaErr(err))
+	}
+	for _, m := range metas {
+		slug := metaString(m, "note_slug")
+		if slug != "" && !seen[slug] {
+			seen[slug] = true
+			slugs = append(slugs, slug)
 		}
-		metas := res.GetMetadatas()
-		if len(metas) == 0 {
-			break
-		}
-		for _, m := range metas {
-			slug := metaString(m, "note_slug")
-			if slug != "" && !seen[slug] {
-				seen[slug] = true
-				slugs = append(slugs, slug)
-			}
-		}
-		if len(metas) < ffiSafePageSize {
-			break
-		}
-		offset += ffiSafePageSize
 	}
 	return slugs, nil
 }
@@ -457,17 +446,14 @@ func (s *Store) Backlinks(ctx context.Context, targetSlug string) ([]Result, err
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	resolver := s.buildLinkTargetResolver(ctx)
-	res, err := s.links.Get(ctx,
-		chroma.WithWhere(s.linkWhereFilters(ctx, targetSlug, resolver)),
-		chroma.WithInclude(chroma.IncludeMetadatas),
-	)
+	res, err := paginatedGetMetadatas(ctx, s.links, s.linkWhereFilters(ctx, targetSlug, resolver))
 	if err != nil {
 		return nil, fmt.Errorf("backlinks: %w", wrapChromaErr(err))
 	}
 
 	seen := map[string]bool{}
 	var out []Result
-	for _, meta := range res.GetMetadatas() {
+	for _, meta := range res {
 		if s.SkipAttachments && (parser.IsAttachmentLink(metaString(meta, "target_path")) || parser.IsAttachmentLink(metaString(meta, "display_text"))) {
 			continue
 		}
@@ -1106,44 +1092,34 @@ func getResultToResults(res chroma.GetResult, limit int, includeText bool) []Res
 func (s *Store) linkedSlugs(ctx context.Context, slug string) (map[string]bool, error) {
 	set := map[string]bool{}
 	resolver := s.buildLinkTargetResolver(ctx)
-	out, err := s.links.Get(ctx,
-		chroma.WithWhere(chroma.EqString("source_slug", slug)),
-		chroma.WithInclude(chroma.IncludeMetadatas),
-	)
+	out, err := paginatedGetMetadatas(ctx, s.links, chroma.EqString("source_slug", slug))
 	if err != nil {
-		return nil, fmt.Errorf("linkedSlugs out: %w", wrapChromaErr(err))
+		return nil, fmt.Errorf("connections out: %w", wrapChromaErr(err))
 	}
-	if out != nil {
-		for _, m := range out.GetMetadatas() {
-			if t := metaString(m, "target_slug"); t != "" {
-				if canon, ok := resolver[t]; ok && canon != "" {
-					set[canon] = true
-				} else {
-					set[t] = true
-				}
+	for _, m := range out {
+		if t := metaString(m, "target_slug"); t != "" {
+			if canon, ok := resolver[t]; ok && canon != "" {
+				set[canon] = true
+			} else {
+				set[t] = true
 			}
-			if p := metaString(m, "target_path"); p != "" {
-				if canon, ok := resolver[p]; ok && canon != "" {
-					set[canon] = true
-				}
+		}
+		if p := metaString(m, "target_path"); p != "" {
+			if canon, ok := resolver[p]; ok && canon != "" {
+				set[canon] = true
 			}
 		}
 	}
-	in, err := s.links.Get(ctx,
-		chroma.WithWhere(s.linkWhereFilters(ctx, slug, resolver)),
-		chroma.WithInclude(chroma.IncludeMetadatas),
-	)
+	in, err := paginatedGetMetadatas(ctx, s.links, s.linkWhereFilters(ctx, slug, resolver))
 	if err != nil {
-		return nil, fmt.Errorf("linkedSlugs in: %w", wrapChromaErr(err))
+		return nil, fmt.Errorf("connections in: %w", wrapChromaErr(err))
 	}
-	if in != nil {
-		for _, m := range in.GetMetadatas() {
-			if src := metaString(m, "source_slug"); src != "" {
-				if canon, ok := resolver[src]; ok && canon != "" {
-					set[canon] = true
-				} else {
-					set[src] = true
-				}
+	for _, m := range in {
+		if src := metaString(m, "source_slug"); src != "" {
+			if canon, ok := resolver[src]; ok && canon != "" {
+				set[canon] = true
+			} else {
+				set[src] = true
 			}
 		}
 	}
