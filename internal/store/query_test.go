@@ -479,12 +479,89 @@ func TestTagSearch(t *testing.T) {
 
 	setupTestData(t, ctx, st)
 
-	res, err := st.TagSearch(ctx, "vector", 10, nil, false)
+	// Add more records to test hierarchical matching and prefix pruning
+	extraChunks := []store.ChunkRecord{
+		{
+			ID:         "note-c:0",
+			NoteSlug:   "note-c",
+			Title:      "Note C",
+			FilePath:   "Note C.md",
+			ChunkIndex: 0,
+			Text:       "k8s note",
+			Tags:       []string{"kubernetes"},
+			ModifiedMs: time.Now().UnixMilli(),
+			Embedding:  []float32{0.0, 0.0, 1.0},
+		},
+		{
+			ID:         "note-d:0",
+			NoteSlug:   "note-d",
+			Title:      "Note D",
+			FilePath:   "Note D.md",
+			ChunkIndex: 0,
+			Text:       "k8s cka prep",
+			Tags:       []string{"kubernetes/cka"},
+			ModifiedMs: time.Now().UnixMilli(),
+			Embedding:  []float32{0.0, 0.0, 1.0},
+		},
+		{
+			ID:         "note-e:0",
+			NoteSlug:   "note-e",
+			Title:      "Note E",
+			FilePath:   "Note E.md",
+			ChunkIndex: 0,
+			Text:       "python web dev",
+			Tags:       []string{"django"},
+			ModifiedMs: time.Now().UnixMilli(),
+			Embedding:  []float32{0.0, 0.0, 1.0},
+		},
+	}
+	if err := st.UpsertChunks(ctx, extraChunks); err != nil {
+		t.Fatalf("upsert extra chunks failed: %v", err)
+	}
+
+	// 1. Test Exact Match
+	res, err := st.TagSearch(ctx, "vector", 10, false, nil, false)
 	if err != nil {
-		t.Fatalf("TagSearch failed: %v", err)
+		t.Fatalf("TagSearch (exact) failed: %v", err)
 	}
 	if len(res) == 0 || res[0].NoteSlug != "note-a" {
 		t.Errorf("Expected note-a for tag 'vector', got %v", res)
+	}
+
+	// 2. Test Exact Match doesn't match children
+	res, err = st.TagSearch(ctx, "kubernetes", 10, false, nil, false)
+	if err != nil {
+		t.Fatalf("TagSearch (exact kubernetes) failed: %v", err)
+	}
+	if len(res) != 1 || res[0].NoteSlug != "note-c" {
+		t.Errorf("Expected only note-c (exact kubernetes), got: %v", res)
+	}
+
+	// 3. Test Hierarchical Match matches parents and children
+	res, err = st.TagSearch(ctx, "kubernetes", 10, true, nil, false)
+	if err != nil {
+		t.Fatalf("TagSearch (hierarchical kubernetes) failed: %v", err)
+	}
+	if len(res) != 2 {
+		t.Errorf("Expected both note-c and note-d for hierarchical 'kubernetes', got: %v", res)
+	}
+	slugs := map[string]bool{}
+	for _, r := range res {
+		slugs[r.NoteSlug] = true
+	}
+	if !slugs["note-c"] || !slugs["note-d"] {
+		t.Errorf("Expected note-c and note-d in hierarchical tag search, got: %v", slugs)
+	}
+
+	// 4. Test Hierarchical prefix match avoids substring false positives (e.g. django when searching go)
+	res, err = st.TagSearch(ctx, "go", 10, true, nil, false)
+	if err != nil {
+		t.Fatalf("TagSearch (hierarchical go) failed: %v", err)
+	}
+	for _, r := range res {
+		if r.NoteSlug == "note-e" {
+			t.Errorf("TagSearch for 'go' should not match 'django' in note-e, got: %v", res)
+		}
 	}
 }
 
