@@ -90,7 +90,9 @@ Only perform additional retrieval when the initial search is insufficient:
 | Related but unlinked notes                               | `hidden`        |
 | Related but unlinked notes, Deep chunk by chunk analysis | `hidden --deep` |
 | Semantic search around a note                            | `boosted`       |
-| Shared tags                                              | `tags`          |
+| Direct tag search                                        | `tags`          |
+| Direct tag search with children                          | `tags --children`|
+| Shared tags                                              | `tags --shared` |
 
 **Never chain all four graph commands** (`backlinks → connections → hidden → tags`) for a simple lookup. Run only the single command the request actually needs, unless the user explicitly asks for a comprehensive, vault-wide audit of a topic.
 

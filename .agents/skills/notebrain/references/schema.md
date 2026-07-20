@@ -92,6 +92,30 @@ Each item in the `results` array may contain:
 }
 ```
 
+### Direct Tag Search (compact)
+
+`notebrain tags "#Architecture" --children --format=json --compact`
+
+```json
+{
+  "total": 2,
+  "results": [
+    {
+      "note_slug": "architecture/event-driven-systems",
+      "title": "Event Driven Systems",
+      "score": 1.0,
+      "tags": ["#Architecture", "#DistributedSystems"]
+    },
+    {
+      "note_slug": "architecture/microservices/intro",
+      "title": "Microservices Introduction",
+      "score": 1.0,
+      "tags": ["#Architecture/Microservices", "#Go"]
+    }
+  ]
+}
+```
+
 ### TSV Format
 
 `notebrain backlinks "architecture/event-driven-systems" --format=tsv`

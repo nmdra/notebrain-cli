@@ -37,9 +37,11 @@ These flags are available only on the commands listed.
 
 ### `tags`
 
-| Flag             | Purpose                                                     | Default |
-| ---------------- | ----------------------------------------------------------- | ------- |
-| `--min-shared N` | Minimum number of shared tags required to include a result. | `1`     |
+| Flag             | Purpose                                                                                                     | Default |
+| ---------------- | ----------------------------------------------------------------------------------------------------------- | ------- |
+| `--shared`       | Treat the query as a note slug/title to find notes sharing its tags.                                         | `false` |
+| `--children`     | Include child tags in hierarchical structure (e.g. searching 'kubernetes' also matches 'kubernetes/cka').  | `false` |
+| `--min-shared N` | Minimum number of shared tags required to include a result (only applies when --shared is active).           | `1`     |
 
 ### `boosted`
 
