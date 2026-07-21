@@ -151,7 +151,7 @@ func (s *Store) Stats(ctx context.Context) (map[string]int64, error) {
 	if nc > 0 {
 		seen := make(map[string]struct{})
 		offset := 0
-		batchSize := 500
+		batchSize := ffiSafePageSize
 		for {
 			res, err := s.chunks.Get(ctx,
 				chroma.WithWhere(chroma.EqInt("chunk_index", 0)),

@@ -55,6 +55,7 @@ func TestPipelineRun(t *testing.T) {
 	}
 
 	p := NewPipeline(st, &mockEmbedder{}, 2)
+	p.MinChunkWords = 0
 
 	// Use an io.Pipe for stdin so Bubble Tea doesn't immediately exit due to EOF
 	pr, pw := io.Pipe()
@@ -93,6 +94,7 @@ func TestPipelineSyncDeleted(t *testing.T) {
 	_ = os.WriteFile(n2Path, []byte("Note two [[note1]]"), 0644)
 
 	p := NewPipeline(st, &mockEmbedder{}, 1)
+	p.MinChunkWords = 0
 
 	// Ingest initially
 	pr1, pw1 := io.Pipe()
@@ -147,6 +149,7 @@ func TestPipelineMinChunkWords(t *testing.T) {
 	_ = os.WriteFile(filepath.Join(vaultDir, "note2.md"), []byte("this is a longer note containing several words"), 0644)
 
 	p := NewPipeline(st, &mockEmbedder{}, 1)
+	p.MinChunkWords = 0
 	p.MinChunkWords = 5
 
 	pr, pw := io.Pipe()
@@ -184,6 +187,7 @@ func TestPipelineRespectExclude(t *testing.T) {
 	_ = os.WriteFile(filepath.Join(vaultDir, "99.Storage-Shed", "Attachments", "attachment.md"), []byte("Attachment note"), 0644)
 
 	p := NewPipeline(st, &mockEmbedder{}, 1)
+	p.MinChunkWords = 0
 	p.RespectExclude = true
 
 	pr, pw := io.Pipe()
@@ -272,6 +276,7 @@ func TestPipeline_CodeOnlyNoteIngest(t *testing.T) {
 	_ = os.WriteFile(filepath.Join(vaultDir, "code.md"), []byte(codeNote), 0644)
 
 	p := NewPipeline(st, &mockEmbedder{}, 1)
+	p.MinChunkWords = 0
 	pr, pw := io.Pipe()
 	go func() { _ = pw.Close() }()
 	var stdout bytes.Buffer

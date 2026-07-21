@@ -52,6 +52,7 @@ func NewPipeline(s *store.Store, e Embedder, workers int) *Pipeline {
 		// Defaults matching config.Default() — callers should override from config.
 		ChunkSize:       800,
 		ChunkOverlap:    100,
+		MinChunkWords:   10,
 		MaxEmbedTokens:  256,
 		RespectExclude:  true,
 		SkipAttachments: true,
