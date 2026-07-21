@@ -2,7 +2,7 @@
 
 A Go CLI tool that turns your [Obsidian](https://obsidian.md/) vault into a fully offline knowledge backend for **AI coding agents**. NoteBrain indexes markdown notes into a local **[ChromaDB](https://www.trychroma.com/)** vector database and exposes semantic search, wikilink graph traversal, and hidden connection discovery through structured output — designed to be chained directly by autonomous agents, shell pipelines, and LLM tool-use workflows.
 
-Ships with an [AI agent skill](wiki/Skill_Usage.md) and [OpenCode Agent Configuration](wiki/OpenCode_Integration.md) for integration with autonomous coding agents like [OpenCode](https://opencode.ai), [Google Antigravity](https://antigravity.google/), [Pi agent](https://pi.dev), and Claude Code. This setup is specially optimized to reduce token usage and latency.
+Ships with an [AI agent skill](wiki/Skill_Usage.md) and [OpenCode Agent Configuration](wiki/OpenCode_Integration.md) for integration with autonomous coding agents like [OpenCode](https://opencode.ai), [Pi agent](https://pi.dev), and Claude Code. This setup is specially optimized to reduce token usage and latency.
 
 [![Release](https://github.com/nmdra/notebrain-cli/actions/workflows/release.yml/badge.svg)](https://github.com/nmdra/notebrain-cli/actions/workflows/release.yml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/nmdra/notebrain-cli.svg)](https://pkg.go.dev/github.com/nmdra/notebrain-cli/v2)
@@ -13,7 +13,7 @@ Ships with an [AI agent skill](wiki/Skill_Usage.md) and [OpenCode Agent Configur
 [![GitHub stars](https://img.shields.io/github/stars/nmdra/notebrain-cli?style=social)](https://github.com/nmdra/notebrain-cli/stargazers)
 
 <p align="center">
-  <img src="assets/banner.jpg" alt="NoteBrain CLI — AI-powered knowledge backend for your Obsidian vault" width="100%">
+  <img src="assets/banner.svg" alt="NoteBrain CLI — AI-powered knowledge backend for your Obsidian vault" width="100%">
 </p>
 
 > [!NOTE]

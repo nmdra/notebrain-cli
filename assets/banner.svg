@@ -1,0 +1,267 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 400" width="100%" height="100%">
+    <defs>
+        <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#0e0b1a" />
+            <stop offset="55%" stop-color="#171227" />
+            <stop offset="100%" stop-color="#08070f" />
+        </linearGradient>
+
+        <radialGradient id="clusterGlow" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#8b5cf6" stop-opacity="0.16" />
+            <stop offset="100%" stop-color="#8b5cf6" stop-opacity="0" />
+        </radialGradient>
+
+        <radialGradient id="targetGlow" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#f0a94e" stop-opacity="0.22" />
+            <stop offset="100%" stop-color="#f0a94e" stop-opacity="0" />
+        </radialGradient>
+
+        <filter id="softAmber" x="-100%" y="-100%" width="300%" height="300%">
+            <feGaussianBlur stdDeviation="7" />
+        </filter>
+
+        <style>
+            .eyebrow {
+                font-family: ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, Consolas, "Liberation Mono", monospace;
+                font-size: 15px;
+                letter-spacing: 3px;
+                fill: #7d76a3;
+                font-weight: 600;
+            }
+            .title {
+                font-family: ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, Consolas, "Liberation Mono", monospace;
+                font-size: 68px;
+                font-weight: 800;
+            }
+            .cli-badge {
+                font-family: ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, Consolas, monospace;
+                font-size: 23px;
+                font-weight: 800;
+                letter-spacing: 2px;
+                fill: #f0a94e;
+            }
+            .prompt {
+                font-family: ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, Consolas, "Liberation Mono", monospace;
+                font-size: 19px;
+            }
+            .tag-text {
+                font-family: ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, Consolas, monospace;
+                font-size: 12.5px;
+                letter-spacing: 1.5px;
+                fill: #9089b3;
+                font-weight: 600;
+            }
+            .match-label {
+                font-family: ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, Consolas, monospace;
+                font-size: 11.5px;
+                fill: #f0a94e;
+                font-weight: 700;
+            }
+            .cursor { fill: #f0a94e; animation: blink 1.1s step-end infinite; }
+
+            .card { fill: #171227; stroke: #4c3d78; stroke-width: 1.5; }
+            .card-line { stroke: #8f88b3; stroke-width: 1.2; }
+            .edge-solid { stroke: #382c58; stroke-width: 1.5; }
+            .hidden-edge {
+                stroke: #f0a94e;
+                stroke-width: 2;
+                stroke-dasharray: 7 6;
+                animation: march 9s linear infinite;
+            }
+            .node-pulse-violet { fill: #8b5cf6; animation: pulseV 3.2s infinite ease-in-out; }
+            .node-pulse-amber { fill: #f0a94e; animation: pulseA 3.2s infinite ease-in-out 0.6s; }
+
+            @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+            @keyframes march { to { stroke-dashoffset: -130; } }
+            @keyframes pulseV { 0% { r: 5; opacity: 0.65; } 50% { r: 15; opacity: 0.05; } 100% { r: 5; opacity: 0.65; } }
+            @keyframes pulseA { 0% { r: 4; opacity: 0.7; } 50% { r: 13; opacity: 0.05; } 100% { r: 4; opacity: 0.7; } }
+
+            @keyframes float1 {
+                0% { transform: translateY(0px) translateX(0px); }
+                33% { transform: translateY(-12px) translateX(8px); }
+                66% { transform: translateY(9px) translateX(-6px); }
+                100% { transform: translateY(0px) translateX(0px); }
+            }
+            @keyframes float2 {
+                0% { transform: translateY(0px) translateX(0px); }
+                33% { transform: translateY(8px) translateX(-8px); }
+                66% { transform: translateY(-10px) translateX(6px); }
+                100% { transform: translateY(0px) translateX(0px); }
+            }
+            .float-1 { animation: float1 13s infinite ease-in-out; }
+            .float-2 { animation: float2 16s infinite ease-in-out; }
+            .float-3 { animation: float1 19s infinite ease-in-out reverse; }
+
+            .glow-v { filter: drop-shadow(0 0 7px rgba(139, 92, 246, 0.55)); }
+            .glow-a { filter: drop-shadow(0 0 6px rgba(240, 169, 78, 0.6)); }
+
+            @keyframes badgeFloat {
+                0%, 100% { transform: translateY(0px); }
+                50% { transform: translateY(-7px); }
+            }
+            @keyframes badgePulse {
+                0%, 100% { opacity: 0.3; }
+                50% { opacity: 0.8; }
+            }
+            .badge-float { animation: badgeFloat 2.6s ease-in-out infinite; }
+            .badge-pulse { animation: badgePulse 2.6s ease-in-out infinite; }
+
+            .edge-active { stroke-dasharray: 4 6; opacity: 0.55; animation: marchSlow 15s linear infinite; }
+            @keyframes marchSlow { to { stroke-dashoffset: -100; } }
+
+            .node-pulse-violet-2 { fill: #8b5cf6; animation: pulseV 3.6s infinite ease-in-out 1.8s; }
+            .bg-node { fill: #4c3d78; opacity: 0.5; }
+        </style>
+    </defs>
+
+    <rect width="100%" height="100%" fill="url(#bg)" />
+
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+        <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#ffffff" stroke-width="0.5" stroke-opacity="0.025"/>
+    </pattern>
+    <rect width="100%" height="100%" fill="url(#grid)" />
+
+    <circle cx="950" cy="190" r="260" fill="url(#clusterGlow)" />
+
+    <!-- Main note-graph cluster -->
+    <g transform="translate(950, 190)">
+        <g class="float-1">
+            <!-- faint background notes, suggesting the graph extends past the frame -->
+            <circle cx="-200" cy="-30" r="2.5" class="bg-node" />
+            <circle cx="205" cy="-150" r="2" class="bg-node" />
+            <circle cx="-60" cy="185" r="2" class="bg-node" />
+
+            <!-- structural (wikilink) edges -->
+            <line x1="0" y1="0" x2="-140" y2="-70" class="edge-solid" />
+            <line x1="0" y1="0" x2="-40" y2="-140" class="edge-solid" />
+            <line x1="0" y1="0" x2="100" y2="-95" class="edge-solid" />
+            <line x1="0" y1="0" x2="150" y2="20" class="edge-solid edge-active" />
+            <line x1="-140" y1="-70" x2="-130" y2="95" class="edge-solid" />
+            <line x1="150" y1="20" x2="-10" y2="140" class="edge-solid" />
+            <line x1="-130" y1="95" x2="-10" y2="140" class="edge-solid" />
+            <line x1="-40" y1="-140" x2="100" y2="-95" class="edge-solid" />
+
+            <!-- hidden semantic connection, discovered not linked -->
+            <path d="M0,0 Q140,25 210,120" fill="none" class="hidden-edge glow-a" />
+
+            <!-- traveling pulses along the hidden connection, like a live query -->
+            <circle r="3.2" fill="#f0a94e" class="glow-a">
+                <animateMotion dur="3.2s" repeatCount="indefinite" path="M0,0 Q140,25 210,120" />
+            </circle>
+            <circle r="2.2" fill="#f0a94e" opacity="0.55">
+                <animateMotion dur="3.2s" repeatCount="indefinite" begin="-1.6s" path="M0,0 Q140,25 210,120" />
+            </circle>
+
+            <!-- match label -->
+            <rect x="60" y="45" width="88" height="26" rx="13" fill="rgba(240,169,78,0.12)" stroke="#f0a94e" stroke-width="1" />
+            <text x="104" y="62.5" text-anchor="middle" class="match-label">92% match</text>
+
+            <!-- outer notes -->
+            <g transform="translate(-140,-70)">
+                <circle r="8" class="node-pulse-violet-2" />
+                <rect x="-15" y="-10" width="30" height="20" rx="4" class="card" />
+                <line x1="-9" y1="-3" x2="6" y2="-3" class="card-line" opacity="0.6" />
+                <line x1="-9" y1="3" x2="2" y2="3" class="card-line" opacity="0.4" />
+            </g>
+            <g transform="translate(-40,-140)">
+                <rect x="-15" y="-10" width="30" height="20" rx="4" class="card" />
+                <line x1="-9" y1="-3" x2="6" y2="-3" class="card-line" opacity="0.6" />
+                <line x1="-9" y1="3" x2="2" y2="3" class="card-line" opacity="0.4" />
+            </g>
+            <g transform="translate(100,-95)">
+                <circle r="9" class="node-pulse-violet" style="animation-delay: 1.2s;" />
+                <rect x="-15" y="-10" width="30" height="20" rx="4" class="card" />
+                <line x1="-9" y1="-3" x2="6" y2="-3" class="card-line" opacity="0.6" />
+                <line x1="-9" y1="3" x2="2" y2="3" class="card-line" opacity="0.4" />
+            </g>
+            <g transform="translate(150,20)">
+                <rect x="-15" y="-10" width="30" height="20" rx="4" class="card" />
+                <line x1="-9" y1="-3" x2="6" y2="-3" class="card-line" opacity="0.6" />
+                <line x1="-9" y1="3" x2="2" y2="3" class="card-line" opacity="0.4" />
+            </g>
+            <g transform="translate(-130,95)">
+                <rect x="-15" y="-10" width="30" height="20" rx="4" class="card" />
+                <line x1="-9" y1="-3" x2="6" y2="-3" class="card-line" opacity="0.6" />
+                <line x1="-9" y1="3" x2="2" y2="3" class="card-line" opacity="0.4" />
+            </g>
+            <g transform="translate(-10,140)">
+                <circle r="7" class="node-pulse-violet-2" style="animation-delay: 0.9s;" />
+                <rect x="-15" y="-10" width="30" height="20" rx="4" class="card" />
+                <line x1="-9" y1="-3" x2="6" y2="-3" class="card-line" opacity="0.6" />
+                <line x1="-9" y1="3" x2="2" y2="3" class="card-line" opacity="0.4" />
+            </g>
+
+            <!-- hidden-connection target: semantically related, not wikilinked -->
+            <circle cx="210" cy="120" r="70" fill="url(#targetGlow)" />
+            <g transform="translate(210,120)">
+                <circle r="10" class="node-pulse-amber" />
+                <rect x="-15" y="-10" width="30" height="20" rx="4" fill="#171227" stroke="#f0a94e" stroke-width="1.5" />
+                <line x1="-9" y1="-3" x2="6" y2="-3" stroke="#f0c98a" stroke-width="1.2" opacity="0.7" />
+                <line x1="-9" y1="3" x2="2" y2="3" stroke="#f0c98a" stroke-width="1.2" opacity="0.5" />
+            </g>
+
+            <!-- center: the active note -->
+            <g class="glow-v">
+                <circle r="6" class="node-pulse-violet" />
+                <rect x="-18" y="-12" width="36" height="24" rx="5" fill="#221a3d" stroke="#8b5cf6" stroke-width="2" />
+                <line x1="-11" y1="-4" x2="9" y2="-4" stroke="#f4f0ea" stroke-width="1.3" opacity="0.75" />
+                <line x1="-11" y1="3" x2="4" y2="3" stroke="#f4f0ea" stroke-width="1.3" opacity="0.5" />
+            </g>
+        </g>
+    </g>
+
+    <!-- satellite cluster: rest of the vault -->
+    <g transform="translate(1122, 55)">
+        <g class="float-2" opacity="0.55">
+            <line x1="0" y1="0" x2="-55" y2="42" class="edge-solid" />
+            <line x1="0" y1="0" x2="45" y2="55" class="edge-solid" />
+            <line x1="-55" y1="42" x2="45" y2="55" class="edge-solid" />
+            <circle cx="0" cy="0" r="4.5" fill="#8b5cf6" opacity="0.8" />
+            <circle cx="-55" cy="42" r="3.5" fill="#8b5cf6" opacity="0.7" />
+            <circle cx="45" cy="55" r="3" fill="#8b5cf6" opacity="0.7" />
+        </g>
+    </g>
+
+    <g transform="translate(742, 305)">
+        <g class="float-3" opacity="0.5">
+            <line x1="0" y1="0" x2="46" y2="-38" class="edge-solid" />
+            <line x1="0" y1="0" x2="-36" y2="-28" class="edge-solid" />
+            <circle cx="0" cy="0" r="3.5" fill="#8b5cf6" opacity="0.75" />
+            <circle cx="46" cy="-38" r="3" fill="#8b5cf6" opacity="0.6" />
+            <circle cx="-36" cy="-28" r="3" fill="#8b5cf6" opacity="0.6" />
+        </g>
+    </g>
+
+    <!-- Content -->
+    <g transform="translate(100, 0)">
+        <text class="eyebrow" x="0" y="130">FAST &#183; LOCAL-FIRST &#183; SEMANTIC SEARCH</text>
+
+        <text class="title" x="0" y="228">
+            <tspan fill="#8b5cf6">[[</tspan><tspan fill="#f4f0ea">NoteBrain</tspan><tspan fill="#8b5cf6">]]</tspan>
+        </text>
+
+        <g class="badge-float">
+            <ellipse cx="669" cy="206" rx="60" ry="34" fill="#f0a94e" class="badge-pulse" filter="url(#softAmber)" />
+            <rect x="619" y="182" width="100" height="48" rx="10" fill="rgba(240,169,78,0.14)" stroke="#f0a94e" stroke-width="1.5" />
+            <text class="cli-badge" x="669" y="214" text-anchor="middle">CLI</text>
+        </g>
+
+        <text class="prompt" x="0" y="278">
+            <tspan fill="#f0a94e" font-weight="700">$</tspan>
+            <tspan fill="#9089b3"> notebrain search </tspan>
+            <tspan fill="#f4f0ea">&#8220;system performance metrics&#8221;</tspan>
+            <tspan class="cursor">&#9612;</tspan>
+        </text>
+
+        <g>
+            <rect x="0" y="330" width="102" height="30" rx="15" fill="none" stroke="#382c58" stroke-width="1.3" />
+            <text class="tag-text" x="51" y="349.5" text-anchor="middle">100% LOCAL</text>
+
+            <rect x="116" y="330" width="102" height="30" rx="15" fill="none" stroke="#382c58" stroke-width="1.3" />
+            <text class="tag-text" x="167" y="349.5" text-anchor="middle">NO SERVERS</text>
+
+            <rect x="232" y="330" width="150" height="30" rx="15" fill="none" stroke="#382c58" stroke-width="1.3" />
+            <text class="tag-text" x="307" y="349.5" text-anchor="middle">AI-AGENT READY</text>
+        </g>
+    </g>
+</svg>
