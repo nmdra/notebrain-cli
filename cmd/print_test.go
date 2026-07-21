@@ -296,15 +296,6 @@ func TestPrintResultsFormatted_Formats(t *testing.T) {
 	if !strings.Contains(outTSV, "slug\ttitle\tfile_path") || !strings.Contains(outTSV, "json-note\tJSON Note") {
 		t.Errorf("Expected tsv header and row, got %q", outTSV)
 	}
-
-	// Test NDJSON format
-	buf.Reset()
-	globals.Format = "ndjson"
-	printResultsFormattedToWriter(&buf, "search", "query", "query", results, globals, nil)
-	outNDJSON := buf.String()
-	if !strings.Contains(outNDJSON, `"note_slug":"json-note"`) && !strings.Contains(outNDJSON, `"note_slug": "json-note"`) {
-		t.Errorf("Expected ndjson output containing note_slug, got %q", outNDJSON)
-	}
 }
 
 func TestPrintResultsFormatted_MinScore(t *testing.T) {
@@ -371,34 +362,31 @@ func TestPrintResultsFormatted_RawQuery(t *testing.T) {
 	}
 }
 
-func TestPrintResultsFormatted_Compact(t *testing.T) {
+func TestPrintResultsFormatted_ShowFilePath(t *testing.T) {
 	var buf bytes.Buffer
 	results := []store.Result{
 		{NoteSlug: "test-note", Title: "Test Note", FilePath: "notes/test.md", Score: 0.9},
 	}
-	globals := &Globals{Format: "json", Compact: true}
+	globals := &Globals{Format: "json", ShowFilePath: false}
 	printResultsFormattedToWriter(&buf, "search", "query", "query", results, globals, nil)
 	out := buf.String()
-	if strings.Contains(out, `"command":`) {
-		t.Errorf("Did not expect command field when Compact=true, got %q", out)
-	}
 	if strings.Contains(out, `"file_path":`) {
-		t.Errorf("Did not expect file_path field when Compact=true, got %q", out)
+		t.Errorf("Did not expect file_path field when ShowFilePath=false, got %q", out)
 	}
 	if !strings.Contains(out, `"note_slug": "test-note"`) {
-		t.Errorf("Expected note_slug field when Compact=true, got %q", out)
+		t.Errorf("Expected note_slug field when ShowFilePath=false, got %q", out)
+	}
+	if !strings.Contains(out, `"command": "search"`) {
+		t.Errorf("Expected command field, got %q", out)
 	}
 
-	// Verify Compact=false includes both
+	// Verify ShowFilePath=true includes it
 	buf.Reset()
-	globals.Compact = false
+	globals.ShowFilePath = true
 	printResultsFormattedToWriter(&buf, "search", "query", "query", results, globals, nil)
 	outFull := buf.String()
-	if !strings.Contains(outFull, `"command": "search"`) {
-		t.Errorf("Expected command field when Compact=false, got %q", outFull)
-	}
 	if !strings.Contains(outFull, `"file_path": "notes/test.md"`) {
-		t.Errorf("Expected file_path field when Compact=false, got %q", outFull)
+		t.Errorf("Expected file_path field when ShowFilePath=true, got %q", outFull)
 	}
 }
 

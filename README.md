@@ -152,7 +152,7 @@ Key settings ([full reference](./config.example.toml)):
 ```toml
 vault-path = "/path/to/Second-Brain"
 vault-name = "Second-Brain"
-format     = "text"              # "text", "json", "tsv", "ndjson"
+format     = "text"              # "text", "json", "tsv"
 
 skip-attachments = true          # ignore image/file links in graph
 skip-phantom     = true          # exclude uncreated "phantom" notes

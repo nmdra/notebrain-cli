@@ -63,8 +63,8 @@ These flags work identically on `search`, `backlinks`, `connections`, `hidden`, 
 
 | Flag              | Purpose                                                                                                                                           | Default |
 | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| `--format FORMAT` | Output format: `json` (structured envelope), `ndjson` (one JSON object per line), `tsv` (tab-separated, no key names), `text` (standard text).         | `text`  |
-| `--compact`       | Omit redundant envelope fields (`command`, `file_path`) from `json`/`ndjson` output. Reduces token footprint by ~40–50% — recommended for agents. | `false` |
+| `--format FORMAT` | Output format: `json` (structured envelope), `tsv` (tab-separated, no key names), `text` (standard text).         | `text`  |
+| `--show-file-path`| Show the `file_path` field in `json` output. By default this is omitted to reduce token footprint for agents.       | `false` |
 | `--jsonpath PATH` | Extract specific JSON elements using JSONPath (e.g., `"$.results[*].note_slug"`). Eliminates JSON envelope overhead entirely.                     | —       |
 | `--include-text`  | Include the matched markdown text chunk in results. Omit during initial structure-mapping to save tokens.                                         | off     |
 
@@ -91,5 +91,4 @@ These flags work identically on `search`, `backlinks`, `connections`, `hidden`, 
 | `--verbose`           | Show detailed output including all matched sections.                 | off                               |
 | `--no-hyperlinks`     | Disable clickable terminal hyperlinks in output.                     | off                               |
 
-> [!TIP]
-> **Persistent Compact Mode**: Add `compact = true` to `~/.notebrain/config/config.toml` to automatically apply `--compact` to all query commands. When active, JSON output omits `command` and `file_path`, rounds `score` to 4 decimal places, and strips `query` headers — retaining only `note_slug`, `title`, `score`, `text`, and `context`.
+> **JSON File Path Configuration**: The `file_path` field is highly redundant because it is typically just the `note_slug` with a `.md` extension. It is hidden in JSON outputs by default to save tokens. Add `show-file-path = true` to `~/.notebrain/config/config.toml` if you explicitly need it included on all queries.

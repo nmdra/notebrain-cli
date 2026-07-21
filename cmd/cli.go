@@ -27,14 +27,14 @@ type Globals struct {
 	VaultName       string           `name:"vault-name" help:"vault display name for Obsidian URI links (defaults to basename of --vault-path)"`
 	Verbose         bool             `help:"show detailed output including all matched sections"`
 	NoHyperlinks    bool             `help:"disable clickable terminal hyperlinks in output"`
-	Format          string           `help:"output format: text, json, tsv, or ndjson" enum:"text,json,tsv,ndjson" default:"text"`
+	Format          string           `help:"output format: text, json, or tsv" enum:"text,json,tsv" default:"text"`
 	JSONPath        string           `name:"jsonpath" help:"extract fields using JSONPath (e.g. '$.results[*].note_slug')"`
 	LogFormat       string           `name:"log-format" help:"log output format (auto, json, text)" default:"auto"`
 	LogLevel        string           `name:"log-level" help:"minimum log severity (info, debug, warn, error)" default:"info"`
 	SkipAttachments bool             `name:"skip-attachments" help:"exclude image/attachment links from graph edges" default:"true"`
 	SkipPhantom     bool             `name:"skip-phantom" help:"exclude phantom (uncreated) notes from results" default:"true"`
 	HideTags        bool             `name:"hide-tags" help:"hide tag names from output (use --hide-tags=false to show)" default:"true"`
-	Compact         bool             `name:"compact" help:"omit redundant fields (file_path, command) from JSON output for token-efficient LLM consumption" default:"false"`
+	ShowFilePath    bool             `name:"show-file-path" help:"show file_path in JSON output" default:"false"`
 	Version         kong.VersionFlag `name:"version" help:"show version information"`
 
 	// Internal fields, not exposed as flags

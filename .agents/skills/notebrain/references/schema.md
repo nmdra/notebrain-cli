@@ -6,9 +6,8 @@ This reference documents the structure of NoteBrain's output in each format. Rea
 
 | Format   | When to Use                                                                                             |
 | -------- | ------------------------------------------------------------------------------------------------------- |
-| `json`   | Default for agents. Structured envelope with `results` array. Pair with `--compact` to cut token bloat. |
+| `json`   | Default for agents. Structured envelope with `results` array. |
 | `tsv`    | Token-optimized for scan-only steps — no repeating key names. Good for backlinks, connections, tags.    |
-| `ndjson` | One JSON object per line (no envelope). Useful for streaming or line-by-line parsing.                   |
 | `text`   | Standard text output for human reading. Not recommended for agents — use structured formats instead.                |
 
 ## JSON Envelope Structure
@@ -24,7 +23,6 @@ When `--format=json` is used, the response has this top-level shape:
 }
 ```
 
-With `--compact`, the `command` and `query` envelope fields are stripped, leaving only `total` and `results`.
 
 ### Result Fields
 
@@ -34,7 +32,7 @@ Each item in the `results` array may contain:
 | ----------------- | ------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | `note_slug`       | Always                          | URL-safe unique identifier derived from the file path. Used as input for graph/get commands.              |
 | `title`           | Always                          | Note title extracted from frontmatter or filename.                                                        |
-| `file_path`       | Unless `--compact`              | Relative file path within the vault. Omitted when `--compact` is active.                                  |
+| `file_path`       | When `--show-file-path` is passed | Relative file path within the vault. Omitted by default to save tokens.                                   |
 | `score`           | Always                          | Similarity score (0–1) for semantic search; hop count for graph connections. Rounded to 4 decimal places. |
 | `chunk_index`     | search, hidden, boosted         | Which chunk of the note matched the query (0-indexed).                                                    |
 | `tags`            | When note has tags              | Array of tag strings (e.g., `["#Architecture", "#Go"]`).                                                  |
@@ -47,9 +45,9 @@ Each item in the `results` array may contain:
 
 ## Example Outputs
 
-### Semantic Search (compact, with text and context)
+### Semantic Search (with text and context)
 
-`notebrain search "event driven architecture" --format=json --compact --include-text --context-window 1`
+`notebrain search "event driven architecture" --format=json --include-text --context-window 1`
 
 ```json
 {
@@ -73,9 +71,9 @@ Each item in the `results` array may contain:
 }
 ```
 
-### Graph & Structure Mapping (compact)
+### Graph & Structure Mapping
 
-`notebrain connections "architecture/event-driven-systems" --hops 1 --format=json --compact`
+`notebrain connections "architecture/event-driven-systems" --hops 1 --format=json`
 
 ```json
 {
@@ -92,9 +90,9 @@ Each item in the `results` array may contain:
 }
 ```
 
-### Direct Tag Search (compact)
+### Direct Tag Search
 
-`notebrain tags "#Architecture" --children --format=json --compact`
+`notebrain tags "#Architecture" --children --format=json`
 
 ```json
 {
@@ -130,7 +128,7 @@ First line is the header row. Columns are tab-separated. Tags are comma-joined i
 
 ### Stats
 
-`notebrain stats --format=json --compact`
+`notebrain stats --format=json`
 
 ```json
 {

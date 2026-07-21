@@ -57,9 +57,6 @@ func printResultsFormattedToWriter(w io.Writer, commandName string, headerQuery 
 	}
 
 	cmdName := commandName
-	if globals.Compact {
-		cmdName = ""
-	}
 
 	if globals.JSONPath != "" {
 		env := jsonEnvelope{
@@ -78,8 +75,6 @@ func printResultsFormattedToWriter(w io.Writer, commandName string, headerQuery 
 	switch globals.Format {
 	case "json":
 		printJSONResults(w, cmdName, queryStr, filtered, globals)
-	case "ndjson":
-		printNDJSONResults(w, filtered)
 	case "tsv":
 		printTSVResults(w, filtered)
 	default: // "text"
@@ -106,7 +101,7 @@ func filterResults(results []store.Result, globals *Globals, displayFlags *Chunk
 		if globals.HideTags {
 			r.Tags = nil
 		}
-		if globals.Compact {
+		if !globals.ShowFilePath {
 			r.FilePath = ""
 		}
 		if !includeText {
@@ -129,13 +124,6 @@ func printJSONResults(w io.Writer, commandName, query string, filtered []store.R
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 	_ = enc.Encode(env)
-}
-
-func printNDJSONResults(w io.Writer, filtered []store.Result) {
-	enc := json.NewEncoder(w)
-	for _, r := range filtered {
-		_ = enc.Encode(r)
-	}
 }
 
 func printTSVResults(w io.Writer, filtered []store.Result) {

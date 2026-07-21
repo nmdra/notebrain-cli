@@ -19,7 +19,7 @@ NoteBrain is **read-only** — it searches, retrieves, and explores notes that h
 Before running your first query in a conversation, confirm NoteBrain is functional:
 
 ```bash
-notebrain stats --format=json --compact
+notebrain stats --format=json
 ```
 
 - If the binary is missing or errors, tell the user plainly: _"NoteBrain doesn't appear to be installed or accessible. I can't search your vault without it."_ Do not fall back to `grep`/`find` against raw markdown files — results would be incomplete and miss semantic matches.
@@ -38,11 +38,11 @@ notebrain stats --format=json --compact
    - Matching text snippets: `--jsonpath="$.results[*].text"`
    - Surrounding chunk context: `--jsonpath="$.results[*].context"`
    - When scanning tabular lists without text content, use `--format tsv` to drop repeating JSON key names.
-   - When outputting full JSON (i.e., not using `--jsonpath`), add `--compact` to strip redundant envelope fields (`command`, `file_path`) — this cuts token footprint by ~40–50%.
+   - When outputting full JSON (i.e., not using `--jsonpath`), the `file_path` field is omitted by default to cut token footprint by ~40–50%. Pass `--show-file-path` only if strictly needed.
 
 5. **Intelligent Query Splitting**: When researching compound questions or orthogonal topics (e.g., comparing two technologies), split the query into distinct terms to activate multi-hit boosting:
-   - **Positional arguments** (when exact terms are known): `notebrain search "redis pubsub" "kafka brokers" --limit 5 --format json --compact`
-   - **`--split` flag** (when splitting natural language by delimiters): `notebrain search "redis, kafka, rabbitmq" --split --limit 5 --format json --compact`
+   - **Positional arguments** (when exact terms are known): `notebrain search "redis pubsub" "kafka brokers" --limit 5 --format json`
+   - **`--split` flag** (when splitting natural language by delimiters): `notebrain search "redis, kafka, rabbitmq" --split --limit 5 --format json`
 
 6. **Avoid Blanket Chaining**: A single `search` with `--context-window 1 --include-text` answers most questions. Never blindly run `search → backlinks → connections → hidden` sequentially unless the user explicitly requests a comprehensive vault-wide audit of a topic. Pick the exact command tailored to the query.
 
@@ -55,7 +55,7 @@ To prevent excessive tool calls, token bloat, and redundant queries, follow a tw
 ### Step 1: Start Lean (Candidate & Slug Discovery)
 
 ```bash
-notebrain search "<query>" --format=json --compact --include-text
+notebrain search "<query>" --format=json --include-text
 ```
 
 Check the `score` of your top candidates. If the top match has high similarity (`score ≥ 0.75`) and the text fully answers the user's question, **stop here**. Do not execute unnecessary follow-up queries.
@@ -63,7 +63,7 @@ Check the `score` of your top candidates. If the top match has high similarity (
 If you've identified a candidate note but need surrounding paragraphs (±N chunks) to verify details:
 
 ```bash
-notebrain search "<query>" --format=json --compact --include-text --top-k 2 --context-window 1
+notebrain search "<query>" --format=json --include-text --top-k 2 --context-window 1
 ```
 
 | Flag                 | Purpose                                                                                                                       | Example |
@@ -80,17 +80,17 @@ Only when the task specifically requires exploring graph topology, backlinks, or
 
 | User Intent                                            | Command       | Syntax                                                                                           |
 | ------------------------------------------------------ | ------------- | ------------------------------------------------------------------------------------------------ |
-| "What do my notes say about X?"                        | `search`      | `notebrain search "topic" --context-window 1 --limit 3 --include-text --compact`                 |
+| "What do my notes say about X?"                        | `search`      | `notebrain search "topic" --context-window 1 --limit 3 --include-text`                 |
 | "Find the slug for a note about X" _(discovery step)_  | `search`      | `notebrain search "<query>" --jsonpath="$.results[*].note_slug"`                                 |
 | "Read full note Y" _(use sparingly; prefer context)_   | `get`         | `notebrain get "<slug-or-path>"`                                                                 |
-| "What links directly to this note?"                    | `backlinks`   | `notebrain backlinks "<slug>" --format json --compact`                                           |
+| "What links directly to this note?"                    | `backlinks`   | `notebrain backlinks "<slug>" --format json`                                           |
 | "What is structurally nearby in the graph?"            | `connections` | `notebrain connections "<slug>" --hops 2 --format tsv`                                           |
-| "What is related in meaning but NOT linked?"           | `hidden`      | `notebrain hidden "<slug>" --limit 5 --deep --format json --compact`                             |
-| "What is related in meaning (including linked notes)?" | `hidden`      | `notebrain hidden "<slug>" --include-linked --limit 5 --format json --compact`                   |
-| "Find concepts related to X centered around note Y"    | `boosted`     | `notebrain boosted --seed="<slug>" "query" --context-window 1 --limit 5 --format json --compact` |
-| "Find notes with tag X"                                | `tags`        | `notebrain tags "#Tag" --format json --compact`                                                  |
-| "Find notes with tag X and its child tags"            | `tags`        | `notebrain tags "#Tag" --children --format json --compact`                                      |
-| "What notes share tags with X?"                        | `tags`        | `notebrain tags "<slug>" --shared --min-shared 1 --format json --compact`                        |
+| "What is related in meaning but NOT linked?"           | `hidden`      | `notebrain hidden "<slug>" --limit 5 --deep --format json`                             |
+| "What is related in meaning (including linked notes)?" | `hidden`      | `notebrain hidden "<slug>" --include-linked --limit 5 --format json`                   |
+| "Find concepts related to X centered around note Y"    | `boosted`     | `notebrain boosted --seed="<slug>" "query" --context-window 1 --limit 5 --format json` |
+| "Find notes with tag X"                                | `tags`        | `notebrain tags "#Tag" --format json`                                                  |
+| "Find notes with tag X and its child tags"            | `tags`        | `notebrain tags "#Tag" --children --format json`                                      |
+| "What notes share tags with X?"                        | `tags`        | `notebrain tags "<slug>" --shared --min-shared 1 --format json`                        |
 
 > **Need detailed flag descriptions or output schemas?** Read [references/flags.md](references/flags.md) for full flag tables and [references/schema.md](references/schema.md) for JSON envelope fields and TSV formatting.
 
