@@ -26,9 +26,9 @@ These flags can be applied to `notebrain` before any subcommand (e.g., `notebrai
 | `--vault-name`       | `string`  | _(Basename of vault)_             | Obsidian vault name (used for generating `obsidian://` URI links).                                                                         |
 | `--verbose`          | `boolean` | `false`                           | Enable verbose debug logging output.                                                                                                       |
 | `--no-hyperlinks`    | `boolean` | `false`                           | Disable OSC 8 terminal hyperlinks in output. Can also be set via `$NO_HYPERLINKS`.                                                         |
-| `--format`           | `string`  | `text`                            | Output format: `text` (standard/TUI), `json` (pretty structured JSON), `tsv` (Tab-Separated Values), or `ndjson` (Newline Delimited JSON). |
+| `--format`           | `string`  | `text`                            | Output format: `text` (standard text), `json` (pretty structured JSON), or `tsv` (Tab-Separated Values). |
 | `--jsonpath`         | `string`  | _(None)_                          | JSONPath expression to extract and filter specific fields from JSON output (e.g., `$.results[0].note_slug`).                               |
-| `--include-text`     | `boolean` | `false`                           | Include matched chunk text inside structured outputs (JSON, TSV, NDJSON).                                                                  |
+| `--include-text`     | `boolean` | `false`                           | Include matched chunk text inside structured outputs (JSON, TSV).                                                                  |
 | `--context-window`   | `integer` | `0`                               | Fetch ±N adjacent chunks around each match for additional semantic context.                                                                |
 | `--min-score`        | `float`   | `0.0`                             | Suppress search results below this similarity score (0.0 to 1.0).                                                                          |
 | `--respect-exclude`  | `boolean` | `true`                            | Respect Obsidian user ignore filters and attachment folder exclusions during ingestion.                                                    |
@@ -36,32 +36,21 @@ These flags can be applied to `notebrain` before any subcommand (e.g., `notebrai
 | `--log-format`       | `string`  | `auto`                            | Log format: `auto` (detects TTY), `json`, or `text`.                                                                                       |
 | `--log-level`        | `string`  | `info`                            | Minimum log severity to show: `info`, `debug`, `warn`, or `error`.                                                                         |
 | `--hide-tags`        | `boolean` | `true`                            | Hide tag names (`#Tag/Subtag`) in search and graph outputs.                                                                                |
-| `--compact`          | `boolean` | `false`                           | Omit redundant properties (`file_path`, `command`) from JSON/NDJSON outputs for token-efficient LLM consumption (`compact=true` in `config.toml`). |
+| `--show-file-path`   | `boolean` | `false`                           | Show `file_path` in JSON outputs. Omitted by default to reduce token footprint for LLMs (`show-file-path=true` in `config.toml`). |
 
-### Token Efficiency & Quiet Mode for AI Agents (`--compact` & `--quiet`)
+### Token Efficiency & Quiet Mode for AI Agents
 
-When executing NoteBrain queries inside AI agent workflows, automated pipelines, or background scripts, controlling token footprint and suppressing interactive TUI formatting is essential:
+When executing NoteBrain queries inside AI agent workflows, automated pipelines, or background scripts, controlling token footprint and suppressing interactive formatting is essential:
 
 1. **Automatic Quiet Mode (`--quiet`)**:
-   Whenever a non-interactive machine format (`--format=json`, `tsv`, `ndjson`, or `--jsonpath`) is specified, NoteBrain automatically activates quiet mode (`embedder.WithQuiet`). This suppresses the embedder loading spinner and background log output, ensuring stdout is 100% clean and uncorrupted for JSON parsers and AI agents.
-2. **Compact JSON Envelopes (`--compact`)**:
-   Passing `--compact` (or setting `compact = true` in `~/.notebrain/config/config.toml`) strips redundant envelope properties (`command`) and result properties (`file_path`) from structured outputs (`json` / `ndjson`), reducing token consumption by ~40–50% when ingested by Large Language Models. In compact mode, similarity scores (`score`) are rounded cleanly to 4 decimal places (`0.8520`), and query headers (`query`) are stripped of terminal decorations.
+   Whenever a non-interactive machine format (`--format=json`, `tsv`, or `--jsonpath`) is specified, NoteBrain automatically activates quiet mode (`embedder.WithQuiet`). This suppresses background log output, ensuring stdout is 100% clean and uncorrupted for JSON parsers and AI agents.
+2. **Compact JSON Envelopes**:
+   By default, JSON output strips redundant properties (`file_path`), reducing token consumption by ~40–50% when ingested by Large Language Models. You can use `--show-file-path` to include it. Similarity scores (`score`) are rounded cleanly to 4 decimal places (`0.8520`), and query headers (`query`) are stripped of terminal decorations.
 3. **Non-Redundant Context Windows (`--context-window N`)**:
    When `--context-window N` (e.g., `--context-window 1` or `2`) is passed alongside `--include-text`, NoteBrain fetches $\pm N$ adjacent chunks into the `context` array while specifically excluding the matched chunk (`text`) itself from the array (`PopulateContext`), eliminating duplicated text across `text` and `context`.
 | `--version`          | `boolean` | `false`                           | Show version information.                                                                                                                  |
 
 ---
-
-## Interactive Terminal UI (TUI)
-
-For query-based commands (`search`, `backlinks`, `connections`, `hidden`, `boosted`, `tags`), NoteBrain launches an interactive terminal interface when output format is set to `text` and executed in a TTY:
-
-- **Up/Down / J/K:** Navigate through results.
-- **Slash (`/`):** Enter live-filter mode to filter results.
-- **Enter:** Open the selected note using the default method (Obsidian, or your editor if `--use-editor` is enabled).
-- **`o`:** Explicitly open the note in Obsidian.
-- **`e`:** Explicitly open the note in your terminal or GUI editor (defined by the `$EDITOR` environment variable).
-- **`q` / `Esc`:** Exit the TUI.
 
 ### Context-Aware Empty Result Guidance
 
@@ -72,7 +61,7 @@ When a search or graph command returns zero results in standard terminal `text` 
 - **`tags`**: Suggests checking note tags or lowering `--min-shared`.
 - **`search` / `boosted`**: Suggests broadening search terms, adjusting `--boost`, or running `notebrain ingest`.
 
-> *Note: To ensure compatibility with automated scripts and AI agents, contextual hints only appear in standard `text` output and are strictly omitted from machine formats (`json`, `ndjson`, `tsv`, `--jsonpath`).*
+> *Note: To ensure compatibility with automated scripts and AI agents, contextual hints only appear in standard `text` output and are strictly omitted from machine formats (`json`, `tsv`, `--jsonpath`).*
 
 ---
 
@@ -437,7 +426,7 @@ skip-attachments = true
 
 ## Machine-Readable Output & AI Chain Automation
 
-Using output formats like JSON or NDJSON and extracting fields via `--jsonpath` allows easy piping to shell tools and AI agents:
+Using output formats like JSON and extracting fields via `--jsonpath` allows easy piping to shell tools and AI agents:
 
 ```bash
 # Extract the slug of the top result

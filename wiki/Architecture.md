@@ -184,7 +184,7 @@ In standard vector databases, search queries return isolated, independent text c
 
 To optimize network and database throughput, semantic searches in NoteBrain default to returning metadata-only results (e.g., note title, slug, file path, and similarity scores).
 
-- **How it works**: Passing `--include-text` tells NoteBrain to pull the raw document content from ChromaDB's persistent store and populate the `text` field in the structured output (JSON, TSV, or NDJSON).
+- **How it works**: Passing `--include-text` tells NoteBrain to pull the raw document content from ChromaDB's persistent store and populate the `text` field in the structured output (JSON or TSV).
 - It enables one-step Retrieval-Augmented Generation (RAG). The agent can issue a single command (e.g., `notebrain search "kubernetes reconciliation" --format json --include-text`) and directly consume both the note references and the actual content text from the returned stream, avoiding the latency and complexity of issuing separate `get` commands or file-read operations.
 
 ### 3. `--top-k` (Chunk Diversity & Note De-duplication)
@@ -202,4 +202,4 @@ When AI agents research complex or orthogonal topics, running multiple separate 
 - **Multi-Hit Boosting**: Results are merged and sorted using a two-tier ranking strategy:
   1. **Primary Sort (Hit Count)**: Chunks matching **multiple** query topics (`len(MatchedQueries)` descending) are boosted to the top of the rankings over single-topic matches, even if a single-topic match has a higher raw similarity score. This automatically surfaces synthesizing concepts that bridge orthogonal domains.
   2. **Secondary Sort (Score)**: Within each hit-count tier, results are ordered by their maximum cosine similarity score descending.
-- **Hit Attribution**: In structured outputs (JSON/TSV/NDJSON), each item includes a `matched_queries` array attributing the exact query vectors that retrieved it. In text mode, hit tags (e.g., `[hits: "redis", "message broker"]`) are displayed.
+- **Hit Attribution**: In structured outputs (JSON/TSV), each item includes a `matched_queries` array attributing the exact query vectors that retrieved it. In text mode, hit tags (e.g., `[hits: "redis", "message broker"]`) are displayed.

@@ -46,7 +46,7 @@ Your job is to help users explore, summarize, and connect knowledge stored in th
    - Prefer:
      - `--context-window`
      - `--include-text`
-     - `--format json --compact`
+     - `--format json`
    - Use `--jsonpath` or `--format tsv` whenever only metadata or specific fields are needed.
 
 3. **Avoid loading full notes.**
@@ -74,8 +74,7 @@ notebrain search "<query>" \
   --limit 5 \
   --context-window 1 \
   --include-text \
-  --format json \
-  --compact
+  --format json
 ```
 
 **Check score before escalating.** If the top result's `score ≥ 0.75` and it fully answers the question, stop here — do not run further commands.
@@ -117,7 +116,7 @@ rather than switching to filesystem search.
 For unrelated or compound concepts, split into distinct terms using either:
 
 - **Positional arguments** (when exact terms are known):
-  `notebrain search "redis pubsub" "kafka brokers" --limit 5 --format json --compact --include-text`
+  `notebrain search "redis pubsub" "kafka brokers" --limit 5 --format json --include-text`
 
 Both activate multi-hit boosting, ranking bridging notes above single-topic matches. Keep single-topic searches intact.
 
@@ -168,8 +167,7 @@ notebrain search "machine learning" \
   --limit 5 \
   --context-window 1 \
   --include-text \
-  --format json \
-  --compact
+  --format json
 ```
 
 ### Find note Slug only

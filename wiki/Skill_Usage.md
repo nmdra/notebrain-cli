@@ -17,16 +17,16 @@ To prevent excessive token consumption and minimize latency, the `notebrain-assi
 1. **Lean Initial Search & Automatic Quiet Mode**:
    The agent always begins with a highly focused, non-interactive semantic query:
    ```bash
-   notebrain search "<query>" --context-window 1 --top-k 2 --include-text --format json --compact
+   notebrain search "<query>" --context-window 1 --top-k 2 --include-text --format json
    ```
-   Specifying `--format json --compact` (or `tsv`/`--jsonpath`) automatically activates **quiet mode** (`embedder.WithQuiet`), suppressing the embedder loading spinner and background log output so the agent receives 100% clean, uncorrupted machine JSON. Furthermore, `--compact` strips redundant properties (`command`, `file_path`) and `--context-window N` fetches $\pm N$ adjacent chunks while excluding the matched chunk (`text`) itself from `context`, reducing token consumption by ~40–50%.
+   Specifying `--format json` (or `tsv`/`--jsonpath`) automatically activates **quiet mode** (`embedder.WithQuiet`), suppressing the embedder loading spinner and background log output so the agent receives 100% clean, uncorrupted machine JSON. Furthermore, `--context-window N` fetches $\pm N$ adjacent chunks while excluding the matched chunk (`text`) itself from `context`, reducing token consumption.
 2. **Similarity Score Check**:
    If the top result returns a similarity score of `score >= 0.75` (rounded to 4 decimal places, e.g. `0.8520`) and provides sufficient context to answer your prompt, the agent **stops immediately** without making additional CLI calls.
 3. **Conditional Escalation**:
    The agent only executes multi-step graph commands when explicitly needed:
    - **Graph Traversal**: For questions about relationships or connections, it runs `notebrain connections "<slug>" --hops 2 --format tsv` (or `--jsonpath="$.results[*].note_slug"` without `--include-text`).
    - **Backlinks**: For questions about what references a concept, it runs `notebrain backlinks "<slug>" --format tsv`.
-   - **Hidden Connections**: For discovering unlinked semantic bridges across your vault, it runs `notebrain hidden "<slug>" --context-window 1 --include-text --format json --compact`.
+   - **Hidden Connections**: For discovering unlinked semantic bridges across your vault, it runs `notebrain hidden "<slug>" --context-window 1 --include-text --format json`.
 4. **Session Caching**:
    Within a single conversation session, the agent caches and reuses previous query results (`connections`, `backlinks`, `hidden`) rather than re-running identical CLI commands.
 
