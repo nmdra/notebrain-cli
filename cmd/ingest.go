@@ -31,11 +31,12 @@ import (
 )
 
 type IngestCmd struct {
-	Glob          string `arg:"" optional:"" help:"glob pattern to filter files (default: all .md files)"`
-	Workers       int    `help:"number of concurrent ingestion workers" default:"4"`
-	MinChunkWords int    `name:"min-chunk-words" help:"skip chunks with fewer words (0=default of 10)" default:"0"`
-	ChunkSize     int    `name:"chunk-size" help:"max runes per chunk (0=default of 800)" default:"0"`
-	ChunkOverlap  int    `name:"chunk-overlap" help:"overlap runes between sub-chunks (0=default of 100)" default:"0"`
+	Glob           string `arg:"" optional:"" help:"glob pattern to filter files (default: all .md files)"`
+	Workers        int    `help:"number of concurrent ingestion workers" default:"4"`
+	MinChunkWords  int    `name:"min-chunk-words" help:"skip chunks with fewer words (0=default of 10)" default:"0"`
+	ChunkSize      int    `name:"chunk-size" help:"max runes per chunk (0=default of 800)" default:"0"`
+	ChunkOverlap   int    `name:"chunk-overlap" help:"overlap runes between sub-chunks (0=default of 100)" default:"0"`
+	RespectExclude bool   `help:"respect Obsidian userIgnoreFilters and attachmentFolderPath settings during ingest" default:"true"`
 }
 
 func (c *IngestCmd) Run(globals *Globals) error {
@@ -67,7 +68,7 @@ func (c *IngestCmd) Run(globals *Globals) error {
 	slog.Info("starting ingestion pipeline", "workers", workers, "vault_path", vaultPath)
 	pipeline := ingest.NewPipeline(st, emb, workers)
 
-	pipeline.RespectExclude = globals.RespectExclude
+	pipeline.RespectExclude = c.RespectExclude
 	pipeline.SkipAttachments = globals.SkipAttachments
 	// Allow flag/config overrides; 0 means "use the pipeline's built-in default".
 	if c.MinChunkWords > 0 {

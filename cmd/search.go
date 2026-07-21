@@ -33,6 +33,7 @@ import (
 )
 
 type SearchCmd struct {
+	ChunkDisplayFlags
 	Queries     []string `arg:"" optional:"" name:"query" help:"search query (multiple args for multi-hit boosting)"`
 	Split       bool     `help:"split query by delimiters for independent sub-searches with multi-hit boosting"`
 	SplitBy     string   `name:"split-by" help:"delimiter characters for --split" default:",|;"`
@@ -107,12 +108,12 @@ func (c *SearchCmd) runStatic(ctx context.Context, globals *Globals, st *store.S
 	whereFilter := c.buildWhereFilter(len(resolved) > 0)
 
 	if len(resolved) == 0 {
-		results, err := st.TagSearch(ctx, c.Tag, c.Limit, false, whereFilter, globals.IncludeText)
+		results, err := st.TagSearch(ctx, c.Tag, c.Limit, false, whereFilter, c.IncludeText)
 		if err != nil {
 			return err
 		}
-		st.PopulateContext(ctx, results, globals.ContextWindow)
-		printResultsFormatted("search", fmt.Sprintf("Tag Search: %q", c.Tag), c.Tag, results, globals)
+		st.PopulateContext(ctx, results, c.ContextWindow)
+		printResultsFormatted("search", fmt.Sprintf("Tag Search: %q", c.Tag), c.Tag, results, globals, &c.ChunkDisplayFlags)
 		return nil
 	}
 
@@ -121,18 +122,17 @@ func (c *SearchCmd) runStatic(ctx context.Context, globals *Globals, st *store.S
 		if err != nil {
 			return err
 		}
-		results, err := st.MultiSemanticSearch(ctx, qVecs, resolved, c.Limit, c.TopKPerNote, whereFilter, globals.IncludeText)
+		results, err := st.MultiSemanticSearch(ctx, qVecs, resolved, c.Limit, c.TopKPerNote, whereFilter, c.IncludeText)
 		if err != nil {
 			return err
 		}
-		st.PopulateContext(ctx, results, globals.ContextWindow)
+		st.PopulateContext(ctx, results, c.ContextWindow)
 
-		var quoted []string
-		for _, q := range resolved {
-			quoted = append(quoted, fmt.Sprintf("%q", q))
+		header := fmt.Sprintf("Multi-Hit Semantic Search: %q", strings.Join(resolved, ", "))
+		if c.Tag != "" {
+			header += fmt.Sprintf(" (Tag: %s)", c.Tag)
 		}
-		header := fmt.Sprintf("Semantic Search (%d split queries): %s", len(resolved), strings.Join(quoted, " | "))
-		printResultsFormatted("search", header, strings.Join(resolved, " | "), results, globals)
+		printResultsFormatted("search", header, strings.Join(resolved, " | "), results, globals, &c.ChunkDisplayFlags)
 		return nil
 	}
 
@@ -140,14 +140,13 @@ func (c *SearchCmd) runStatic(ctx context.Context, globals *Globals, st *store.S
 	if err != nil {
 		return err
 	}
-
-	results, err := st.SemanticSearch(ctx, qVec, c.Limit, c.TopKPerNote, whereFilter, globals.IncludeText)
+	results, err := st.SemanticSearch(ctx, qVec, c.Limit, c.TopKPerNote, whereFilter, c.IncludeText)
 	if err != nil {
 		return err
 	}
-	st.PopulateContext(ctx, results, globals.ContextWindow)
+	st.PopulateContext(ctx, results, c.ContextWindow)
 
-	printResultsFormatted("search", fmt.Sprintf("Semantic Search: %q", resolved[0]), resolved[0], results, globals)
+	printResultsFormatted("search", fmt.Sprintf("Semantic Search: %q", resolved[0]), resolved[0], results, globals, &c.ChunkDisplayFlags)
 	return nil
 }
 

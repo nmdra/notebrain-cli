@@ -13,6 +13,13 @@ import (
 	"github.com/nmdra/notebrain-cli/v2/internal/configfile"
 )
 
+// ChunkDisplayFlags holds options for semantic search commands that return text chunks.
+type ChunkDisplayFlags struct {
+	IncludeText   bool    `help:"include the matched markdown text in each result"`
+	ContextWindow int     `name:"context-window" help:"fetch ±N surrounding chunks around each match (0=off)" default:"0"`
+	MinScore      float64 `help:"minimum similarity score to include in results (0.0–1.0)" default:"0"`
+}
+
 // Globals holds shared configuration available to all subcommands.
 type Globals struct {
 	ChromaPath      string           `help:"path to ChromaDB persistent storage directory" default:"~/.notebrain/chroma"`
@@ -22,10 +29,6 @@ type Globals struct {
 	NoHyperlinks    bool             `help:"disable clickable terminal hyperlinks in output"`
 	Format          string           `help:"output format: text, json, tsv, or ndjson" enum:"text,json,tsv,ndjson" default:"text"`
 	JSONPath        string           `name:"jsonpath" help:"extract fields using JSONPath (e.g. '$.results[*].note_slug')"`
-	IncludeText     bool             `help:"include the matched markdown text in each result"`
-	ContextWindow   int              `name:"context-window" help:"fetch ±N surrounding chunks around each match (0=off)" default:"0"`
-	MinScore        float64          `help:"minimum similarity score to include in results (0.0–1.0)" default:"0"`
-	RespectExclude  bool             `help:"respect Obsidian userIgnoreFilters and attachmentFolderPath settings during ingest" default:"true"`
 	LogFormat       string           `name:"log-format" help:"log output format (auto, json, text)" default:"auto"`
 	LogLevel        string           `name:"log-level" help:"minimum log severity (info, debug, warn, error)" default:"info"`
 	SkipAttachments bool             `name:"skip-attachments" help:"exclude image/attachment links from graph edges" default:"true"`

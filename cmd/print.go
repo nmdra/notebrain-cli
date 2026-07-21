@@ -41,13 +41,13 @@ type jsonEnvelope struct {
 }
 
 // printResultsFormatted renders a list of results to stdout based on the requested format.
-func printResultsFormatted(commandName string, headerQuery string, rawQuery string, results []store.Result, globals *Globals) {
-	printResultsFormattedToWriter(os.Stdout, commandName, headerQuery, rawQuery, results, globals)
+func printResultsFormatted(commandName string, headerQuery string, rawQuery string, results []store.Result, globals *Globals, displayFlags *ChunkDisplayFlags) {
+	printResultsFormattedToWriter(os.Stdout, commandName, headerQuery, rawQuery, results, globals, displayFlags)
 }
 
-func printResultsFormattedToWriter(w io.Writer, commandName string, headerQuery string, rawQuery string, results []store.Result, globals *Globals) {
+func printResultsFormattedToWriter(w io.Writer, commandName string, headerQuery string, rawQuery string, results []store.Result, globals *Globals, displayFlags *ChunkDisplayFlags) {
 	initStyles()
-	filtered := filterResults(results, globals)
+	filtered := filterResults(results, globals, displayFlags)
 
 	queryStr := headerQuery
 	if globals.Format != "text" || globals.JSONPath != "" {
@@ -87,10 +87,17 @@ func printResultsFormattedToWriter(w io.Writer, commandName string, headerQuery 
 	}
 }
 
-func filterResults(results []store.Result, globals *Globals) []store.Result {
+func filterResults(results []store.Result, globals *Globals, displayFlags *ChunkDisplayFlags) []store.Result {
 	filtered := make([]store.Result, 0, len(results))
+	minScore := 0.0
+	includeText := false
+	if displayFlags != nil {
+		minScore = displayFlags.MinScore
+		includeText = displayFlags.IncludeText
+	}
+
 	for _, r := range results {
-		if r.Score < globals.MinScore {
+		if r.Score < minScore {
 			continue
 		}
 		if globals.SkipPhantom && r.IsPhantom {
@@ -102,7 +109,7 @@ func filterResults(results []store.Result, globals *Globals) []store.Result {
 		if globals.Compact {
 			r.FilePath = ""
 		}
-		if !globals.IncludeText {
+		if !includeText {
 			r.Text = ""
 		}
 		r.Score = math.Round(r.Score*10000) / 10000

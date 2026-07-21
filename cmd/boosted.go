@@ -28,6 +28,7 @@ import (
 )
 
 type BoostedCmd struct {
+	ChunkDisplayFlags
 	Query string  `arg:"" help:"search query text"`
 	Limit int     `help:"maximum number of results" default:"10"`
 	Seed  string  `help:"seed note (slug, title, or path) whose graph neighbors get score boost" required:"true"`
@@ -63,12 +64,12 @@ func (c *BoostedCmd) Run(globals *Globals) error {
 		return err
 	}
 
-	results, err := st.GraphBoostedSearch(ctx, qVec, seedSlug, boost, limit, globals.IncludeText)
+	results, err := st.GraphBoostedSearch(ctx, qVec, seedSlug, boost, limit, c.IncludeText)
 	if err != nil {
 		return err
 	}
-	st.PopulateContext(ctx, results, globals.ContextWindow)
+	st.PopulateContext(ctx, results, c.ContextWindow)
 
-	printResultsFormatted("boosted", fmt.Sprintf("Graph-Boosted Search Results for: %q (seed: %s, boost: %.2f)", query, seedSlug, boost), query, results, globals)
+	printResultsFormatted("boosted", fmt.Sprintf("Graph-Boosted Search Results for: %q (seed: %s, boost: %.2f)", query, seedSlug, boost), query, results, globals, &c.ChunkDisplayFlags)
 	return nil
 }

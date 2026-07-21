@@ -29,6 +29,7 @@ import (
 )
 
 type HiddenCmd struct {
+	ChunkDisplayFlags
 	Note          string `arg:"" help:"note slug, title, or file path (auto-resolved)"`
 	Limit         int    `help:"maximum number of hidden connections to return" default:"10"`
 	Deep          bool   `help:"analyze each chunk individually for granular section-level matches"`
@@ -55,11 +56,11 @@ func (c *HiddenCmd) Run(globals *Globals) error {
 	opts := []store.HiddenOption{store.WithIncludeLinked(c.IncludeLinked)}
 
 	if c.Deep {
-		results, seedChunks, err := st.HiddenConnectionsDeep(ctx, targetSlug, limit, c.TopK, globals.IncludeText, opts...)
+		results, seedChunks, err := st.HiddenConnectionsDeep(ctx, targetSlug, limit, c.TopK, c.IncludeText, opts...)
 		if err != nil {
 			return err
 		}
-		st.PopulateContext(ctx, results, globals.ContextWindow)
+		st.PopulateContext(ctx, results, c.ContextWindow)
 		globals.Queries = seedChunks
 		cmdName := "hidden --deep"
 		title := fmt.Sprintf("Deep chunk-by-chunk hidden connections for: %q (slug: %s) [%d target chunks analyzed]", targetNote, targetSlug, len(seedChunks))
@@ -67,7 +68,7 @@ func (c *HiddenCmd) Run(globals *Globals) error {
 			cmdName = "hidden --deep --include-linked"
 			title = fmt.Sprintf("Deep chunk-by-chunk related connections (including linked) for: %q (slug: %s) [%d target chunks analyzed]", targetNote, targetSlug, len(seedChunks))
 		}
-		printResultsFormatted(cmdName, title, targetSlug, results, globals)
+		printResultsFormatted(cmdName, title, targetSlug, results, globals, &c.ChunkDisplayFlags)
 		return nil
 	}
 
@@ -82,11 +83,11 @@ func (c *HiddenCmd) Run(globals *Globals) error {
 		return err
 	}
 
-	results, err := st.HiddenConnections(ctx, qVec, targetSlug, limit, globals.IncludeText, opts...)
+	results, err := st.HiddenConnections(ctx, qVec, targetSlug, limit, c.IncludeText, opts...)
 	if err != nil {
 		return err
 	}
-	st.PopulateContext(ctx, results, globals.ContextWindow)
+	st.PopulateContext(ctx, results, c.ContextWindow)
 
 	cmdName := "hidden"
 	title := fmt.Sprintf("Hidden connections for: %q (slug: %s)", targetNote, targetSlug)
@@ -94,6 +95,6 @@ func (c *HiddenCmd) Run(globals *Globals) error {
 		cmdName = "hidden --include-linked"
 		title = fmt.Sprintf("Related connections (including linked) for: %q (slug: %s)", targetNote, targetSlug)
 	}
-	printResultsFormatted(cmdName, title, targetSlug, results, globals)
+	printResultsFormatted(cmdName, title, targetSlug, results, globals, &c.ChunkDisplayFlags)
 	return nil
 }
