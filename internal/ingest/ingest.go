@@ -59,7 +59,7 @@ func NewPipeline(s *store.Store, e Embedder, workers int) *Pipeline {
 }
 
 // Run walks the vault directory, finds markdown files matching glob, and ingests
-// them into the store with a TUI progress bar rendered to stdout.
+// them into the store with structured logging for progress.
 func (p *Pipeline) Run(ctx context.Context, vaultPath string, glob string, stdin io.Reader, stdout io.Writer) error {
 	files, err := p.collectFiles(vaultPath, glob)
 	if err != nil {

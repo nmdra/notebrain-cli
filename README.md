@@ -30,13 +30,11 @@ Ships with an [AI agent skill](wiki/Skill_Usage.md) and [OpenCode Agent Configur
 - **Knowledge Graph Traversal** — Explore your Obsidian wikilink graph through backlinks, multi-hop connections, and shared tag relationships.
 - **Hidden Connections** — Discover semantically related notes that aren't explicitly linked, with optional deep section-level analysis.
 - **Graph-Boosted Ranking** — Improve search relevance by combining semantic similarity with graph relationships.
-- **Interactive Terminal UI** — Browse results with a fuzzy-search interface, plus intelligent guidance when searches return no matches.
 - **Advanced Filtering** — Refine results by sections, tags, code blocks, tasks, and other note metadata.
 - **Full Note Retrieval** — Reconstruct complete notes on demand from indexed content.
 - **Structured Output** — Export results as JSON or TSV, with built-in JSONPath querying for easy automation.
 - **AI Agent Integration** — Includes a built-in AI agent skill and dedicated for autonomous knowledge retrieval.
 - **Terminal Hyperlinks** — Open notes directly from supported terminals using OSC 8 hyperlinks.
-- **Editor Integration** — Open search results instantly in your preferred editor or directly in Obsidian.
 - **Obsidian-Aware Indexing** — Respects your Obsidian configuration, including ignored files, attachment folders, and optional exclusion of empty-note references.
 
 > _Note: Currently, this tool focuses on Markdown text only and does not support PDF or image OCR._

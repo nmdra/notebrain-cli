@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/amikos-tech/chroma-go/pkg/embeddings/ort"
-	"github.com/nmdra/notebrain-cli/v2/internal/tui"
 )
 
 type LocalEmbedder struct {
@@ -41,13 +40,7 @@ func NewLocalEmbedder(opts ...Option) (*LocalEmbedder, error) {
 		ef, destroy, err = ort.NewDefaultEmbeddingFunction()
 	}()
 
-	if opt.quiet {
-		<-done
-	} else {
-		if pErr := tui.RunSpinner("Setting up MiniLM (first run downloads ~33 MB)...", done); pErr != nil {
-			return nil, fmt.Errorf("spinner error: %w", pErr)
-		}
-	}
+	<-done
 
 	if err != nil {
 		return nil, fmt.Errorf("init local embedder: %w", err)

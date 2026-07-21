@@ -18,7 +18,7 @@ These flags are available only on the commands listed.
 | `--tag "TagName"`    | Filter results to notes with this tag.                                                                                | —        |
 | `--has-tasks`        | Only return chunks containing task lists (checkboxes).                                                                | off      |
 | `--has-code`         | Only return chunks containing fenced code blocks.                                                                     | off      |
-| `--interactive`      | Launch the live interactive search TUI. Not useful for agents — avoid in automated workflows.                         | off      |
+
 
 ### `hidden`
 
@@ -63,7 +63,7 @@ These flags work identically on `search`, `backlinks`, `connections`, `hidden`, 
 
 | Flag              | Purpose                                                                                                                                           | Default |
 | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| `--format FORMAT` | Output format: `json` (structured envelope), `ndjson` (one JSON object per line), `tsv` (tab-separated, no key names), `text` (rich TUI).         | `text`  |
+| `--format FORMAT` | Output format: `json` (structured envelope), `ndjson` (one JSON object per line), `tsv` (tab-separated, no key names), `text` (standard text).         | `text`  |
 | `--compact`       | Omit redundant envelope fields (`command`, `file_path`) from `json`/`ndjson` output. Reduces token footprint by ~40–50% — recommended for agents. | `false` |
 | `--jsonpath PATH` | Extract specific JSON elements using JSONPath (e.g., `"$.results[*].note_slug"`). Eliminates JSON envelope overhead entirely.                     | —       |
 | `--include-text`  | Include the matched markdown text chunk in results. Omit during initial structure-mapping to save tokens.                                         | off     |
@@ -87,7 +87,7 @@ These flags work identically on `search`, `backlinks`, `connections`, `hidden`, 
 | `--vault-path PATH`   | Path to the Obsidian vault directory.                                | (from config)                     |
 | `--vault-name STRING` | Vault display name for Obsidian URI links.                           | basename of `--vault-path`        |
 | `--config PATH`       | Path to config file.                                                 | `~/.notebrain/config/config.toml` |
-| `--use-editor`        | Enable external editor (`$EDITOR`) integration as default open type. | `false`                           |
+
 | `--verbose`           | Show detailed output including all matched sections.                 | off                               |
 | `--no-hyperlinks`     | Disable clickable terminal hyperlinks in output.                     | off                               |
 

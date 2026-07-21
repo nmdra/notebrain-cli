@@ -27,10 +27,7 @@ import (
 	"os"
 	"strings"
 
-	tea "charm.land/bubbletea/v2"
 	chroma "github.com/amikos-tech/chroma-go/pkg/api/v2"
-	"github.com/charmbracelet/x/term"
-	"github.com/nmdra/notebrain-cli/v2/cmd/tui"
 	"github.com/nmdra/notebrain-cli/v2/internal/embedder"
 	"github.com/nmdra/notebrain-cli/v2/internal/store"
 )
@@ -45,7 +42,6 @@ type SearchCmd struct {
 	Tag         string   `help:"filter results to notes with this tag"`
 	HasTasks    bool     `help:"only return chunks containing task lists (checkboxes)"`
 	HasCode     bool     `help:"only return chunks containing fenced code blocks"`
-	Interactive bool     `help:"launch the live interactive search TUI"`
 }
 
 func resolveQueries(queries []string, split bool, splitBy string) []string {
@@ -84,10 +80,9 @@ func (c *SearchCmd) Run(globals *Globals) error {
 		fmt.Fprintf(os.Stderr, "warning: --top-k >= 4 may exceed upstream ChromaDB embedded 1 MiB FFI limit on large notes\n")
 	}
 	resolved := resolveQueries(c.Queries, c.Split, c.SplitBy)
-	if !c.Interactive && len(resolved) == 0 && c.Tag == "" {
-		return fmt.Errorf("query or --tag is required (or use --interactive for live search)")
+	if len(resolved) == 0 && c.Tag == "" {
+		return fmt.Errorf("query or --tag is required")
 	}
-	queryStr := strings.Join(resolved, " | ")
 	if len(resolved) > 1 {
 		globals.Queries = resolved
 	}
@@ -105,55 +100,7 @@ func (c *SearchCmd) Run(globals *Globals) error {
 	}
 	defer func() { _ = emb.Close() }()
 
-	if c.Interactive {
-		return c.runInteractive(ctx, globals, st, emb, resolved, queryStr)
-	}
 	return c.runStatic(ctx, globals, st, emb, resolved)
-}
-
-func (c *SearchCmd) runInteractive(ctx context.Context, globals *Globals, st *store.Store, emb *embedder.LocalEmbedder, resolved []string, queryStr string) error {
-	if !term.IsTerminal(os.Stdout.Fd()) || os.Getenv("TERM") == "dumb" {
-		return fmt.Errorf("interactive mode requires a TTY terminal; use --format json or remove --interactive")
-	}
-	whereFilter := c.buildWhereFilter(true)
-	limit := c.Limit
-	topK := c.TopKPerNote
-
-	searchFn := func(ctx context.Context, query string) ([]store.Result, error) {
-		var results []store.Result
-		var err error
-		tui.SuppressOutputs(func() {
-			resQueries := resolveQueries([]string{query}, c.Split, c.SplitBy)
-			if len(resQueries) > 1 {
-				var qVecs [][]float32
-				qVecs, err = emb.EmbedBatch(ctx, resQueries)
-				if err == nil {
-					results, err = st.MultiSemanticSearch(ctx, qVecs, resQueries, limit, topK, whereFilter, false)
-				}
-			} else {
-				var qVec []float32
-				qVec, err = emb.Embed(ctx, query)
-				if err == nil {
-					results, err = st.SemanticSearch(ctx, qVec, limit, topK, whereFilter, false)
-				}
-			}
-			if err == nil {
-				st.PopulateContext(ctx, results, globals.ContextWindow)
-			}
-		})
-		if err != nil {
-			return nil, err
-		}
-		return results, nil
-	}
-
-	model := tui.NewLiveSearch(searchFn, globals.VaultPath, limit, queryStr, globals.UseEditor)
-	p := tea.NewProgram(model)
-	var runErr error
-	tui.SuppressStderr(func() {
-		_, runErr = p.Run()
-	})
-	return runErr
 }
 
 func (c *SearchCmd) runStatic(ctx context.Context, globals *Globals, st *store.Store, emb *embedder.LocalEmbedder, resolved []string) error {

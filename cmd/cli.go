@@ -20,13 +20,12 @@ type Globals struct {
 	VaultName       string           `name:"vault-name" help:"vault display name for Obsidian URI links (defaults to basename of --vault-path)"`
 	Verbose         bool             `help:"show detailed output including all matched sections"`
 	NoHyperlinks    bool             `help:"disable clickable terminal hyperlinks in output"`
-	Format          string           `help:"output format: text (rich TUI), json, tsv, or ndjson" enum:"text,json,tsv,ndjson" default:"text"`
+	Format          string           `help:"output format: text, json, tsv, or ndjson" enum:"text,json,tsv,ndjson" default:"text"`
 	JSONPath        string           `name:"jsonpath" help:"extract fields using JSONPath (e.g. '$.results[*].note_slug')"`
 	IncludeText     bool             `help:"include the matched markdown text in each result"`
 	ContextWindow   int              `name:"context-window" help:"fetch ±N surrounding chunks around each match (0=off)" default:"0"`
 	MinScore        float64          `help:"minimum similarity score to include in results (0.0–1.0)" default:"0"`
 	RespectExclude  bool             `help:"respect Obsidian userIgnoreFilters and attachmentFolderPath settings during ingest" default:"true"`
-	UseEditor       bool             `help:"enable external editor ($EDITOR) integration as default open type" default:"false"`
 	LogFormat       string           `name:"log-format" help:"log output format (auto, json, text)" default:"auto"`
 	LogLevel        string           `name:"log-level" help:"minimum log severity (info, debug, warn, error)" default:"info"`
 	SkipAttachments bool             `name:"skip-attachments" help:"exclude image/attachment links from graph edges" default:"true"`

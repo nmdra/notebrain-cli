@@ -9,7 +9,7 @@ This reference documents the structure of NoteBrain's output in each format. Rea
 | `json`   | Default for agents. Structured envelope with `results` array. Pair with `--compact` to cut token bloat. |
 | `tsv`    | Token-optimized for scan-only steps — no repeating key names. Good for backlinks, connections, tags.    |
 | `ndjson` | One JSON object per line (no envelope). Useful for streaming or line-by-line parsing.                   |
-| `text`   | Rich TUI output for human reading. Not useful for agents — avoid in automated workflows.                |
+| `text`   | Standard text output for human reading. Not recommended for agents — use structured formats instead.                |
 
 ## JSON Envelope Structure
 
