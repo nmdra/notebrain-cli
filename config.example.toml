@@ -28,11 +28,11 @@ verbose = false
 no-hyperlinks = false
 
 # Default CLI output formatting option.
-# Options: "text" (human-readable), "json" (structured API), "tsv" (tabular), "ndjson" (newline-delimited JSON)
+# Options: "text" (human-readable), "json" (structured API), "tsv" (tabular)
 # Defaults to "text"
 format = "text"
 
-# Include full matched note chunk text in structured JSON, TSV, or NDJSON outputs.
+# Include full matched note chunk text in structured JSON or TSV outputs.
 # Defaults to false
 include-text = false
 
@@ -46,10 +46,10 @@ min-score = 0.0
 # Defaults to true
 respect-exclude = true
 
-# Use your preferred terminal/GUI editor ($EDITOR environment variable) as the default opener.
-# If true, pressing Enter in the interactive search UI opens notes in the editor instead of Obsidian.
+# Show the file_path field in JSON output.
+# If false, the file_path is omitted to reduce token footprint for LLMs.
 # Defaults to false
-use-editor = false
+show-file-path = false
 
 # ------------------------------------------------------------------------------
 # Ingestion Pipeline Settings
