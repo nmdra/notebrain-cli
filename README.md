@@ -130,9 +130,9 @@ notebrain get "$SLUG" --jsonpath="$.text"
 Use the built-in [AI agent skill](wiki/Skill_Usage.md) and [OpenCode Agent Configuration](wiki/OpenCode_Integration.md) for knowledge retrieval.
 
 > [!tip]
-> I highly recommend using the [Pi Agent](wiki/Pi_Agent.md) with the provided skill. It delivers higher-quality results, even with low cost models such as [DeepSeek Flash](https://www.deepseek.com/), without consuming unnecessary tokens. It also improves cache hit rates, helping reduce overall costs.
+> I highly recommend using the [Pi Agent](wiki/Pi_Agent.md) with the provided skill. It delivers higher-quality results, even with low cost models such as [DeepSeek V4 Flash](https://www.deepseek.com/) / [tencent hy3](https://hy.tencent.com/) / [Gemini Flash 3.6](https://ai.google.dev/gemini-api/docs/flash), without consuming unnecessary tokens. It also improves cache hit rates, helping reduce overall costs.
 >
-> For LLM models, use the default or **medium** thinking mode for fast responses.
+> For LLM models, use the **medium / low** thinking mode for fast responses.
 
 [![asciicast](https://asciinema.org/a/1261133.svg)](https://asciinema.org/a/1261133)
 
