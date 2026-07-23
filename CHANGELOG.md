@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.7.0] - 2026-07-23
+
+### Added
+- **Direct Tag Search**: Inverted the `tags` command so direct tag search is now the default behavior, returning all notes containing a specified tag. Shared tag discovery is available via `--shared` (`feat(cmd)`).
+- **Absolute File Path Output (`--show-file-path`)**: Added `--show-file-path` CLI flag and `show-file-path` TOML option to optionally include absolute file paths in outputs (`feat(cli)`).
+- **Tag Lowercasing Standardization**: Extracted tags from frontmatter and inline elements are standardized to lowercase to guarantee consistent case-insensitive database matching (`feat(parser)`).
+
+### Fixed
+- **ChromaDB FFI Buffer Overflow Prevention**: Implemented chunked/paginated querying (`ffiSafePageSize = 200`, `ffiSafeSemanticLimit = 100`, `paginatedGetMetadatas`) across all ChromaDB FFI operations (`TagSearch`, `semanticSearch`, `Backlinks`, `HiddenConnectionsDeep`, `GetNote`, `PopulateContext`, graph traversal, and ingestion cleanup), preventing 1 MiB FFI buffer overflow crashes on large vaults (`fix(store)`).
+- **Core Implementation Fixes**: Resolved edge-case issues in `MinChunkWords` configuration parsing, database `Stats` chunk/link pagination, and unused configuration settings (`fix`).
+
+### Changed
+- **Streamlined CLI Output & TUI Deprecation**: Removed interactive TUI dependencies (`bubbletea`, `bubbles`, `lipgloss`) and simplified JSON output flags by removing redundant `--compact` and `--ndjson` options to keep CLI focus on fast, clean machine output (`refactor(cli)`).
+- **AI Models and Thinking Modes Documentation**: Updated README and Wiki with recommended AI models (DeepSeek V4 Flash, Tencent hy3, Gemini Flash 3.6) and adjusted thinking mode configurations (`docs`).
+- **Animated SVG Banner**: Redesigned README hero section with an animated SVG banner featuring pulsing graph nodes (`docs`).
+
 ## [v2.6.0] - 2026-07-20
 
 ### Added
