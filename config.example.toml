@@ -46,10 +46,11 @@ min-score = 0.0
 # Defaults to true
 respect-exclude = true
 
-# Show the file_path field in JSON output.
-# If false, the file_path is omitted to reduce token footprint for LLMs.
-# Defaults to false
-show-file-path = false
+# Include the file_path field in outputs.
+# If false, file paths are omitted to conserve token footprint for LLMs,
+# and clickable terminal hyperlinks will NOT be shown in text mode.
+# Defaults to true
+show-file-path = true
 
 # ------------------------------------------------------------------------------
 # Ingestion Pipeline Settings

@@ -417,3 +417,26 @@ func TestFilterResults_IncludeText(t *testing.T) {
 		t.Errorf("Expected Text to be preserved when IncludeText=true, got %q", filteredTrue[0].Text)
 	}
 }
+
+func TestPrintResultsFormatted_HyperlinkFooter(t *testing.T) {
+	var buf bytes.Buffer
+	results := []store.Result{
+		{NoteSlug: "test-note", Title: "Test Note", FilePath: "notes/test.md", Score: 0.9},
+	}
+	t.Setenv("COLORTERM", "truecolor")
+
+	// When ShowFilePath = false, hyperlink footer should NOT be present
+	globalsFalse := &Globals{Format: "text", ShowFilePath: false}
+	printResultsFormattedToWriter(&buf, "search", "query", "query", results, globalsFalse, nil)
+	if strings.Contains(buf.String(), "(Ctrl+click / Cmd+click a title to open in Obsidian)") {
+		t.Errorf("Did not expect hyperlink click footer when ShowFilePath=false, got %q", buf.String())
+	}
+
+	// When ShowFilePath = true, hyperlink footer SHOULD be present
+	buf.Reset()
+	globalsTrue := &Globals{Format: "text", ShowFilePath: true}
+	printResultsFormattedToWriter(&buf, "search", "query", "query", results, globalsTrue, nil)
+	if !strings.Contains(buf.String(), "(Ctrl+click / Cmd+click a title to open in Obsidian)") {
+		t.Errorf("Expected hyperlink click footer when ShowFilePath=true, got %q", buf.String())
+	}
+}

@@ -185,7 +185,7 @@ func printTextResults(w io.Writer, commandName, query string, filtered []store.R
 		return
 	}
 
-	useLinks := hyperlinkSupported(globals)
+	useLinks := hyperlinkSupported(globals) && globals.ShowFilePath
 	termWidth := getTerminalWidth()
 
 	noteCounts := make(map[string]int, len(filtered))

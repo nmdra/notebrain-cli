@@ -34,7 +34,7 @@ type Globals struct {
 	SkipAttachments bool             `name:"skip-attachments" help:"exclude image/attachment links from graph edges" default:"true"`
 	SkipPhantom     bool             `name:"skip-phantom" help:"exclude phantom (uncreated) notes from results" default:"true"`
 	HideTags        bool             `name:"hide-tags" help:"hide tag names from output (use --hide-tags=false to show)" default:"true"`
-	ShowFilePath    bool             `name:"show-file-path" help:"show file_path in JSON output" default:"false"`
+	ShowFilePath    bool             `name:"show-file-path" help:"include file_path in output (use --show-file-path=false to hide)" default:"true"`
 	Version         kong.VersionFlag `name:"version" help:"show version information"`
 
 	// Internal fields, not exposed as flags
