@@ -78,18 +78,18 @@ Only when the task specifically requires exploring graph topology, backlinks, or
 
 ## Command Reference
 
-| User Intent                                            | Command       | Syntax                                                                                           |
-| ------------------------------------------------------ | ------------- | ------------------------------------------------------------------------------------------------ |
+| User Intent                                            | Command       | Syntax                                                                                 |
+| ------------------------------------------------------ | ------------- | -------------------------------------------------------------------------------------- |
 | "What do my notes say about X?"                        | `search`      | `notebrain search "topic" --context-window 1 --limit 3 --include-text`                 |
-| "Find the slug for a note about X" _(discovery step)_  | `search`      | `notebrain search "<query>" --jsonpath="$.results[*].note_slug"`                                 |
-| "Read full note Y" _(use sparingly; prefer context)_   | `get`         | `notebrain get "<slug-or-path>"`                                                                 |
+| "Find the slug for a note about X" _(discovery step)_  | `search`      | `notebrain search "<query>" --jsonpath="$.results[*].note_slug"`                       |
+| "Read full note Y" _(use sparingly; prefer context)_   | `get`         | `notebrain get "<slug-or-path>"`                                                       |
 | "What links directly to this note?"                    | `backlinks`   | `notebrain backlinks "<slug>" --format json`                                           |
-| "What is structurally nearby in the graph?"            | `connections` | `notebrain connections "<slug>" --hops 2 --format tsv`                                           |
+| "What is structurally nearby in the graph?"            | `connections` | `notebrain connections "<slug>" --hops 2 --format tsv`                                 |
 | "What is related in meaning but NOT linked?"           | `hidden`      | `notebrain hidden "<slug>" --limit 5 --deep --format json`                             |
 | "What is related in meaning (including linked notes)?" | `hidden`      | `notebrain hidden "<slug>" --include-linked --limit 5 --format json`                   |
 | "Find concepts related to X centered around note Y"    | `boosted`     | `notebrain boosted --seed="<slug>" "query" --context-window 1 --limit 5 --format json` |
 | "Find notes with tag X"                                | `tags`        | `notebrain tags "#Tag" --format json`                                                  |
-| "Find notes with tag X and its child tags"            | `tags`        | `notebrain tags "#Tag" --children --format json`                                      |
+| "Find notes with tag X and its child tags"             | `tags`        | `notebrain tags "#Tag" --children --format json`                                       |
 | "What notes share tags with X?"                        | `tags`        | `notebrain tags "<slug>" --shared --min-shared 1 --format json`                        |
 
 > **Need detailed flag descriptions or output schemas?** Read [references/flags.md](references/flags.md) for full flag tables and [references/schema.md](references/schema.md) for JSON envelope fields and TSV formatting.

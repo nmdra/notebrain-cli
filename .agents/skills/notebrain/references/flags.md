@@ -19,7 +19,6 @@ These flags are available only on the commands listed.
 | `--has-tasks`        | Only return chunks containing task lists (checkboxes).                                                                | off      |
 | `--has-code`         | Only return chunks containing fenced code blocks.                                                                     | off      |
 
-
 ### `hidden`
 
 | Flag               | Purpose                                                                                                             | Default |
@@ -37,11 +36,11 @@ These flags are available only on the commands listed.
 
 ### `tags`
 
-| Flag             | Purpose                                                                                                     | Default |
-| ---------------- | ----------------------------------------------------------------------------------------------------------- | ------- |
-| `--shared`       | Treat the query as a note slug/title to find notes sharing its tags.                                         | `false` |
-| `--children`     | Include child tags in hierarchical structure (e.g. searching 'kubernetes' also matches 'kubernetes/cka').  | `false` |
-| `--min-shared N` | Minimum number of shared tags required to include a result (only applies when --shared is active).           | `1`     |
+| Flag             | Purpose                                                                                                   | Default |
+| ---------------- | --------------------------------------------------------------------------------------------------------- | ------- |
+| `--shared`       | Treat the query as a note slug/title to find notes sharing its tags.                                      | `false` |
+| `--children`     | Include child tags in hierarchical structure (e.g. searching 'kubernetes' also matches 'kubernetes/cka'). | `false` |
+| `--min-shared N` | Minimum number of shared tags required to include a result (only applies when --shared is active).        | `1`     |
 
 ### `boosted`
 
@@ -61,12 +60,12 @@ These flags work identically on `search`, `backlinks`, `connections`, `hidden`, 
 
 ### Output Format & Extraction
 
-| Flag              | Purpose                                                                                                                                           | Default |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| `--format FORMAT` | Output format: `json` (structured envelope), `tsv` (tab-separated, no key names), `text` (standard text).         | `text`  |
-| `--show-file-path`| Show the `file_path` field in `json` output. By default this is omitted to reduce token footprint for agents.       | `false` |
-| `--jsonpath PATH` | Extract specific JSON elements using JSONPath (e.g., `"$.results[*].note_slug"`). Eliminates JSON envelope overhead entirely.                     | —       |
-| `--include-text`  | Include the matched markdown text chunk in results. Omit during initial structure-mapping to save tokens.                                         | off     |
+| Flag               | Purpose                                                                                                                       | Default |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------- | ------- |
+| `--format FORMAT`  | Output format: `json` (structured envelope), `tsv` (tab-separated, no key names), `text` (standard text).                     | `text`  |
+| `--show-file-path` | Include the `file_path` field in output (use `--show-file-path=false` to hide).                                               | `true`  |
+| `--jsonpath PATH`  | Extract specific JSON elements using JSONPath (e.g., `"$.results[*].note_slug"`). Eliminates JSON envelope overhead entirely. | —       |
+| `--include-text`   | Include the matched markdown text chunk in results. Omit during initial structure-mapping to save tokens.                     | off     |
 
 ### Search & Filtering
 
@@ -81,14 +80,11 @@ These flags work identically on `search`, `backlinks`, `connections`, `hidden`, 
 
 ### Environment & Config
 
-| Flag                  | Purpose                                                              | Default                           |
-| --------------------- | -------------------------------------------------------------------- | --------------------------------- |
-| `--chroma-path PATH`  | Path to ChromaDB persistent storage directory.                       | `~/.notebrain/chroma`             |
-| `--vault-path PATH`   | Path to the Obsidian vault directory.                                | (from config)                     |
-| `--vault-name STRING` | Vault display name for Obsidian URI links.                           | basename of `--vault-path`        |
-| `--config PATH`       | Path to config file.                                                 | `~/.notebrain/config/config.toml` |
-
-| `--verbose`           | Show detailed output including all matched sections.                 | off                               |
-| `--no-hyperlinks`     | Disable clickable terminal hyperlinks in output.                     | off                               |
-
-> **JSON File Path Configuration**: The `file_path` field is highly redundant because it is typically just the `note_slug` with a `.md` extension. It is hidden in JSON outputs by default to save tokens. Add `show-file-path = true` to `~/.notebrain/config/config.toml` if you explicitly need it included on all queries.
+| Flag                  | Purpose                                              | Default                           |
+| --------------------- | ---------------------------------------------------- | --------------------------------- |
+| `--chroma-path PATH`  | Path to ChromaDB persistent storage directory.       | `~/.notebrain/chroma`             |
+| `--vault-path PATH`   | Path to the Obsidian vault directory.                | (from config)                     |
+| `--vault-name STRING` | Vault display name for Obsidian URI links.           | basename of `--vault-path`        |
+| `--config PATH`       | Path to config file.                                 | `~/.notebrain/config/config.toml` |
+| `--verbose`           | Show detailed output including all matched sections. | off                               |
+| `--no-hyperlinks`     | Disable clickable terminal hyperlinks in output.     | off                               |

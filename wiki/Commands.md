@@ -18,24 +18,24 @@ automation workflows.
 
 These flags can be applied to `notebrain` before any subcommand (e.g., `notebrain --verbose search "query"`) or defined in your configuration file.
 
-| Flag                 | Type      | Default                           | Description                                                                                                                                |
-| :------------------- | :-------- | :-------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------- |
-| `--config`           | `string`  | `~/.notebrain/config/config.toml` | Path to the TOML config file.                                                                                                              |
-| `--chroma-path`      | `string`  | `~/.notebrain/chroma`             | Path to ChromaDB persistent storage. Can also be set via the `$CHROMA_PATH` environment variable.                                          |
-| `--vault-path`       | `string`  | _(None)_                          | **Required.** Absolute path to your Obsidian vault.                                                                                        |
-| `--vault-name`       | `string`  | _(Basename of vault)_             | Obsidian vault name (used for generating `obsidian://` URI links).                                                                         |
-| `--verbose`          | `boolean` | `false`                           | Enable verbose debug logging output.                                                                                                       |
-| `--no-hyperlinks`    | `boolean` | `false`                           | Disable OSC 8 terminal hyperlinks in output. Can also be set via `$NO_HYPERLINKS`.                                                         |
-| `--format`           | `string`  | `text`                            | Output format: `text` (standard text), `json` (pretty structured JSON), or `tsv` (Tab-Separated Values). |
-| `--jsonpath`         | `string`  | _(None)_                          | JSONPath expression to extract and filter specific fields from JSON output (e.g., `$.results[0].note_slug`).                               |
-| `--include-text`     | `boolean` | `false`                           | Include matched chunk text inside structured outputs (JSON, TSV).                                                                  |
-| `--context-window`   | `integer` | `0`                               | Fetch ±N adjacent chunks around each match for additional semantic context.                                                                |
-| `--min-score`        | `float`   | `0.0`                             | Suppress search results below this similarity score (0.0 to 1.0).                                                                          |
-| `--respect-exclude`  | `boolean` | `true`                            | Respect Obsidian user ignore filters and attachment folder exclusions during ingestion.                                                    |
-| `--log-format`       | `string`  | `auto`                            | Log format: `auto` (detects TTY), `json`, or `text`.                                                                                       |
-| `--log-level`        | `string`  | `info`                            | Minimum log severity to show: `info`, `debug`, `warn`, or `error`.                                                                         |
-| `--hide-tags`        | `boolean` | `true`                            | Hide tag names (`#Tag/Subtag`) in search and graph outputs.                                                                                |
-| `--show-file-path`   | `boolean` | `false`                           | Show `file_path` in JSON outputs. Omitted by default to reduce token footprint for LLMs (`show-file-path=true` in `config.toml`). |
+| Flag                | Type      | Default                           | Description                                                                                                  |
+| :------------------ | :-------- | :-------------------------------- | :----------------------------------------------------------------------------------------------------------- |
+| `--config`          | `string`  | `~/.notebrain/config/config.toml` | Path to the TOML config file.                                                                                |
+| `--chroma-path`     | `string`  | `~/.notebrain/chroma`             | Path to ChromaDB persistent storage. Can also be set via the `$CHROMA_PATH` environment variable.            |
+| `--vault-path`      | `string`  | _(None)_                          | **Required.** Absolute path to your Obsidian vault.                                                          |
+| `--vault-name`      | `string`  | _(Basename of vault)_             | Obsidian vault name (used for generating `obsidian://` URI links).                                           |
+| `--verbose`         | `boolean` | `false`                           | Enable verbose debug logging output.                                                                         |
+| `--no-hyperlinks`   | `boolean` | `false`                           | Disable OSC 8 terminal hyperlinks in output. Can also be set via `$NO_HYPERLINKS`.                           |
+| `--format`          | `string`  | `text`                            | Output format: `text` (standard text), `json` (pretty structured JSON), or `tsv` (Tab-Separated Values).     |
+| `--jsonpath`        | `string`  | _(None)_                          | JSONPath expression to extract and filter specific fields from JSON output (e.g., `$.results[0].note_slug`). |
+| `--include-text`    | `boolean` | `false`                           | Include matched chunk text inside structured outputs (JSON, TSV).                                            |
+| `--context-window`  | `integer` | `0`                               | Fetch ±N adjacent chunks around each match for additional semantic context.                                  |
+| `--min-score`       | `float`   | `0.0`                             | Suppress search results below this similarity score (0.0 to 1.0).                                            |
+| `--respect-exclude` | `boolean` | `true`                            | Respect Obsidian user ignore filters and attachment folder exclusions during ingestion.                      |
+| `--log-format`      | `string`  | `auto`                            | Log format: `auto` (detects TTY), `json`, or `text`.                                                         |
+| `--log-level`       | `string`  | `info`                            | Minimum log severity to show: `info`, `debug`, `warn`, or `error`.                                           |
+| `--hide-tags`       | `boolean` | `true`                            | Hide tag names (`#Tag/Subtag`) in search and graph outputs.                                                  |
+| `--show-file-path`  | `boolean` | `true`                            | Include `file_path` in outputs (`--show-file-path=false` to omit).                                           |
 
 ### Token Efficiency & Quiet Mode for AI Agents
 
@@ -44,23 +44,24 @@ When executing NoteBrain queries inside AI agent workflows, automated pipelines,
 1. **Automatic Quiet Mode (`--quiet`)**:
    Whenever a non-interactive machine format (`--format=json`, `tsv`, or `--jsonpath`) is specified, NoteBrain automatically activates quiet mode (`embedder.WithQuiet`). This suppresses background log output, ensuring stdout is 100% clean and uncorrupted for JSON parsers and AI agents.
 2. **Compact JSON Envelopes**:
-   By default, JSON output strips redundant properties (`file_path`), reducing token consumption by ~40–50% when ingested by Large Language Models. You can use `--show-file-path` to include it. Similarity scores (`score`) are rounded cleanly to 4 decimal places (`0.8520`), and query headers (`query`) are stripped of terminal decorations.
+   By default, JSON output includes essential properties cleanly formatted. You can use `--show-file-path=false` to strip file paths and reduce token consumption for Large Language Models. Similarity scores (`score`) are rounded cleanly to 4 decimal places (`0.8520`), and query headers (`query`) are stripped of terminal decorations.
 3. **Non-Redundant Context Windows (`--context-window N`)**:
    When `--context-window N` (e.g., `--context-window 1` or `2`) is passed alongside `--include-text`, NoteBrain fetches $\pm N$ adjacent chunks into the `context` array while specifically excluding the matched chunk (`text`) itself from the array (`PopulateContext`), eliminating duplicated text across `text` and `context`.
-| `--version`          | `boolean` | `false`                           | Show version information.                                                                                                                  |
+   | `--version` | `boolean` | `false` | Show version information. |
 
 ---
 
 ### Context-Aware Empty Result Guidance
 
 When a search or graph command returns zero results in standard terminal `text` format (`--format=text`), NoteBrain displays actionable, tailored tips formatted in italicized amber (`hintStyle`) under the command header instead of generic `(no results)` text:
+
 - **`backlinks`**: Suggests verifying whether other notes link to the target or re-indexing via `notebrain ingest`.
 - **`connections`**: Suggests increasing `--hops` or checking for valid Wikilinks.
 - **`hidden`**: Suggests trying `--include-linked` to include notes that may already be linked, or re-indexing if the note is too unique.
 - **`tags`**: Suggests checking note tags or lowering `--min-shared`.
 - **`search` / `boosted`**: Suggests broadening search terms, adjusting `--boost`, or running `notebrain ingest`.
 
-> *Note: To ensure compatibility with automated scripts and AI agents, contextual hints only appear in standard `text` output and are strictly omitted from machine formats (`json`, `tsv`, `--jsonpath`).*
+> _Note: To ensure compatibility with automated scripts and AI agents, contextual hints only appear in standard `text` output and are strictly omitted from machine formats (`json`, `tsv`, `--jsonpath`)._
 
 ---
 
@@ -133,17 +134,17 @@ notebrain search [<query>] [flags]
 
 #### Command-Specific Flags
 
-| Flag            | Type      | Default  | Description                                                                          |
-| :-------------- | :-------- | :------- | :----------------------------------------------------------------------------------- |
-| `--limit`       | `integer` | `10`     | Maximum number of results to return.                                                 |
-| `--top-k`       | `integer` | `3`      | Maximum number of chunks to return per note.                                         |
-| `--section`     | `string`  | _(None)_ | Filter results by heading path.                                                      |
-| `--tag`         | `string`  | _(None)_ | Filter results by tag name (prefixed `#` is optional).                               |
-| `--has-tasks`   | `boolean` | `false`  | Only return chunks containing markdown task lists (`- [ ]`).                         |
-| `--has-code`    | `boolean` | `false`  | Only return chunks containing code blocks.                                           |
-| `--interactive` | `boolean` | `false`  | Launch a live interactive search TUI where you can type queries and preview results. |
+| Flag            | Type      | Default  | Description                                                                                    |
+| :-------------- | :-------- | :------- | :--------------------------------------------------------------------------------------------- |
+| `--limit`       | `integer` | `10`     | Maximum number of results to return.                                                           |
+| `--top-k`       | `integer` | `3`      | Maximum number of chunks to return per note.                                                   |
+| `--section`     | `string`  | _(None)_ | Filter results by heading path.                                                                |
+| `--tag`         | `string`  | _(None)_ | Filter results by tag name (prefixed `#` is optional).                                         |
+| `--has-tasks`   | `boolean` | `false`  | Only return chunks containing markdown task lists (`- [ ]`).                                   |
+| `--has-code`    | `boolean` | `false`  | Only return chunks containing code blocks.                                                     |
+| `--interactive` | `boolean` | `false`  | Launch a live interactive search TUI where you can type queries and preview results.           |
 | `--split`       | `boolean` | `false`  | Split query string by delimiters (comma, pipe, semicolon) or execute multi-positional queries. |
-| `--split-by`    | `string`  | `,|;`    | Delimiters used to split query strings when `--split` is active.                     |
+| `--split-by`    | `string`  | `,       | ;`                                                                                             | Delimiters used to split query strings when `--split` is active. |
 
 #### Examples
 
@@ -168,7 +169,9 @@ notebrain search --interactive
 ```
 
 #### How Multi-Query Matching & Ranking Works
+
 When multiple queries are provided (either via multiple positional arguments or via `--split`):
+
 1. **Semantic Vector Matching**: NoteBrain embeds each query independently into a 384-dimensional vector using `MiniLM-L6-v2`. Matching is based **100% on semantic vector similarity** (cosine distance in ChromaDB), not exact keyword or substring matching. A note can match a query even if it uses completely different terminology or synonyms.
 2. **Multi-Hit Boosting**: When a note chunk is semantically relevant to multiple queries in your search, NoteBrain boosts its rank! Results are sorted using a two-tier strategy:
    - **Primary Sort**: Descending order by the number of matched query topics (`len(MatchedQueries)`). Chunks bridging multiple concepts (e.g., matching both `"message brokers"` and `"redis queue"`) appear at the top.
@@ -271,12 +274,12 @@ notebrain hidden <note> [flags]
 
 #### Command-Specific Flags
 
-| Flag      | Type      | Default | Description                                                                                    |
-| :-------- | :-------- | :------ | :--------------------------------------------------------------------------------------------- |
-| `--deep`           | `boolean` | `false` | Perform granular chunk-by-chunk analysis across individual note sections using stored vectors. |
+| Flag               | Type      | Default | Description                                                                                                                          |
+| :----------------- | :-------- | :------ | :----------------------------------------------------------------------------------------------------------------------------------- |
+| `--deep`           | `boolean` | `false` | Perform granular chunk-by-chunk analysis across individual note sections using stored vectors.                                       |
 | `--include-linked` | `boolean` | `false` | Include notes that are already linked directly/indirectly in the hidden connections output while strictly excluding self-references. |
-| `--top-k`          | `integer` | `3`     | Maximum matching target sections to evaluate and display per candidate note (in `--deep` mode).  |
-| `--limit`          | `integer` | `10`    | Maximum number of hidden connections to return.                                                |
+| `--top-k`          | `integer` | `3`     | Maximum matching target sections to evaluate and display per candidate note (in `--deep` mode).                                      |
+| `--limit`          | `integer` | `10`    | Maximum number of hidden connections to return.                                                                                      |
 
 #### Examples
 
@@ -306,11 +309,11 @@ notebrain tags <query> [flags]
 
 #### Command-Specific Flags
 
-| Flag            | Type      | Default | Description                                                                                                   |
-| :-------------- | :-------- | :------ | :------------------------------------------------------------------------------------------------------------ |
-| `--shared`      | `boolean` | `false` | Treat the query as a note slug/title to find other notes sharing its tags.                                    |
-| `--children`    | `boolean` | `false` | Include child tags in hierarchical structure (e.g. searching 'kubernetes' also matches 'kubernetes/cka').     |
-| `--min-shared`  | `integer` | `1`     | Minimum number of shared tags to include a result (only applies when --shared is active).                      |
+| Flag           | Type      | Default | Description                                                                                               |
+| :------------- | :-------- | :------ | :-------------------------------------------------------------------------------------------------------- |
+| `--shared`     | `boolean` | `false` | Treat the query as a note slug/title to find other notes sharing its tags.                                |
+| `--children`   | `boolean` | `false` | Include child tags in hierarchical structure (e.g. searching 'kubernetes' also matches 'kubernetes/cka'). |
+| `--min-shared` | `integer` | `1`     | Minimum number of shared tags to include a result (only applies when --shared is active).                 |
 
 #### Examples
 
