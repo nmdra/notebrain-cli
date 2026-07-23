@@ -1110,3 +1110,46 @@ func TestBacklinks_SubfolderSlugResolution(t *testing.T) {
 		t.Errorf("Expected 1 backlink from System Design note, got %v", res)
 	}
 }
+
+func TestTagSearch_HierarchicalDeduplication(t *testing.T) {
+	ctx := context.Background()
+	st := newTestStore(t)
+
+	chunks := []store.ChunkRecord{
+		{
+			ID:         "note-llm:0",
+			NoteSlug:   "note-llm",
+			Title:      "LLM Quantization",
+			FilePath:   "LLM Quantization.md",
+			ChunkIndex: 0,
+			Text:       "Introduction to LLM quantization #llm",
+			Tags:       []string{"llm"},
+			Embedding:  []float32{1.0, 0.0, 0.0},
+		},
+		{
+			ID:         "note-llm:1",
+			NoteSlug:   "note-llm",
+			Title:      "LLM Quantization",
+			FilePath:   "LLM Quantization.md",
+			ChunkIndex: 1,
+			Text:       "Advanced techniques #llm/quantization",
+			Tags:       []string{"llm/quantization"},
+			Embedding:  []float32{1.0, 0.0, 0.0},
+		},
+	}
+	if err := st.UpsertChunks(ctx, chunks); err != nil {
+		t.Fatalf("UpsertChunks failed: %v", err)
+	}
+
+	res, err := st.TagSearch(ctx, "llm", 10, true, nil, false)
+	if err != nil {
+		t.Fatalf("TagSearch failed: %v", err)
+	}
+
+	if len(res) != 1 {
+		t.Fatalf("Expected exactly 1 deduplicated result note for 'llm' with --children, got %d", len(res))
+	}
+	if res[0].NoteSlug != "note-llm" {
+		t.Errorf("Expected note-llm, got %s", res[0].NoteSlug)
+	}
+}

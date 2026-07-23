@@ -884,6 +884,7 @@ func (s *Store) TagSearch(ctx context.Context, tag string, limit int, hierarchic
 			}
 
 			results := getResultToResults(res, 999999, includeText)
+			var pageMatches []Result
 			for _, r := range results {
 				match := false
 				for _, t := range r.Tags {
@@ -894,9 +895,10 @@ func (s *Store) TagSearch(ctx context.Context, tag string, limit int, hierarchic
 					}
 				}
 				if match {
-					filtered = append(filtered, r)
+					pageMatches = append(pageMatches, r)
 				}
 			}
+			filtered = mergeDeduplicatedResults(filtered, pageMatches)
 
 			if len(filtered) >= limit {
 				filtered = filtered[:limit]
