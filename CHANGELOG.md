@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.7.1] - 2026-07-23
+
+### Fixed
+- **Hierarchical Tag Search Duplication**: Fixed an issue where `tags --children` would return duplicate notes across pagination pages by implementing cross-page deduplication (`fix(store)`).
+- **Terminal Hyperlink Restoration**: Restored OSC 8 terminal hyperlinks by setting `--show-file-path` to `true` by default. When explicitly set to `false`, the instructional click footer is now properly hidden (`fix(cli)`).
+
+### Changed
+- **Pre-commit Hooks**: Added `modernize` to the `lefthook` configuration for automated codebase modernization (`ci`).
+- **Documentation**: Updated default flags in agent SKILL and Wiki references to reflect `--show-file-path=true` (`docs`).
+
 ## [v2.7.0] - 2026-07-23
 
 ### Added
