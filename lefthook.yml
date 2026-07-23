@@ -11,6 +11,9 @@ pre-commit:
     govet:
       glob: "*.go"
       run: go vet ./...
+    modernize:
+      glob: "*.go"
+      run: modernize ./...
     test-short:
       run: go test -short ./...
 
