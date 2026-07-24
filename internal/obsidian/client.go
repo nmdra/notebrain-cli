@@ -46,6 +46,7 @@ func EditorCommand(filePath string) *exec.Cmd {
 	}
 
 	args = append(args, filePath)
+	//nolint:gosec // execution of CLI tool with provided parameters
 	return exec.Command(bin, args...)
 }
 
@@ -55,6 +56,7 @@ func OpenInObsidian(vaultName, filePath string) error {
 		return nil
 	}
 	uri := store.ObsidianURI(vaultName, filePath)
+	//nolint:gosec // launching OS opener with obsidian URI
 	cmd := exec.Command(openCommand(), uri)
 	if err := cmd.Start(); err != nil {
 		return err
