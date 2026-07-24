@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/charmbracelet/x/ansi"
+
 	"github.com/nmdra/notebrain-cli/v2/internal/store"
 )
 

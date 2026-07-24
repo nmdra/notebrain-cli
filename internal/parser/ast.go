@@ -8,16 +8,15 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	latex "github.com/soypat/goldmark-latex"
 	"github.com/yuin/goldmark"
+	meta "github.com/yuin/goldmark-meta"
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/extension"
 	extast "github.com/yuin/goldmark/extension/ast"
 	"github.com/yuin/goldmark/parser"
 	"github.com/yuin/goldmark/text"
 	"github.com/yuin/goldmark/util"
-
-	latex "github.com/soypat/goldmark-latex"
-	meta "github.com/yuin/goldmark-meta"
 	"go.abhg.dev/goldmark/hashtag"
 	"go.abhg.dev/goldmark/mermaid"
 	"go.abhg.dev/goldmark/wikilink"

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	chroma "github.com/amikos-tech/chroma-go/pkg/api/v2"
+
 	"github.com/nmdra/notebrain-cli/v2/internal/store"
 )
 

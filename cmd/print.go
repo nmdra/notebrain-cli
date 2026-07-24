@@ -12,6 +12,7 @@ import (
 	"github.com/PaesslerAG/jsonpath"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/charmbracelet/x/term"
+
 	"github.com/nmdra/notebrain-cli/v2/internal/store"
 )
 
