@@ -31,7 +31,7 @@ func TOMLResolver(r io.Reader) (kong.Resolver, error) {
 		normalized[normalizeKey(k)] = v
 	}
 
-	return kong.ResolverFunc(func(context *kong.Context, parent *kong.Path, flag *kong.Flag) (any, error) {
+	return kong.ResolverFunc(func(_ *kong.Context, _ *kong.Path, flag *kong.Flag) (any, error) {
 		name := flag.Name
 
 		if val, ok := parsed[name]; ok {
