@@ -79,6 +79,8 @@ func yaml_parser_set_encoding(parser *yaml_parser_t, encoding yaml_encoding_t) {
 	parser.encoding = encoding
 }
 
+var disableLineWrapping = false
+
 // Create a new emitter object.
 func yaml_emitter_initialize(emitter *yaml_emitter_t) {
 	*emitter = yaml_emitter_t{
@@ -86,7 +88,9 @@ func yaml_emitter_initialize(emitter *yaml_emitter_t) {
 		raw_buffer: make([]byte, 0, output_raw_buffer_size),
 		states:     make([]yaml_emitter_state_t, 0, initial_stack_size),
 		events:     make([]yaml_event_t, 0, initial_queue_size),
-		best_width: -1,
+	}
+	if disableLineWrapping {
+		emitter.best_width = -1
 	}
 }
 
@@ -139,7 +143,7 @@ func yaml_emitter_set_canonical(emitter *yaml_emitter_t, canonical bool) {
 	emitter.canonical = canonical
 }
 
-//// Set the indentation increment.
+// // Set the indentation increment.
 func yaml_emitter_set_indent(emitter *yaml_emitter_t, indent int) {
 	if indent < 2 || indent > 9 {
 		indent = 2

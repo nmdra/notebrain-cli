@@ -2,8 +2,7 @@
 //
 // Source code and other details for the project are available at GitHub:
 //
-//   https://github.com/go-yaml/yaml
-//
+//	https://github.com/go-yaml/yaml
 package yaml
 
 import (
@@ -67,16 +66,15 @@ type Marshaler interface {
 //
 // For example:
 //
-//     type T struct {
-//         F int `yaml:"a,omitempty"`
-//         B int
-//     }
-//     var t T
-//     yaml.Unmarshal([]byte("a: 1\nb: 2"), &t)
+//	type T struct {
+//	    F int `yaml:"a,omitempty"`
+//	    B int
+//	}
+//	var t T
+//	yaml.Unmarshal([]byte("a: 1\nb: 2"), &t)
 //
 // See the documentation of Marshal for the format of tags and a list of
 // supported tag options.
-//
 func Unmarshal(in []byte, out interface{}) (err error) {
 	return unmarshal(in, out, false)
 }
@@ -166,36 +164,35 @@ func unmarshal(in []byte, out interface{}, strict bool) (err error) {
 //
 // The field tag format accepted is:
 //
-//     `(...) yaml:"[<key>][,<flag1>[,<flag2>]]" (...)`
+//	`(...) yaml:"[<key>][,<flag1>[,<flag2>]]" (...)`
 //
 // The following flags are currently supported:
 //
-//     omitempty    Only include the field if it's not set to the zero
-//                  value for the type or to empty slices or maps.
-//                  Zero valued structs will be omitted if all their public
-//                  fields are zero, unless they implement an IsZero
-//                  method (see the IsZeroer interface type), in which
-//                  case the field will be included if that method returns true.
+//	omitempty    Only include the field if it's not set to the zero
+//	             value for the type or to empty slices or maps.
+//	             Zero valued structs will be omitted if all their public
+//	             fields are zero, unless they implement an IsZero
+//	             method (see the IsZeroer interface type), in which
+//	             case the field will be excluded if IsZero returns true.
 //
-//     flow         Marshal using a flow style (useful for structs,
-//                  sequences and maps).
+//	flow         Marshal using a flow style (useful for structs,
+//	             sequences and maps).
 //
-//     inline       Inline the field, which must be a struct or a map,
-//                  causing all of its fields or keys to be processed as if
-//                  they were part of the outer struct. For maps, keys must
-//                  not conflict with the yaml keys of other struct fields.
+//	inline       Inline the field, which must be a struct or a map,
+//	             causing all of its fields or keys to be processed as if
+//	             they were part of the outer struct. For maps, keys must
+//	             not conflict with the yaml keys of other struct fields.
 //
 // In addition, if the key is "-", the field is ignored.
 //
 // For example:
 //
-//     type T struct {
-//         F int `yaml:"a,omitempty"`
-//         B int
-//     }
-//     yaml.Marshal(&T{B: 2}) // Returns "b: 2\n"
-//     yaml.Marshal(&T{F: 1}} // Returns "a: 1\nb: 0\n"
-//
+//	type T struct {
+//	    F int `yaml:"a,omitempty"`
+//	    B int
+//	}
+//	yaml.Marshal(&T{B: 2}) // Returns "b: 2\n"
+//	yaml.Marshal(&T{F: 1}} // Returns "a: 1\nb: 0\n"
 func Marshal(in interface{}) (out []byte, err error) {
 	defer handleErr(&err)
 	e := newEncoder()
@@ -463,4 +460,16 @@ func isZero(v reflect.Value) bool {
 		return true
 	}
 	return false
+}
+
+// FutureLineWrap globally disables line wrapping when encoding long strings.
+// This is a temporary and thus deprecated method introduced to faciliate
+// migration towards v3, which offers more control of line lengths on
+// individual encodings, and has a default matching the behavior introduced
+// by this function.
+//
+// The default formatting of v2 was erroneously changed in v2.3.0 and reverted
+// in v2.4.0, at which point this function was introduced to help migration.
+func FutureLineWrap() {
+	disableLineWrapping = true
 }
