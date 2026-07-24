@@ -61,7 +61,7 @@ func NewPipeline(s *store.Store, e Embedder, workers int) *Pipeline {
 
 // Run walks the vault directory, finds markdown files matching glob, and ingests
 // them into the store with structured logging for progress.
-func (p *Pipeline) Run(ctx context.Context, vaultPath string, glob string, stdin io.Reader, stdout io.Writer) error {
+func (p *Pipeline) Run(ctx context.Context, vaultPath string, glob string, _ io.Reader, _ io.Writer) error {
 	files, err := p.collectFiles(vaultPath, glob)
 	if err != nil {
 		return err
@@ -373,11 +373,12 @@ func buildEmbedText(title, headingPath string, tags []string, chunkText string, 
 	bodyTokens := estimateTokens(chunkText)
 
 	breadcrumb := ""
-	if title != "" && headingPath != "" && headingPath != title {
+	switch {
+	case title != "" && headingPath != "" && headingPath != title:
 		breadcrumb = title + " > " + headingPath
-	} else if title != "" {
+	case title != "":
 		breadcrumb = title
-	} else if headingPath != "" {
+	case headingPath != "":
 		breadcrumb = headingPath
 	}
 
@@ -395,7 +396,8 @@ func buildEmbedText(title, headingPath string, tags []string, chunkText string, 
 		bcTokens := estimateTokens(breadcrumb)
 		tagTokens := estimateTokens(tagLine)
 
-		if bcTokens+tagTokens <= prefixBudget {
+		switch {
+		case bcTokens+tagTokens <= prefixBudget:
 			if breadcrumb != "" {
 				sb.WriteString(breadcrumb)
 				sb.WriteByte('\n')
@@ -404,12 +406,12 @@ func buildEmbedText(title, headingPath string, tags []string, chunkText string, 
 				sb.WriteString(tagLine)
 				sb.WriteByte('\n')
 			}
-		} else if bcTokens <= prefixBudget {
+		case bcTokens <= prefixBudget:
 			if breadcrumb != "" {
 				sb.WriteString(breadcrumb)
 				sb.WriteByte('\n')
 			}
-		} else if estimateTokens(title) <= prefixBudget && title != "" {
+		case estimateTokens(title) <= prefixBudget && title != "":
 			sb.WriteString(title)
 			sb.WriteByte('\n')
 		}
