@@ -681,15 +681,15 @@ func (s *Store) HiddenConnectionsDeep(ctx context.Context, seedSlug string, limi
 	var metas []chroma.DocumentMetadata
 	offset := 0
 	for {
-		res, err := s.chunks.Get(ctx,
+		res, gerr := s.chunks.Get(ctx,
 			chroma.WithWhere(chroma.EqString("note_slug", seedSlug)),
 			chroma.WithInclude(chroma.IncludeMetadatas, chroma.IncludeEmbeddings),
 			chroma.WithLimit(ffiSafePageSize),
 			chroma.WithOffset(offset),
 		)
-		if err != nil {
+		if gerr != nil {
 			s.mu.RUnlock()
-			return nil, nil, fmt.Errorf("hidden connections deep: get seed chunks: %w", wrapChromaErr(err))
+			return nil, nil, fmt.Errorf("hidden connections deep: get seed chunks: %w", wrapChromaErr(gerr))
 		}
 		if res.Count() == 0 {
 			break
@@ -721,16 +721,17 @@ func (s *Store) HiddenConnectionsDeep(ctx context.Context, seedSlug string, limi
 		idx := metaInt(m, "chunk_index")
 		hp := metaString(m, "heading_path")
 		label := ""
-		if hp != "" {
+		switch {
+		case hp != "":
 			label = "§ " + hp
-		} else if idx == 0 {
+		case idx == 0:
 			title := metaString(m, "title")
 			if title != "" {
 				label = "§ " + title
 			} else {
 				label = "§ (intro)"
 			}
-		} else {
+		default:
 			label = fmt.Sprintf("chunk #%d", idx+1)
 		}
 		seedInfo = append(seedInfo, seedChunkInfo{index: idx, vec: vec, label: label})

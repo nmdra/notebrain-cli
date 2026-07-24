@@ -69,8 +69,8 @@ func (s *Store) BatchIngest(ctx context.Context, data []BatchIngestData, staleSl
 
 			// Delete existing chunks
 			if len(resChunks.GetIDs()) > 0 {
-				if err := s.chunks.Delete(ctx, chroma.WithIDs(resChunks.GetIDs()...)); err != nil {
-					return fmt.Errorf("delete chunks batch: %w", err)
+				if derr := s.chunks.Delete(ctx, chroma.WithIDs(resChunks.GetIDs()...)); derr != nil {
+					return fmt.Errorf("delete chunks batch: %w", derr)
 				}
 			}
 
@@ -296,6 +296,7 @@ func (s *Store) upsertLinks(ctx context.Context, noteSlug string, links []string
 	for i := range uniqueLinks {
 		vec := make([]float32, 16)
 		for j := range 16 {
+			//nolint:gosec // math/rand used intentionally for dummy 16-dim random vector generation
 			vec[j] = rand.Float32()
 		}
 		embs[i] = embeddings.NewEmbeddingFromFloat32(vec)
