@@ -1,0 +1,67 @@
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  default: standard
+  enable:
+    - contextcheck # verifies context is passed through correctly
+    - errorlint # finds wrapping issues with errors.Is/As
+    - gocritic # broad set of style/bug checks
+    - goconst # flags repeated string literals that should be constants
+    - gosec # security-focused checks
+    - misspell # catches common misspellings in comments/strings
+    - nolintlint # ensures //nolint directives are well-formed and justified
+    - revive # configurable replacement for the deprecated golint
+    - unconvert # flags unnecessary type conversions
+    - unparam # flags unused function parameters
+    - whitespace # flags unnecessary blank lines
+  settings:
+    errcheck:
+      exclude-functions:
+        - (*os.File).Close
+    govet:
+      enable:
+        - shadow
+    gosec:
+      excludes:
+        - G104 # already covered by errcheck
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - path: _test\.go
+        linters:
+          - gosec
+          - errcheck
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+
+formatters:
+  enable:
+    - gci
+    - gofmt
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - localmodule
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

@@ -1,27 +1,33 @@
 pre-commit:
   parallel: false
+  skip:
+    - merge
+    - rebase
   commands:
     fmt:
+      priority: 1
       glob: "*.go"
-      run: gofmt -w {staged_files}
-      stage_fixed: true # re-stage files reformatted by go fmt
-    lint:
-      glob: "*.go"
-      run: golangci-lint run ./...
-    govet:
-      glob: "*.go"
-      run: go vet ./...
+      run: golangci-lint fmt {staged_files}
+      stage_fixed: true # re-stage files reformatted by gofmt/gci
     modernize:
+      priority: 2
       glob: "*.go"
-      run: modernize ./...
+      run: modernize -fix ./...
+      stage_fixed: true # re-stage files rewritten by modernize
+    lint:
+      priority: 3
+      glob: "*.go"
+      run: golangci-lint run --new-from-rev=HEAD ./...
     test-short:
+      priority: 4
+      glob: "*.go"
       run: go test -short ./...
 
 commit-msg:
   commands:
     lint:
       run: |
-        msg=$(cat {1})
+        msg=$(cat "{1}")
         if [ ${#msg} -lt 10 ]; then
           echo "Commit message too short!"
           exit 1
