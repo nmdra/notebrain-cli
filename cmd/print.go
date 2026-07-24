@@ -17,7 +17,7 @@ import (
 )
 
 var getTerminalWidth = func() int {
-	w, _, err := term.GetSize(uintptr(os.Stdout.Fd()))
+	w, _, err := term.GetSize(os.Stdout.Fd())
 	if err != nil || w <= 0 {
 		return 0
 	}
@@ -327,8 +327,8 @@ func printJSONPathResultToWriter(w io.Writer, obj any, jp string) error {
 		return fmt.Errorf("jsonpath marshal: %w", err)
 	}
 	var raw any
-	if err := json.Unmarshal(data, &raw); err != nil {
-		return fmt.Errorf("jsonpath unmarshal: %w", err)
+	if uerr := json.Unmarshal(data, &raw); uerr != nil {
+		return fmt.Errorf("jsonpath unmarshal: %w", uerr)
 	}
 
 	normPath := normalizeJSONPath(jp)

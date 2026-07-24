@@ -42,7 +42,8 @@ func (c *TagsCmd) Run(globals *Globals) error {
 	defer func() { _ = st.Close() }()
 
 	if c.Shared {
-		targetSlug, err := st.ResolveNoteSlug(ctx, c.Query)
+		var targetSlug string
+		targetSlug, err = st.ResolveNoteSlug(ctx, c.Query)
 		if err != nil {
 			return err
 		}

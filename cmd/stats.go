@@ -33,7 +33,6 @@ type StatsCmd struct {
 }
 
 func (c *StatsCmd) Run(globals *Globals) error {
-
 	ctx := globals.Ctx
 	st, err := openStore(ctx, globals)
 	if err != nil {

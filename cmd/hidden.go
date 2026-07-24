@@ -56,7 +56,11 @@ func (c *HiddenCmd) Run(globals *Globals) error {
 	opts := []store.HiddenOption{store.WithIncludeLinked(c.IncludeLinked)}
 
 	if c.Deep {
-		results, seedChunks, err := st.HiddenConnectionsDeep(ctx, targetSlug, limit, c.TopK, c.IncludeText, opts...)
+		var (
+			results    []store.Result
+			seedChunks []string
+		)
+		results, seedChunks, err = st.HiddenConnectionsDeep(ctx, targetSlug, limit, c.TopK, c.IncludeText, opts...)
 		if err != nil {
 			return err
 		}
