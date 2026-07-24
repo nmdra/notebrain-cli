@@ -16,6 +16,12 @@ import (
 	"github.com/nmdra/notebrain-cli/v2/internal/store"
 )
 
+const (
+	formatText   = "text"
+	formatJSON   = "json"
+	formatNDJSON = "ndjson"
+)
+
 var getTerminalWidth = func() int {
 	w, _, err := term.GetSize(os.Stdout.Fd())
 	if err != nil || w <= 0 {
@@ -51,7 +57,7 @@ func printResultsFormattedToWriter(w io.Writer, commandName string, headerQuery 
 	filtered := filterResults(results, globals, displayFlags)
 
 	queryStr := headerQuery
-	if globals.Format != "text" || globals.JSONPath != "" {
+	if globals.Format != formatText || globals.JSONPath != "" {
 		if rawQuery != "" {
 			queryStr = rawQuery
 		}
@@ -74,7 +80,7 @@ func printResultsFormattedToWriter(w io.Writer, commandName string, headerQuery 
 	}
 
 	switch globals.Format {
-	case "json":
+	case formatJSON:
 		printJSONResults(w, cmdName, queryStr, filtered, globals)
 	case "tsv":
 		printTSVResults(w, filtered)

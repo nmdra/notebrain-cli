@@ -53,7 +53,7 @@ func (c *BoostedCmd) Run(globals *Globals) error {
 		return err
 	}
 
-	emb, err := embedder.NewLocalEmbedder(embedder.WithQuiet(globals.Format != "text" || globals.JSONPath != ""))
+	emb, err := embedder.NewLocalEmbedder(embedder.WithQuiet(globals.Format != formatText || globals.JSONPath != ""))
 	if err != nil {
 		return err
 	}

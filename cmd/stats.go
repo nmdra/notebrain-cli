@@ -49,7 +49,7 @@ func (c *StatsCmd) Run(globals *Globals) error {
 		return printJSONPathResult(stats, globals.JSONPath)
 	}
 
-	if globals.Format == "json" || globals.Format == "ndjson" {
+	if globals.Format == formatJSON || globals.Format == formatNDJSON {
 		enc := json.NewEncoder(os.Stdout)
 		enc.SetIndent("", "  ")
 		return enc.Encode(stats)

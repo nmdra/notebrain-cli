@@ -96,7 +96,7 @@ func (c *SearchCmd) Run(globals *Globals) error {
 	}
 	defer func() { _ = st.Close() }()
 
-	emb, err := embedder.NewLocalEmbedder(embedder.WithQuiet(globals.Format != "text" || globals.JSONPath != ""))
+	emb, err := embedder.NewLocalEmbedder(embedder.WithQuiet(globals.Format != formatText || globals.JSONPath != ""))
 	if err != nil {
 		return err
 	}

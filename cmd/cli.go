@@ -130,7 +130,7 @@ Examples:
 
 	err = ctxParser.Run(&cli.Globals)
 	if err != nil {
-		if cli.Format == "json" || cli.Format == "ndjson" {
+		if cli.Format == formatJSON || cli.Format == formatNDJSON {
 			// Print error as JSON to stdout for agents
 			_, _ = fmt.Fprintf(os.Stdout, "{\"error\": %q}\n", err.Error())
 		}

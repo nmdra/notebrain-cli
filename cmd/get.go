@@ -31,7 +31,7 @@ func (c *GetCmd) Run(globals *Globals) error {
 	}
 
 	switch globals.Format {
-	case "json", "ndjson":
+	case formatJSON, formatNDJSON:
 		enc := json.NewEncoder(os.Stdout)
 		enc.SetIndent("", "  ")
 		return enc.Encode(note)
