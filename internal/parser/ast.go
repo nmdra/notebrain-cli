@@ -70,9 +70,15 @@ var (
 	skipAttachmentsKey = parser.NewContextKey()
 )
 
+const (
+	blockKindCode      = "code"
+	blockKindParagraph = "paragraph"
+	blockKindTaskList  = "task_list"
+)
+
 type metadataTransformer struct{}
 
-func (t *metadataTransformer) Transform(node *ast.Document, reader text.Reader, pc parser.Context) {
+func (t *metadataTransformer) Transform(node *ast.Document, _ text.Reader, pc parser.Context) {
 	tagsSet := make(map[string]struct{})
 	linksSet := make(map[string]struct{})
 
@@ -268,7 +274,7 @@ func (e *sectionExtractor) processFencedCode(node *ast.FencedCodeBlock) (ast.Wal
 		code.Write(line.Value(e.src))
 	}
 	e.current.blocks = append(e.current.blocks, block{
-		kind:     "code",
+		kind:     blockKindCode,
 		codeText: code.String(),
 		language: lang,
 	})
@@ -283,7 +289,7 @@ func (e *sectionExtractor) processMermaid(node *mermaid.Block) (ast.WalkStatus, 
 		code.Write(line.Value(e.src))
 	}
 	e.current.blocks = append(e.current.blocks, block{
-		kind:     "code",
+		kind:     blockKindCode,
 		codeText: code.String(),
 		language: "mermaid",
 	})
@@ -299,9 +305,9 @@ func (e *sectionExtractor) processParagraph(node *ast.Paragraph) (ast.WalkStatus
 	if t == "" {
 		return ast.WalkSkipChildren, nil
 	}
-	kind := "paragraph"
+	kind := blockKindParagraph
 	if containsTaskList(node) {
-		kind = "task_list"
+		kind = blockKindTaskList
 	}
 	e.current.blocks = append(e.current.blocks, block{
 		kind: kind,
@@ -318,7 +324,7 @@ func (e *sectionExtractor) processList(node *ast.List) (ast.WalkStatus, error) {
 	}
 	kind := "list"
 	if isTask {
-		kind = "task_list"
+		kind = blockKindTaskList
 	}
 	e.current.blocks = append(e.current.blocks, block{
 		kind: kind,
@@ -411,7 +417,7 @@ func buildChunks(sections []section, noteSlug string, maxRunes, overlapRunes int
 				}
 			}
 			switch b.kind {
-			case "code":
+			case blockKindCode:
 				codeCount++
 				codeIdx := len(codeInfos)
 				codeInfos = append(codeInfos, codeBlockInfo{lang: b.language, code: b.codeText})

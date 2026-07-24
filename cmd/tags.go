@@ -24,6 +24,8 @@ package cmd
 import (
 	"fmt"
 	"strings"
+
+	"github.com/nmdra/notebrain-cli/v2/internal/store"
 )
 
 type TagsCmd struct {
@@ -48,7 +50,8 @@ func (c *TagsCmd) Run(globals *Globals) error {
 			return err
 		}
 
-		nodes, err := st.SharedTags(ctx, targetSlug, c.MinShared)
+		var nodes []store.Result
+		nodes, err = st.SharedTags(ctx, targetSlug, c.MinShared)
 		if err != nil {
 			return err
 		}
