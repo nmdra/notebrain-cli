@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"slices"
 	"strings"
 )
 
@@ -37,19 +38,14 @@ func (b *TesseractBackend) ValidateLang(ctx context.Context) error {
 	}
 
 	// Check each requested language is in the output
+	availableLangs := strings.Fields(string(out))
 	for lang := range strings.SplitSeq(b.Lang, "+") {
 		lang = strings.TrimSpace(lang)
 		if lang == "" {
 			continue
 		}
-		found := false
-		for _, available := range strings.Fields(string(out)) {
-			if available == lang {
-				found = true
-				break
-			}
-		}
-		if !found {
+
+		if !slices.Contains(availableLangs, lang) {
 			return fmt.Errorf(
 				"language %q not found in tesseract data (available: %s)",
 				lang, strings.TrimSpace(string(out)),
