@@ -69,17 +69,22 @@ See the full [Installation Guide](wiki/Installation.md) for details.
 
 ## Quick Start
 
-**1. Index your vault:**
+**1. Initialize your configuration:**
 
 ```bash
-notebrain ingest --vault-path "/path/to/your/Obsidian Vault"
-# Or with PDF support:
-notebrain ingest --vault-path "/path/to/your/Obsidian Vault" --enable-pdf --enable-ocr
+notebrain init
+```
+*(This interactive wizard configures your vault path, PDF, and OCR settings).*
+
+**2. Index your vault:**
+
+```bash
+notebrain ingest
 ```
 
 > _Note: First-time indexing may take several minutes depending on your vault size and PDF count._
 
-**2. Search your notes by meaning:**
+**3. Search your notes by meaning:**
 
 ```bash
 notebrain search "how do message brokers work?" --limit 5 --top-k 2
@@ -91,7 +96,7 @@ notebrain search "message broker" --with-pdf
   <img src="assets/search.png" alt="Notebrain search" width="100%">
 </p>
 
-**3. Discover deep hidden connections across note sections:**
+**4. Discover deep hidden connections across note sections:**
 
 Find notes that share similar concepts without direct wikilinks, using `--deep` chunk-by-chunk section matching (`§ <Heading>`):
 
@@ -103,7 +108,7 @@ notebrain hidden "TLS" --deep
   <img src="assets/deep-hidden-connections.png" alt="Notebrain deep hidden connections" width="100%">
 </p>
 
-**4. Get structured output for scripts and AI agents:**
+**5. Get structured output for scripts and AI agents:**
 
 ```bash
 notebrain search "how do message brokers work?" --limit 2 --top-k 1 --format=json | jq
@@ -118,7 +123,7 @@ notebrain search "how do message brokers work?" --limit 2 --top-k 1 --format=jso
 
 </details>
 
-**5. Chain commands to retrieve full notes:**
+**6. Chain commands to retrieve full notes:**
 
 ```bash
 # Extract slug from top search result
@@ -128,9 +133,9 @@ SLUG=$(notebrain search "message broker" --limit 1 --jsonpath="$.results[0].note
 notebrain get "$SLUG" --jsonpath="$.text"
 ```
 
-**6. Automate indexing** with a cron job or systemd timer so your index stays fresh (see [Scheduled Ingestion](wiki/Scheduled_Ingestion.md)).
+**7. Automate indexing** with a cron job or systemd timer so your index stays fresh (see [Scheduled Ingestion](wiki/Scheduled_Ingestion.md)).
 
-**7. Integration with AI Agents**
+**8. Integration with AI Agents**
 
 Use the built-in [AI agent skill](wiki/Skill_Usage.md) and [OpenCode Agent Configuration](wiki/OpenCode_Integration.md) for knowledge retrieval.
 
