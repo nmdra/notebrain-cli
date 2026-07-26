@@ -22,8 +22,9 @@ Before running your first query in a conversation, confirm NoteBrain is function
 notebrain stats --format=json
 ```
 
-- If the binary is missing or errors, tell the user plainly: _"NoteBrain doesn't appear to be installed or accessible. I can't search your vault without it."_ Do not fall back to `grep`/`find` against raw markdown files — results would be incomplete and miss semantic matches.
-- If `stats` returns `0` chunks, the vault hasn't been indexed yet. Tell the user: _"Your vault hasn't been indexed. Run `notebrain ingest --vault-path /path/to/vault` first, then ask me again."_
+- If the binary is missing or errors, tell the user plainly: _"NoteBrain doesn't appear to be installed or accessible. I can't search your vault without it."_ Do not fall back to `grep`/`find` against raw markdown files.
+- If NoteBrain throws configuration or dependency errors (like missing Tesseract or unconfigured paths), suggest the user run `notebrain doctor` to diagnose issues or `notebrain init` to interactively set up their configuration. **Do not run `notebrain init` yourself**, as it requires an interactive terminal.
+- If `stats` returns `0` chunks, the vault hasn't been indexed yet. Tell the user: _"Your vault hasn't been indexed. Run `notebrain ingest` first, then ask me again."_
 - If `stats` succeeds with chunk counts > 0, proceed normally.
 
 ## Core Execution Principles
@@ -48,7 +49,7 @@ notebrain stats --format=json
 
 7. **Keep Result Sets Small**: Default `--limit` and `--top-k` to 3–5. Larger result sets rarely add useful signal — they flood context with diminishing-relevance matches and inflate token costs. Only increase beyond 5 when the user explicitly asks for more results or the task requires exhaustive coverage (e.g., "list all notes tagged X").
 
-8. **PDF Support**: By default, search results only return Markdown text. If the user explicitly asks to include PDF notes in their search results, append the `--with-pdf` flag to `search` or `boosted` commands.
+8. **PDF Support**: By default, search results only return Markdown notes text. If the user explicitly asks to include PDF notes in their search results, append the `--with-pdf` flag to `search` or `boosted` commands.
 
 ## Progressive Retrieval Workflow (`notebrain search`)
 
@@ -93,6 +94,7 @@ Only when the task specifically requires exploring graph topology, backlinks, or
 | "Find notes with tag X"                                | `tags`        | `notebrain tags "#Tag" --format json`                                                  |
 | "Find notes with tag X and its child tags"             | `tags`        | `notebrain tags "#Tag" --children --format json`                                       |
 | "What notes share tags with X?"                        | `tags`        | `notebrain tags "<slug>" --shared --min-shared 1 --format json`                        |
+| "Diagnose issues with NoteBrain or its environment"    | `doctor`      | `notebrain doctor`                                                                     |
 
 > **Need detailed flag descriptions or output schemas?** Read [references/flags.md](references/flags.md) for full flag tables and [references/schema.md](references/schema.md) for JSON envelope fields and TSV formatting.
 
