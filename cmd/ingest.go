@@ -36,7 +36,7 @@ type IngestCmd struct {
 	MinChunkWords  int    `name:"min-chunk-words" help:"skip chunks with fewer words (0=default of 10)" default:"0"`
 	ChunkSize      int    `name:"chunk-size" help:"max runes per chunk (0=default of 800)" default:"0"`
 	ChunkOverlap   int    `name:"chunk-overlap" help:"overlap runes between sub-chunks (0=default of 100)" default:"0"`
-	RespectExclude bool   `help:"respect Obsidian userIgnoreFilters and attachmentFolderPath settings during ingest" default:"true"`
+	RespectExclude bool   `help:"respect Obsidian userIgnoreFilters and attachmentFolderPath settings during ingest" default:"false"`
 	EnablePDF      bool   `help:"enable indexing of PDF attachments" default:"false"`
 	EnableOCR      bool   `help:"enable OCR for scanned PDFs (requires tesseract)" default:"false"`
 }

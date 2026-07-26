@@ -31,7 +31,7 @@ These flags can be applied to `notebrain` before any subcommand (e.g., `notebrai
 | `--include-text`    | `boolean` | `false`                           | Include matched chunk text inside structured outputs (JSON, TSV).                                            |
 | `--context-window`  | `integer` | `0`                               | Fetch ±N adjacent chunks around each match for additional semantic context.                                  |
 | `--min-score`       | `float`   | `0.0`                             | Suppress search results below this similarity score (0.0 to 1.0).                                            |
-| `--respect-exclude` | `boolean` | `true`                            | Respect Obsidian user ignore filters and attachment folder exclusions during ingestion.                      |
+| `--respect-exclude` | `boolean` | `false`                           | Respect Obsidian user ignore filters and attachment folder exclusions during ingestion.                      |
 | `--log-format`      | `string`  | `auto`                            | Log format: `auto` (detects TTY), `json`, or `text`.                                                         |
 | `--log-level`       | `string`  | `info`                            | Minimum log severity to show: `info`, `debug`, `warn`, or `error`.                                           |
 | `--hide-tags`       | `boolean` | `true`                            | Hide tag names (`#Tag/Subtag`) in search and graph outputs.                                                  |

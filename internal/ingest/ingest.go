@@ -59,7 +59,7 @@ func NewPipeline(s *store.Store, e Embedder, workers int) *Pipeline {
 		ChunkOverlap:    100,
 		MinChunkWords:   10,
 		MaxEmbedTokens:  256,
-		RespectExclude:  true,
+		RespectExclude:  false,
 		SkipAttachments: true,
 	}
 }

@@ -166,7 +166,7 @@ format     = "text"              # "text", "json", "tsv"
 
 skip-attachments = true          # ignore image/file links in graph
 skip-phantom     = true          # exclude uncreated "phantom" notes
-respect-exclude  = true          # honor Obsidian's ignore rules
+respect-exclude  = false         # honor Obsidian's ignore rules
 ```
 
 ### Data Location
