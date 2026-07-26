@@ -1,6 +1,6 @@
 # NoteBrain CLI
 
-A Go CLI tool that turns your [Obsidian](https://obsidian.md/) vault into a fully offline knowledge backend for **AI coding agents**. NoteBrain indexes markdown notes into a local **[ChromaDB](https://www.trychroma.com/)** vector database and exposes semantic search, wikilink graph traversal, and hidden connection discovery through structured output — designed to be chained directly by autonomous agents, shell pipelines, and LLM tool-use workflows.
+A Go CLI tool that turns your [Obsidian](https://obsidian.md/) vault into a fully offline knowledge backend for **AI coding agents**. NoteBrain indexes markdown notes (and connected PDFs) into a local **[ChromaDB](https://www.trychroma.com/)** vector database and exposes semantic search, wikilink graph traversal, and hidden connection discovery through structured output — designed to be chained directly by autonomous agents, shell pipelines, and LLM tool-use workflows.
 
 Ships with an [AI agent skill](wiki/Skill_Usage.md) and [OpenCode Agent Configuration](wiki/OpenCode_Integration.md) for integration with autonomous coding agents like [OpenCode](https://opencode.ai), [Pi agent](https://pi.dev), and Claude Code. This setup is specially optimized to reduce token usage and latency.
 
@@ -36,12 +36,11 @@ Ships with an [AI agent skill](wiki/Skill_Usage.md) and [OpenCode Agent Configur
 - **AI Agent Integration** — Includes a built-in AI agent skill and dedicated for autonomous knowledge retrieval.
 - **Terminal Hyperlinks** — Open notes directly from supported terminals using OSC 8 hyperlinks.
 - **Obsidian-Aware Indexing** — Respects your Obsidian configuration, including ignored files, attachment folders, and optional exclusion of empty-note references.
-
-> _Note: NoteBrain now supports optional PDF text extraction and OCR for scanned documents using the `--enable-pdf` and `--enable-ocr` flags._
+- **PDF Support** — Extract and index text from PDFs, including scanned documents.
 
 ### Under the Hood
 
-- **PDF & OCR Support** — Extracts text from PDFs using PDFium and OCRs scanned images using Tesseract, indexing them seamlessly alongside markdown notes.
+- **PDF Support** — Extracts text from PDFs using **[PDFium-go](https://github.com/klippa-app/go-pdfium)** and performs OCR on scanned images using **[Tesseract OCR](https://github.com/tesseract-ocr/tesseract)**, indexing their contents seamlessly alongside Markdown notes.
 - **Goldmark AST-Aware Chunking** — Splits markdown by header hierarchy rather than arbitrary character offsets, strictly preserving lists, GFM tables, blockquotes/callouts, and code blocks.
 - **Embedded ChromaDB** — Stores vectors directly on disk via [`chroma-go`](https://github.com/amikos-tech/chroma-go).
 - **Incremental Ingestion** — SHA-256 content hashing skips unmodified notes in milliseconds on re-runs.
@@ -74,7 +73,8 @@ See the full [Installation Guide](wiki/Installation.md) for details.
 ```bash
 notebrain init
 ```
-*(This interactive wizard configures your vault path, PDF, and OCR settings).*
+
+_(This interactive wizard configures your vault path, PDF, and OCR settings)._
 
 **2. Index your vault:**
 
