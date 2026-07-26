@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"charm.land/lipgloss/v2"
+
 	"github.com/nmdra/notebrain-cli/v2/internal/pdfextract"
 )
 
@@ -23,11 +24,12 @@ func (c *DoctorCmd) Run(globals *Globals) error {
 		printWarning("Vault Path", "Not configured in config.toml or flags.")
 	} else {
 		info, err := os.Stat(vaultPath)
-		if err != nil {
+		switch {
+		case err != nil:
 			printError("Vault Path", fmt.Sprintf("Cannot access %q: %v", vaultPath, err))
-		} else if !info.IsDir() {
+		case !info.IsDir():
 			printError("Vault Path", fmt.Sprintf("%q is not a directory.", vaultPath))
-		} else {
+		default:
 			printSuccess("Vault Path", fmt.Sprintf("Accessible (%s)", vaultPath))
 		}
 	}
@@ -42,7 +44,7 @@ func (c *DoctorCmd) Run(globals *Globals) error {
 			printError("ChromaDB Path", fmt.Sprintf("Cannot create/access directory %q: %v", chromaPath, err))
 		} else {
 			testFile := filepath.Join(chromaPath, ".notebrain_test_write")
-			err = os.WriteFile(testFile, []byte("test"), 0644)
+			err = os.WriteFile(testFile, []byte("test"), 0600)
 			if err != nil {
 				printError("ChromaDB Path", fmt.Sprintf("Directory %q is not writable: %v", chromaPath, err))
 			} else {

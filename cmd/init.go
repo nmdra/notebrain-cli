@@ -36,7 +36,7 @@ func (c *InitCmd) Run(globals *Globals) error {
 	// Ask for vault path
 	defaultVault := filepath.Join(home, "Documents", "Obsidian")
 	vaultPath := askString("Where is your Obsidian Vault located?", defaultVault)
-	
+
 	// Expand tilde if user typed it
 	if strings.HasPrefix(vaultPath, "~/") {
 		vaultPath = filepath.Join(home, vaultPath[2:])
@@ -70,7 +70,7 @@ func (c *InitCmd) Run(globals *Globals) error {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
-	if err := os.WriteFile(configPath, []byte(configStr), 0644); err != nil {
+	if err := os.WriteFile(configPath, []byte(configStr), 0600); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
 
@@ -84,10 +84,10 @@ func (c *InitCmd) Run(globals *Globals) error {
 func askString(prompt, defaultValue string) string {
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Printf("%s [%s]: ", prompt, defaultValue)
-	
+
 	input, _ := reader.ReadString('\n')
 	input = strings.TrimSpace(input)
-	
+
 	if input == "" {
 		return defaultValue
 	}
@@ -100,12 +100,12 @@ func askYesNo(prompt string, defaultYes bool) bool {
 	if defaultYes {
 		options = "[Y/n]"
 	}
-	
+
 	fmt.Printf("%s %s: ", prompt, options)
-	
+
 	input, _ := reader.ReadString('\n')
 	input = strings.TrimSpace(strings.ToLower(input))
-	
+
 	if input == "" {
 		return defaultYes
 	}
