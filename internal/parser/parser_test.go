@@ -76,7 +76,7 @@ func TestIsAttachmentLink(t *testing.T) {
 		{name: "note with anchor and alias", target: "My Note#Heading|Alias", want: false},
 		{name: "webp image", target: "redis-queue-1741846972555.webp", want: true},
 		{name: "png image with alias", target: "image.png|My Image", want: true},
-		{name: "pdf document", target: "docs/spec.pdf", want: true},
+		{name: "pdf document", target: "docs/spec.pdf", want: false},
 		{name: "canvas file", target: "architecture.canvas", want: true},
 	}
 	for _, tt := range tests {
@@ -258,8 +258,10 @@ func TestParse_SkipAttachments(t *testing.T) {
 	body := "Here is a note link [[Apache Kafka]] and an image link ![[redis-queue-1741846972555.webp]] and pdf [[doc.pdf]]."
 
 	resSkip := Parse(body, "test-note", 1000, 0, true)
-	if len(resSkip.Links) != 1 || resSkip.Links[0] != "Apache Kafka" {
-		t.Errorf("expected only Apache Kafka when skipAttachments=true, got %v", resSkip.Links)
+	sort.Strings(resSkip.Links)
+	expectedSkip := []string{"Apache Kafka", "doc.pdf"}
+	if !reflect.DeepEqual(resSkip.Links, expectedSkip) {
+		t.Errorf("expected Apache Kafka and doc.pdf when skipAttachments=true, got %v", resSkip.Links)
 	}
 
 	resNoSkip := Parse(body, "test-note", 1000, 0, false)

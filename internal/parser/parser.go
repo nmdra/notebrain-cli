@@ -72,7 +72,7 @@ func IsAttachmentLink(target string) bool {
 		return false
 	}
 	ext := strings.ToLower(filepath.Ext(s))
-	if ext != "" && ext != ".md" {
+	if ext != "" && ext != ".md" && ext != ".pdf" {
 		return true
 	}
 	return false
