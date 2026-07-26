@@ -18,6 +18,7 @@ These flags are available only on the commands listed.
 | `--tag "TagName"`    | Filter results to notes with this tag.                                                                                | —        |
 | `--has-tasks`        | Only return chunks containing task lists (checkboxes).                                                                | off      |
 | `--has-code`         | Only return chunks containing fenced code blocks.                                                                     | off      |
+| `--with-pdf`         | Include PDF text extraction results in the search. Defaults to false (Markdown-only).                                 | `false`  |
 
 ### `hidden`
 
@@ -49,6 +50,16 @@ These flags are available only on the commands listed.
 | `--seed STRING` | **Required.** Seed note (slug, title, or path) whose graph neighbors get a score boost. | —       |
 | `--limit N`     | Maximum number of results.                                                              | `10`    |
 | `--boost F`     | Score multiplier for graph-connected results (e.g., `1.5` = 50% boost over base score). | `1.5`   |
+| `--with-pdf`    | Include PDF text extraction results in the search. Defaults to false (Markdown-only).   | `false` |
+
+### `ingest`
+
+| Flag             | Purpose                                                                                                 | Default |
+| ---------------- | ------------------------------------------------------------------------------------------------------- | ------- |
+| `--enable-pdf`   | Process and index PDF files found in the vault using native text extraction.                            | `false` |
+| `--enable-ocr`   | Automatically perform Tesseract OCR on scanned/image-based PDFs if text extraction fails.               | `false` |
+| `--tesseract-bin`| Path to the tesseract binary.                                                                           | `tesseract`|
+| `--ocr-langs`    | Language codes to pass to Tesseract (e.g., `eng+fra`).                                                  | `eng`   |
 
 ### `get`
 
