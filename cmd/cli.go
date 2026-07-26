@@ -60,6 +60,7 @@ type CLI struct {
 	Stats       StatsCmd       `cmd:"" help:"Show collection statistics"`
 	Get         GetCmd         `cmd:"" help:"Retrieve the full text of an indexed note"`
 	Reset       ResetCmd       `cmd:"" help:"Delete all indexed data and reset the database"`
+	Doctor      DoctorCmd      `cmd:"" help:"Run diagnostics to check system dependencies and configurations"`
 	Version     VersionCmd     `cmd:"" help:"Show version information"`
 }
 
