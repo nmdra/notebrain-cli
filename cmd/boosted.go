@@ -24,6 +24,8 @@ package cmd
 import (
 	"fmt"
 
+	chroma "github.com/amikos-tech/chroma-go/pkg/api/v2"
+
 	"github.com/nmdra/notebrain-cli/v2/internal/embedder"
 )
 
@@ -33,6 +35,14 @@ type BoostedCmd struct {
 	Limit int     `help:"maximum number of results" default:"10"`
 	Seed  string  `help:"seed note (slug, title, or path) whose graph neighbors get score boost" required:"true"`
 	Boost float64 `help:"score multiplier for graph-connected results (e.g. 1.5 = 50% boost)" default:"1.5"`
+	NoPDF bool    `help:"exclude PDF results from search"`
+}
+
+func (c *BoostedCmd) buildWhereFilter() chroma.WhereFilter {
+	if c.NoPDF {
+		return chroma.EqString("file_type", "md")
+	}
+	return nil
 }
 
 func (c *BoostedCmd) Run(globals *Globals) error {
@@ -64,7 +74,8 @@ func (c *BoostedCmd) Run(globals *Globals) error {
 		return err
 	}
 
-	results, err := st.GraphBoostedSearch(ctx, qVec, seedSlug, boost, limit, c.IncludeText)
+	whereFilter := c.buildWhereFilter()
+	results, err := st.GraphBoostedSearch(ctx, qVec, seedSlug, boost, limit, whereFilter, c.IncludeText)
 	if err != nil {
 		return err
 	}

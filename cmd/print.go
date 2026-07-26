@@ -205,10 +205,18 @@ func printTextResults(w io.Writer, commandName, query string, filtered []store.R
 		rank := rankStyle.Render(fmt.Sprintf("%d.", i+1))
 
 		displayTitle := r.Title
+		if r.FileType == "pdf" {
+			displayTitle = "📄 [PDF] " + displayTitle
+		}
+
 		if r.HeadingPath != "" {
 			displayTitle = fmt.Sprintf("%s (§ %s)", displayTitle, r.HeadingPath)
 		} else if noteCounts[r.NoteSlug] > 1 {
-			displayTitle = fmt.Sprintf("%s (chunk #%d)", displayTitle, r.ChunkIndex+1)
+			if r.FileType == "pdf" {
+				displayTitle = fmt.Sprintf("%s (Page %d)", displayTitle, r.ChunkIndex+1)
+			} else {
+				displayTitle = fmt.Sprintf("%s (chunk #%d)", displayTitle, r.ChunkIndex+1)
+			}
 		}
 
 		titleWidth := 42

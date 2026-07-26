@@ -37,6 +37,8 @@ type IngestCmd struct {
 	ChunkSize      int    `name:"chunk-size" help:"max runes per chunk (0=default of 800)" default:"0"`
 	ChunkOverlap   int    `name:"chunk-overlap" help:"overlap runes between sub-chunks (0=default of 100)" default:"0"`
 	RespectExclude bool   `help:"respect Obsidian userIgnoreFilters and attachmentFolderPath settings during ingest" default:"true"`
+	EnablePDF      bool   `help:"enable indexing of PDF attachments" default:"false"`
+	EnableOCR      bool   `help:"enable OCR for scanned PDFs (requires tesseract)" default:"false"`
 }
 
 func (c *IngestCmd) Run(globals *Globals) error {
@@ -70,6 +72,8 @@ func (c *IngestCmd) Run(globals *Globals) error {
 
 	pipeline.RespectExclude = c.RespectExclude
 	pipeline.SkipAttachments = globals.SkipAttachments
+	pipeline.EnablePDF = c.EnablePDF
+	pipeline.EnableOCR = c.EnableOCR
 	// Allow flag/config overrides; 0 means "use the pipeline's built-in default".
 	if c.MinChunkWords > 0 {
 		pipeline.MinChunkWords = c.MinChunkWords

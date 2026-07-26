@@ -276,7 +276,7 @@ func TestSharedTags(t *testing.T) {
 
 func TestGraphBoostedSearch(t *testing.T) {
 	ctx, st, qVec := setupStoreTest(t)
-	boosted, err := st.GraphBoostedSearch(ctx, qVec, "note-b", 0.5, 10, false)
+	boosted, err := st.GraphBoostedSearch(ctx, qVec, "note-b", 0.5, 10, nil, false)
 	if err != nil {
 		t.Fatalf("GraphBoostedSearch failed: %v", err)
 	}

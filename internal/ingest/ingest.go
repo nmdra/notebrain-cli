@@ -18,6 +18,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/nmdra/notebrain-cli/v2/internal/parser"
+	"github.com/nmdra/notebrain-cli/v2/internal/pdfextract"
 	"github.com/nmdra/notebrain-cli/v2/internal/store"
 )
 
@@ -37,6 +38,10 @@ type Pipeline struct {
 	MaxEmbedTokens  int // max tokens for embed text (model sequence length)
 	RespectExclude  bool
 	SkipAttachments bool
+	EnablePDF       bool
+	EnableOCR       bool
+	pdfBackend      pdfextract.PDFBackend
+	ocrBackend      pdfextract.OCRBackend
 }
 
 // NewPipeline creates an ingestion pipeline with the given number of concurrent workers.
@@ -62,6 +67,28 @@ func NewPipeline(s *store.Store, e Embedder, workers int) *Pipeline {
 // Run walks the vault directory, finds markdown files matching glob, and ingests
 // them into the store with structured logging for progress.
 func (p *Pipeline) Run(ctx context.Context, vaultPath string, glob string, _ io.Reader, _ io.Writer) error {
+	if p.EnablePDF {
+		slog.Info("initializing PDF extractor backend")
+		pb, err := pdfextract.NewPDFiumBackend()
+		if err != nil {
+			return fmt.Errorf("failed to initialize PDF backend: %w", err)
+		}
+		p.pdfBackend = pb
+		defer pb.Close()
+
+		if p.EnableOCR {
+			ob := pdfextract.NewTesseractBackend("tesseract", "eng")
+			if !ob.Available() {
+				slog.Warn("OCR is enabled but tesseract is not available in PATH, skipping OCR")
+			} else if err := ob.ValidateLang(ctx); err != nil {
+				slog.Warn("OCR language validation failed, skipping OCR", "err", err)
+			} else {
+				p.ocrBackend = ob
+				slog.Info("initialized OCR backend (tesseract)")
+			}
+		}
+	}
+
 	files, err := p.collectFiles(vaultPath, glob)
 	if err != nil {
 		return err
@@ -231,7 +258,8 @@ func (p *Pipeline) collectFiles(vaultPath, glob string) ([]string, error) {
 		if d.IsDir() {
 			return nil
 		}
-		if filepath.Ext(path) == ".md" {
+		ext := filepath.Ext(path)
+		if ext == ".md" || (p.EnablePDF && ext == ".pdf") {
 			if glob != "" {
 				matched, _ := filepath.Match(glob, rel)
 				if !matched {
@@ -249,6 +277,10 @@ func (p *Pipeline) collectFiles(vaultPath, glob string) ([]string, error) {
 }
 
 func (p *Pipeline) processFile(ctx context.Context, vaultPath string, filePath string, knownHashes map[string]string) (*store.BatchIngestData, error) {
+	if filepath.Ext(filePath) == ".pdf" {
+		return p.processPdfFile(ctx, vaultPath, filePath, knownHashes)
+	}
+
 	relPath, err := filepath.Rel(vaultPath, filePath)
 	if err != nil {
 		return nil, err
@@ -343,6 +375,7 @@ func (p *Pipeline) processFile(ctx context.Context, vaultPath string, filePath s
 			HeadingPath:  c.HeadingPath,
 			HeadingLevel: c.Level,
 			HasTask:      c.HasTask,
+			FileType:     "md",
 			ModifiedMs:   modTime.UnixMilli(),
 			ContentHash:  hash,
 			Embedding:    emb,
@@ -433,4 +466,79 @@ var codeOnlyPattern = regexp.MustCompile(`^(\[code(:[^\]]+)?\]\s*)+$`)
 // [code:X] placeholder tokens with no prose content.
 func isCodeOnlyChunk(text string) bool {
 	return codeOnlyPattern.MatchString(strings.TrimSpace(text))
+}
+
+func (p *Pipeline) processPdfFile(ctx context.Context, vaultPath string, filePath string, knownHashes map[string]string) (*store.BatchIngestData, error) {
+	relPath, err := filepath.Rel(vaultPath, filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	slug := parser.Slugify(relPath)
+	sum := sha256.Sum256(content)
+	hash := hex.EncodeToString(sum[:])
+	if knownHashes[slug] == hash {
+		return nil, nil // Skip unchanged
+	}
+
+	title := parser.TitleFromPath(relPath)
+
+	info, _ := os.Stat(filePath)
+	modTime := time.Now()
+	if info != nil {
+		modTime = info.ModTime()
+	}
+
+	slog.Debug("extracting text from PDF", "file", relPath)
+	extractedPages, err := pdfextract.Extract(ctx, p.pdfBackend, p.ocrBackend, filePath)
+	if err != nil {
+		return nil, fmt.Errorf("pdf extract failed: %w", err)
+	}
+
+	// Chunk the pages
+	pdfChunks := pdfextract.ChunkPages(extractedPages, p.MinChunkWords, p.ChunkSize, p.ChunkOverlap)
+
+	if len(pdfChunks) == 0 {
+		return nil, nil
+	}
+
+	chunkRecords := make([]store.ChunkRecord, len(pdfChunks))
+	for i, c := range pdfChunks {
+		headingPath := fmt.Sprintf("Page %d", c.PageNum)
+		embedText := buildEmbedText(title, headingPath, nil, c.Text, p.MaxEmbedTokens)
+
+		emb, err := p.embedder.Embed(ctx, embedText)
+		if err != nil {
+			return nil, err
+		}
+
+		chunkRecords[i] = store.ChunkRecord{
+			ID:           fmt.Sprintf("%s:%d", slug, i),
+			NoteSlug:     slug,
+			Title:        title,
+			FilePath:     relPath,
+			ChunkIndex:   i,
+			Text:         c.Text,
+			Tags:         nil,
+			HasLinks:     false,
+			HeadingPath:  headingPath,
+			HeadingLevel: 1,
+			HasTask:      false,
+			FileType:     "pdf",
+			ModifiedMs:   modTime.UnixMilli(),
+			ContentHash:  hash,
+			Embedding:    emb,
+		}
+	}
+
+	return &store.BatchIngestData{
+		NoteSlug:     slug,
+		ChunkRecords: chunkRecords,
+		Links:        nil,
+	}, nil
 }

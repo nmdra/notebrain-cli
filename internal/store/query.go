@@ -38,6 +38,7 @@ type Result struct {
 	Text           string   `json:"text,omitempty"`    // populated only when include-text is requested
 	Context        []string `json:"context,omitempty"` // adjacent chunks when windowing is enabled
 	MatchedQueries []string `json:"matched_queries,omitempty"`
+	FileType       string   `json:"file_type,omitempty"`
 }
 
 // NoteContent represents the complete reconstructed text and metadata of a note.
@@ -970,7 +971,7 @@ func mergeDeduplicatedResults(existing, incoming []Result) []Result {
 
 // GraphBoostedSearch runs semantic search, then boosts scores of notes
 // directly linked to/from seedSlug.
-func (s *Store) GraphBoostedSearch(ctx context.Context, queryVec []float32, seedSlug string, boost float64, limit int, includeText bool) ([]Result, error) {
+func (s *Store) GraphBoostedSearch(ctx context.Context, queryVec []float32, seedSlug string, boost float64, limit int, whereFilter chroma.WhereFilter, includeText bool) ([]Result, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	linked, err := s.linkedSlugs(ctx, seedSlug)
@@ -978,7 +979,7 @@ func (s *Store) GraphBoostedSearch(ctx context.Context, queryVec []float32, seed
 		return nil, err
 	}
 
-	candidates, err := s.semanticSearch(ctx, queryVec, limit*3, 1, nil, includeText)
+	candidates, err := s.semanticSearch(ctx, queryVec, limit*3, 1, whereFilter, includeText)
 	if err != nil {
 		return nil, err
 	}
@@ -1050,6 +1051,7 @@ func deduplicateByNote(res chroma.QueryResult, limit int, topKPerNote int, inclu
 			Score:       float64(1 - dist), // convert distance → similarity
 			ChunkIndex:  metaInt(meta, "chunk_index"),
 			HeadingPath: metaString(meta, "heading_path"),
+			FileType:    metaString(meta, "file_type"),
 			Text:        txt,
 			Tags:        decodeTags(meta),
 		})
@@ -1074,6 +1076,7 @@ func getResultToResults(res chroma.GetResult, limit int, includeText bool) []Res
 		filePath    string
 		chunkIndex  int
 		headingPath string
+		fileType    string
 		text        string
 		tags        []string
 	}
@@ -1094,6 +1097,7 @@ func getResultToResults(res chroma.GetResult, limit int, includeText bool) []Res
 				filePath:    metaString(meta, "file_path"),
 				chunkIndex:  metaInt(meta, "chunk_index"),
 				headingPath: metaString(meta, "heading_path"),
+				fileType:    metaString(meta, "file_type"),
 				text:        txt,
 				tags:        decodeTags(meta),
 			}
@@ -1109,6 +1113,7 @@ func getResultToResults(res chroma.GetResult, limit int, includeText bool) []Res
 			Score:       1.0,
 			ChunkIndex:  b.chunkIndex,
 			HeadingPath: b.headingPath,
+			FileType:    b.fileType,
 			Text:        b.text,
 			Tags:        b.tags,
 		})

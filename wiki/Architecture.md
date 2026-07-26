@@ -23,7 +23,7 @@ graph TD
         Obsidian["Obsidian CLI Client (obsidian/)"]
 
         subgraph IngestionPipeline ["Ingestion Pipeline"]
-            Parser["Markdown Parser & Chunking (parser/)"]
+            Parser["Markdown Parser & PDF/OCR Extractor (parser/ & pdfextract/)"]
             Embedder["Embedding Backend: MiniLM / Ollama (embedder/)"]
             Ingest["Ingestion Coordinator (ingest/)"]
         end
@@ -112,6 +112,7 @@ To maintain strict compatibility with the Go ChromaDB client, array properties (
 | `content_hash`        | `string` | Hash of the chunk content used for deduplication and change tracking.      |
 | `tag_count`           | `int`    | Total number of tags associated with the note/chunk.                       |
 | `tag_0`, `tag_1`, ... | `string` | Flat encoding of individual tags (e.g., `tag_0: "golang"`, `tag_1: "ai"`). |
+| `file_type`           | `string` | Type of file (`md` for markdown, `pdf` for PDF).                           |
 
 ---
 
@@ -153,7 +154,8 @@ Stores directed edges representing wikilinks and Markdown links between notes (`
 - **Configuration (`internal/configfile` & `config/`)**: Manages TOML configuration loading via Kong resolvers. Supports normalized key lookups (`snake_case` and `kebab-case`) and resolves flags without relying on `.env` files or application environment variables.
 - **Embedder (`internal/embedder`)**: Manages the local embedding models. Supports embedded ONNX MiniLM sentence embeddings or external Ollama service backends.
 - **Parser (`internal/parser`)**: Reads Markdown files from the Obsidian vault, extracts YAML frontmatter/properties, parses wikilinks and standard Markdown links, identifies task checkboxes and tables, and splits note text into semantic chunks. It strictly preserves structural Markdown syntax across chunks, including tight ordered/unordered lists (`1. `, `- `), task checkboxes (`[ ] `, `[x] `), multi-line blockquotes and callout headers (`> [!NOTE]`), and GFM tables with alignment separator rows (`| --- | --- |`). Distinct structural blocks (`paragraph`, `list`, `table`, `blockquote`, `code`) are cleanly separated by `\n\n`.
-- **Ingest (`internal/ingest`)**: Handles multi-worker concurrent directory walking. It reads `.md` files, calls the parser, generates embeddings, and coordinates atomic note updates (`DeleteNoteChunks` -> `UpsertChunks` -> `UpsertLinks` under a single store mutex lock).
+- **PDF & OCR Extractor (`internal/pdfextract`)**: Extracts text from PDFs using a WASM-compiled PDFium backend. For scanned images or unextractable text, it gracefully falls back to OCR via Tesseract (if enabled). PDF documents are chunked on a per-page basis to preserve logical pagination in search results.
+- **Ingest (`internal/ingest`)**: Handles multi-worker concurrent directory walking. It reads `.md` and optionally `.pdf` files, calls the parser/extractor, generates embeddings, and coordinates atomic note updates (`DeleteNoteChunks` -> `UpsertChunks` -> `UpsertLinks` under a single store mutex lock).
 - **Store (`internal/store`)**: The ChromaDB wrapper that abstracts collection creation, chunk upsertion, link deduplication, and exposes all graph (BFS traversal in Go) and semantic queries.
 - **Obsidian Client (`internal/obsidian`)**: Interacts with the Obsidian CLI for vault operations and note inspection.
 

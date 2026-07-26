@@ -44,6 +44,7 @@ type SearchCmd struct {
 	Tag         string   `help:"filter results to notes with this tag"`
 	HasTasks    bool     `help:"only return chunks containing task lists (checkboxes)"`
 	HasCode     bool     `help:"only return chunks containing fenced code blocks"`
+	NoPDF       bool     `help:"exclude PDF results from search"`
 }
 
 func resolveQueries(queries []string, split bool, splitBy string) []string {
@@ -161,6 +162,9 @@ func (c *SearchCmd) buildWhereFilter(resolveTags bool) chroma.WhereFilter {
 	}
 	if c.HasCode {
 		filters = append(filters, chroma.EqBool("has_code", true))
+	}
+	if c.NoPDF {
+		filters = append(filters, chroma.EqString("file_type", "md"))
 	}
 	if c.Tag != "" && resolveTags {
 		filters = append(filters, store.TagWhereClause(c.Tag))

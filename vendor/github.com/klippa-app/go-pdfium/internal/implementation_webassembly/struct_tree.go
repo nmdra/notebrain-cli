@@ -1,0 +1,71 @@
+package implementation_webassembly
+
+import (
+	"github.com/google/uuid"
+	"github.com/klippa-app/go-pdfium/references"
+)
+
+func (p *PdfiumImplementation) registerStructTree(structTree *uint64, documentHandle *DocumentHandle) *StructTreeHandle {
+	ref := uuid.New()
+	handle := &StructTreeHandle{
+		handle:      structTree,
+		nativeRef:   references.FPDF_STRUCTTREE(ref.String()),
+		documentRef: documentHandle.nativeRef,
+	}
+
+	documentHandle.structTreeRefs[handle.nativeRef] = handle
+	p.structTreeRefs[handle.nativeRef] = handle
+
+	return handle
+}
+
+func (p *PdfiumImplementation) registerStructElement(structElement *uint64, documentHandle *DocumentHandle) *StructElementHandle {
+	ref := uuid.New()
+	handle := &StructElementHandle{
+		handle:    structElement,
+		nativeRef: references.FPDF_STRUCTELEMENT(ref.String()),
+	}
+
+	if documentHandle != nil {
+		handle.documentRef = documentHandle.nativeRef
+		documentHandle.structElementRefs[handle.nativeRef] = handle
+	}
+
+	p.structElementRefs[handle.nativeRef] = handle
+
+	return handle
+}
+
+type StructElementAttributeHandle struct {
+	handle    *uint64
+	nativeRef references.FPDF_STRUCTELEMENT_ATTR // A string that is our reference inside the process. We need this to close the references in DestroyLibrary.
+}
+
+func (p *PdfiumImplementation) registerStructElementAttribute(structElementAttribute *uint64) *StructElementAttributeHandle {
+	ref := uuid.New()
+	handle := &StructElementAttributeHandle{
+		handle:    structElementAttribute,
+		nativeRef: references.FPDF_STRUCTELEMENT_ATTR(ref.String()),
+	}
+
+	p.structElementAttributeRefs[handle.nativeRef] = handle
+
+	return handle
+}
+
+type StructElementAttributeValueHandle struct {
+	handle    *uint64
+	nativeRef references.FPDF_STRUCTELEMENT_ATTR_VALUE // A string that is our reference inside the process. We need this to close the references in DestroyLibrary.
+}
+
+func (p *PdfiumImplementation) registerStructElementAttributeValue(structElementAttributeValue *uint64) *StructElementAttributeValueHandle {
+	ref := uuid.New()
+	handle := &StructElementAttributeValueHandle{
+		handle:    structElementAttributeValue,
+		nativeRef: references.FPDF_STRUCTELEMENT_ATTR_VALUE(ref.String()),
+	}
+
+	p.structElementAttributeValueRefs[handle.nativeRef] = handle
+
+	return handle
+}

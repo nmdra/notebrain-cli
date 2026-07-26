@@ -102,6 +102,8 @@ notebrain ingest [<glob>] [flags]
 | `--min-chunk-words` | `integer` | `0`     | Skip chunks with fewer words than this (0 defaults to 10 words).                    |
 | `--chunk-size`      | `integer` | `0`     | Maximum runes per chunk for the parser (0 defaults to 800 runes).                   |
 | `--chunk-overlap`   | `integer` | `0`     | Overlap runes between sub-chunks when a section is split (0 defaults to 100 runes). |
+| `--enable-pdf`      | `boolean` | `false` | Enable PDF text extraction using PDFium.                                            |
+| `--enable-ocr`      | `boolean` | `false` | Enable OCR for scanned PDFs using Tesseract (requires `--enable-pdf`).              |
 
 #### Examples
 
@@ -142,6 +144,7 @@ notebrain search [<query>] [flags]
 | `--tag`         | `string`  | _(None)_ | Filter results by tag name (prefixed `#` is optional).                                         |
 | `--has-tasks`   | `boolean` | `false`  | Only return chunks containing markdown task lists (`- [ ]`).                                   |
 | `--has-code`    | `boolean` | `false`  | Only return chunks containing code blocks.                                                     |
+| `--no-pdf`      | `boolean` | `false`  | Exclude PDF results from the search.                                                           |
 | `--interactive` | `boolean` | `false`  | Launch a live interactive search TUI where you can type queries and preview results.           |
 | `--split`       | `boolean` | `false`  | Split query string by delimiters (comma, pipe, semicolon) or execute multi-positional queries. |
 | `--split-by`    | `string`  | `,       | ;`                                                                                             | Delimiters used to split query strings when `--split` is active. |
@@ -351,6 +354,7 @@ notebrain boosted <query> --seed=STRING [flags]
 | `--seed`  | `string`  | _(None)_ | **Required.** The origin note slug or title for graph boosting. |
 | `--boost` | `float`   | `1.5`    | Multiplier applied to scores of graph-connected results.        |
 | `--limit` | `integer` | `10`     | Maximum number of results to return.                            |
+| `--no-pdf`| `boolean` | `false`  | Exclude PDF results from the search.                            |
 
 #### Examples
 

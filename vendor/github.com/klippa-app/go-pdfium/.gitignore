@@ -1,0 +1,12 @@
+/bin/*
+
+/.idea
+/*.log
+/*.log.*
+/out
+/vendor
+
+coverage.out
+shared_tests/testdata/render_*.png
+shared_tests/testdata/render_*.jpg
+

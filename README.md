@@ -37,10 +37,11 @@ Ships with an [AI agent skill](wiki/Skill_Usage.md) and [OpenCode Agent Configur
 - **Terminal Hyperlinks** — Open notes directly from supported terminals using OSC 8 hyperlinks.
 - **Obsidian-Aware Indexing** — Respects your Obsidian configuration, including ignored files, attachment folders, and optional exclusion of empty-note references.
 
-> _Note: Currently, this tool focuses on Markdown text only and does not support PDF or image OCR._
+> _Note: NoteBrain now supports optional PDF text extraction and OCR for scanned documents using the `--enable-pdf` and `--enable-ocr` flags._
 
 ### Under the Hood
 
+- **PDF & OCR Support** — Extracts text from PDFs using PDFium and OCRs scanned images using Tesseract, indexing them seamlessly alongside markdown notes.
 - **Goldmark AST-Aware Chunking** — Splits markdown by header hierarchy rather than arbitrary character offsets, strictly preserving lists, GFM tables, blockquotes/callouts, and code blocks.
 - **Embedded ChromaDB** — Stores vectors directly on disk via [`chroma-go`](https://github.com/amikos-tech/chroma-go).
 - **Incremental Ingestion** — SHA-256 content hashing skips unmodified notes in milliseconds on re-runs.
@@ -72,14 +73,18 @@ See the full [Installation Guide](wiki/Installation.md) for details.
 
 ```bash
 notebrain ingest --vault-path "/path/to/your/Obsidian Vault"
+# Or with PDF support:
+notebrain ingest --vault-path "/path/to/your/Obsidian Vault" --enable-pdf --enable-ocr
 ```
 
-> _Note: First-time indexing may take several minutes depending on your vault size._
+> _Note: First-time indexing may take several minutes depending on your vault size and PDF count._
 
 **2. Search your notes by meaning:**
 
 ```bash
 notebrain search "how do message brokers work?" --limit 5 --top-k 2
+# Exclude PDF results from search:
+notebrain search "message broker" --no-pdf
 ```
 
 <p align="center">

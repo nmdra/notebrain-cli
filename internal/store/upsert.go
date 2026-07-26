@@ -22,6 +22,7 @@ type ChunkRecord struct {
 	Text         string
 	Tags         []string
 	HasLinks     bool
+	FileType     string // e.g. "md" or "pdf"
 	HeadingPath  string
 	HeadingLevel int
 	HasTask      bool
@@ -346,6 +347,7 @@ func buildChunkMeta(c ChunkRecord) map[string]any {
 		"heading_path":  c.HeadingPath,
 		"heading_level": c.HeadingLevel,
 		"has_task":      c.HasTask,
+		"file_type":     c.FileType,
 		"modified_ms":   c.ModifiedMs,
 		"content_hash":  c.ContentHash,
 		"tag_count":     len(c.Tags),

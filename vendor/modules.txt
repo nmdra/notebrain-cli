@@ -102,6 +102,24 @@ github.com/go-viper/mapstructure/v2/internal/errors
 # github.com/google/uuid v1.6.0
 ## explicit
 github.com/google/uuid
+# github.com/jolestar/go-commons-pool/v2 v2.1.2
+## explicit; go 1.13
+github.com/jolestar/go-commons-pool/v2
+github.com/jolestar/go-commons-pool/v2/collections
+github.com/jolestar/go-commons-pool/v2/concurrent
+# github.com/klippa-app/go-pdfium v1.19.4
+## explicit; go 1.25.0
+github.com/klippa-app/go-pdfium
+github.com/klippa-app/go-pdfium/enums
+github.com/klippa-app/go-pdfium/errors
+github.com/klippa-app/go-pdfium/internal/image/image_jpeg
+github.com/klippa-app/go-pdfium/internal/implementation_webassembly
+github.com/klippa-app/go-pdfium/references
+github.com/klippa-app/go-pdfium/requests
+github.com/klippa-app/go-pdfium/responses
+github.com/klippa-app/go-pdfium/structs
+github.com/klippa-app/go-pdfium/webassembly
+github.com/klippa-app/go-pdfium/webassembly/imports
 # github.com/leodido/go-urn v1.5.0
 ## explicit; go 1.24.0
 github.com/leodido/go-urn
@@ -136,6 +154,49 @@ github.com/shopspring/decimal
 # github.com/soypat/goldmark-latex v0.1.4
 ## explicit; go 1.19
 github.com/soypat/goldmark-latex
+# github.com/tetratelabs/wazero v1.12.0
+## explicit; go 1.25.0
+github.com/tetratelabs/wazero
+github.com/tetratelabs/wazero/api
+github.com/tetratelabs/wazero/experimental
+github.com/tetratelabs/wazero/experimental/logging
+github.com/tetratelabs/wazero/experimental/sys
+github.com/tetratelabs/wazero/imports/emscripten
+github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1
+github.com/tetratelabs/wazero/internal/assemblyscript
+github.com/tetratelabs/wazero/internal/assemblyscript/logging
+github.com/tetratelabs/wazero/internal/descriptor
+github.com/tetratelabs/wazero/internal/emscripten
+github.com/tetratelabs/wazero/internal/engine/interpreter
+github.com/tetratelabs/wazero/internal/engine/wazevo
+github.com/tetratelabs/wazero/internal/engine/wazevo/backend
+github.com/tetratelabs/wazero/internal/engine/wazevo/backend/isa/amd64
+github.com/tetratelabs/wazero/internal/engine/wazevo/backend/isa/arm64
+github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc
+github.com/tetratelabs/wazero/internal/engine/wazevo/frontend
+github.com/tetratelabs/wazero/internal/engine/wazevo/ssa
+github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi
+github.com/tetratelabs/wazero/internal/expctxkeys
+github.com/tetratelabs/wazero/internal/filecache
+github.com/tetratelabs/wazero/internal/ieee754
+github.com/tetratelabs/wazero/internal/internalapi
+github.com/tetratelabs/wazero/internal/leb128
+github.com/tetratelabs/wazero/internal/logging
+github.com/tetratelabs/wazero/internal/moremath
+github.com/tetratelabs/wazero/internal/platform
+github.com/tetratelabs/wazero/internal/sock
+github.com/tetratelabs/wazero/internal/sys
+github.com/tetratelabs/wazero/internal/sysfs
+github.com/tetratelabs/wazero/internal/u32
+github.com/tetratelabs/wazero/internal/u64
+github.com/tetratelabs/wazero/internal/version
+github.com/tetratelabs/wazero/internal/wasip1
+github.com/tetratelabs/wazero/internal/wasip1/logging
+github.com/tetratelabs/wazero/internal/wasm
+github.com/tetratelabs/wazero/internal/wasm/binary
+github.com/tetratelabs/wazero/internal/wasmdebug
+github.com/tetratelabs/wazero/internal/wasmruntime
+github.com/tetratelabs/wazero/sys
 # github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e
 ## explicit; go 1.19
 github.com/xo/terminfo
@@ -179,6 +240,9 @@ go.uber.org/zap/zapcore
 # golang.org/x/crypto v0.54.0
 ## explicit; go 1.25.0
 golang.org/x/crypto/sha3
+# golang.org/x/net v0.56.0
+## explicit; go 1.25.0
+golang.org/x/net/context
 # golang.org/x/sync v0.22.0
 ## explicit; go 1.25.0
 golang.org/x/sync/errgroup
@@ -189,10 +253,17 @@ golang.org/x/sys/unix
 golang.org/x/sys/windows
 # golang.org/x/text v0.40.0
 ## explicit; go 1.25.0
+golang.org/x/text/encoding
+golang.org/x/text/encoding/internal
+golang.org/x/text/encoding/internal/identifier
+golang.org/x/text/encoding/unicode
 golang.org/x/text/internal/language
 golang.org/x/text/internal/language/compact
 golang.org/x/text/internal/tag
+golang.org/x/text/internal/utf8internal
 golang.org/x/text/language
+golang.org/x/text/runes
+golang.org/x/text/transform
 # gopkg.in/yaml.v2 v2.4.0
 ## explicit; go 1.15
 gopkg.in/yaml.v2
