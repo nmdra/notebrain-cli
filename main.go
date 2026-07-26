@@ -23,12 +23,16 @@ package main
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
 	"os"
 	"runtime/debug"
 
 	"github.com/nmdra/notebrain-cli/v2/cmd"
 )
+
+//go:embed config.example.toml
+var defaultConfigFile []byte
 
 // Populated automatically by GoReleaser during git tag builds:
 var (
@@ -45,7 +49,7 @@ func main() {
 	}
 
 	ctx := context.Background()
-	if err := cmd.ParseAndRun(ctx, version, commit, date); err != nil {
+	if err := cmd.ParseAndRun(ctx, version, commit, date, defaultConfigFile); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}

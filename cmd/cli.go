@@ -42,6 +42,7 @@ type Globals struct {
 	Ctx           context.Context `kong:"-"`
 	VersionString string          `kong:"-"`
 	Queries       []string        `kong:"-"`
+	DefaultConfig []byte          `kong:"-"`
 
 	Config kong.ConfigFlag `help:"path to config file" default:"~/.notebrain/config/config.toml"`
 }
@@ -61,11 +62,12 @@ type CLI struct {
 	Get         GetCmd         `cmd:"" help:"Retrieve the full text of an indexed note"`
 	Reset       ResetCmd       `cmd:"" help:"Delete all indexed data and reset the database"`
 	Doctor      DoctorCmd      `cmd:"" help:"Run diagnostics to check system dependencies and configurations"`
+	Init        InitCmd        `cmd:"" help:"Initialize NoteBrain configuration interactively"`
 	Version     VersionCmd     `cmd:"" help:"Show version information"`
 }
 
 // ParseAndRun parses CLI arguments and runs the selected subcommand.
-func ParseAndRun(ctx context.Context, version, commit, date string) error {
+func ParseAndRun(ctx context.Context, version, commit, date string, defaultConfig []byte) error {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		home = "."
@@ -79,6 +81,7 @@ func ParseAndRun(ctx context.Context, version, commit, date string) error {
 			ChromaPath:    defaultChromaPath,
 			Ctx:           ctx,
 			VersionString: versionStr,
+			DefaultConfig: defaultConfig,
 		},
 	}
 

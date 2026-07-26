@@ -361,6 +361,31 @@ notebrain boosted "caching strategies" --seed "Redis" --boost 2.0 --limit 5
 
 ---
 
+
+### `doctor`
+
+Runs a diagnostic health check on your environment to ensure NoteBrain is configured correctly and has access to necessary dependencies.
+
+#### Usage
+
+```bash
+notebrain doctor [flags]
+```
+
+---
+
+### `init`
+
+Launches an interactive wizard to create or update your `config.toml` file. It will automatically populate your vault path and let you enable or disable PDF and OCR support.
+
+#### Usage
+
+```bash
+notebrain init [flags]
+```
+
+---
+
 ### `stats`
 
 Displays statistics for your NoteBrain collection (total number of indexed chunks and links).
