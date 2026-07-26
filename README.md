@@ -4,12 +4,12 @@ A Go CLI tool that turns your [Obsidian](https://obsidian.md/) vault into a full
 
 Ships with an [AI agent skill](wiki/Skill_Usage.md) and [OpenCode Agent Configuration](wiki/OpenCode_Integration.md) for integration with autonomous coding agents like [OpenCode](https://opencode.ai), [Pi agent](https://pi.dev), and Claude Code. This setup is specially optimized to reduce token usage and latency.
 
-[![Release](https://github.com/nmdra/notebrain-cli/actions/workflows/release.yml/badge.svg)](https://github.com/nmdra/notebrain-cli/actions/workflows/release.yml)
+<img src="https://github.com/egonelbre/gophers/blob/master/.thumb/animation/gopher-dance-long.gif?raw=true" alt="Gopher Dancing" width="30"/> [![Go Version](https://img.shields.io/github/go-mod/go-version/nmdra/notebrain-cli)](https://github.com/nmdra/notebrain-cli/blob/master/go.mod)
 [![Go Reference](https://pkg.go.dev/badge/github.com/nmdra/notebrain-cli.svg)](https://pkg.go.dev/github.com/nmdra/notebrain-cli/v2)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/nmdra/notebrain-cli)
-[![Go Version](https://img.shields.io/github/go-mod/go-version/nmdra/notebrain-cli)](https://github.com/nmdra/notebrain-cli/blob/master/go.mod)
-[![License: MIT](https://img.shields.io/github/license/nmdra/notebrain-cli)](https://github.com/nmdra/notebrain-cli/blob/main/LICENSE)
+[![Release](https://github.com/nmdra/notebrain-cli/actions/workflows/release.yml/badge.svg)](https://github.com/nmdra/notebrain-cli/actions/workflows/release.yml)
 [![GitHub release](https://img.shields.io/github/v/release/nmdra/notebrain-cli)](https://github.com/nmdra/notebrain-cli/releases)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/nmdra/notebrain-cli)
+[![License: MIT](https://img.shields.io/github/license/nmdra/notebrain-cli)](https://github.com/nmdra/notebrain-cli/blob/main/LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/nmdra/notebrain-cli?style=social)](https://github.com/nmdra/notebrain-cli/stargazers)
 
 <p align="center">
@@ -49,7 +49,7 @@ Ships with an [AI agent skill](wiki/Skill_Usage.md) and [OpenCode Agent Configur
 
 ## Prerequisites
 
-- **Go 1.26.4+**
+- **Go 1.26.4+** <img src="https://github.com/egonelbre/gophers/blob/master/.thumb/animation/gopher-dance-long.gif?raw=true" alt="Gopher Dancing" width="16"/>
 - **CGO-enabled toolchain**
 - Linux (macOS and Windows binaries are untested)
 
