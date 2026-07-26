@@ -44,7 +44,7 @@ type Globals struct {
 	Queries       []string        `kong:"-"`
 	DefaultConfig []byte          `kong:"-"`
 
-	Config kong.ConfigFlag `help:"path to config file" default:"~/.notebrain/config/config.toml"`
+	Config kong.ConfigFlag `help:"path to config file (default: ~/.notebrain/config/config.toml)" type:"path"`
 }
 
 // CLI is the top-level Kong command tree.
@@ -73,6 +73,8 @@ func ParseAndRun(ctx context.Context, version, commit, date string, defaultConfi
 		home = "."
 	}
 	defaultChromaPath := filepath.Join(home, ".notebrain", "chroma")
+
+	defaultConfigPath := filepath.Join(home, ".notebrain", "config", "config.toml")
 
 	versionStr := fmt.Sprintf("notebrain %s (commit: %s, built: %s)", version, commit, date)
 
@@ -112,7 +114,7 @@ Examples:
 			Compact: true,
 			Summary: false,
 		}),
-		kong.Configuration(configfile.IgnoreMissingFileLoader(configfile.TOMLResolver)),
+		kong.Configuration(configfile.IgnoreMissingFileLoader(configfile.TOMLResolver), defaultConfigPath),
 		kong.Vars{"version": versionStr},
 	)
 
