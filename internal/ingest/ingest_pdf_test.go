@@ -2,6 +2,8 @@ package ingest
 
 import (
 	"context"
+	"crypto/sha256"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -45,8 +47,8 @@ func TestProcessPdfFile(t *testing.T) {
 		t.Fatal("expected non-nil result")
 	}
 
-	if res.NoteSlug != "dummypdf" {
-		t.Errorf("expected slug 'dummypdf', got %q", res.NoteSlug)
+	if res.NoteSlug != "dummy-pdf" {
+		t.Errorf("expected slug 'dummy-pdf', got %q", res.NoteSlug)
 	}
 
 	if len(res.ChunkRecords) != 1 {
@@ -70,15 +72,8 @@ func TestProcessPdfFile_SkipUnchanged(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Compute hash manually to mock the unchanged state
-	importHash := "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" // dummy hash just for test structure
-	_ = importHash
-	// Actually we should just calculate it
-	importHashBytes := []byte{ /* placeholder, just let the logic hash it */ }
-	_ = importHashBytes
-
-	// Actually, let's just use the same logic
-	importHash = "8d336829705fcc02f2af2641029c4ba520288863dd252c41c3057a6279f8c6eb" // sha256 of "%PDF-1.4 dummy"
+	importHashBytes := []byte("%PDF-1.4 dummy")
+	importHash := fmt.Sprintf("%x", sha256.Sum256(importHashBytes))
 
 	p := &Pipeline{
 		embedder:   &mockEmbedder{},
@@ -86,7 +81,7 @@ func TestProcessPdfFile_SkipUnchanged(t *testing.T) {
 	}
 
 	knownHashes := map[string]string{
-		"dummypdf": importHash,
+		"dummy-pdf": importHash,
 	}
 
 	res, err := p.processPdfFile(context.Background(), dir, pdfPath, knownHashes)

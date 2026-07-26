@@ -27,8 +27,7 @@ func Extract(ctx context.Context, pdfBackend PDFBackend, ocrBackend OCRBackend, 
 					continue
 				}
 
-				ocrText, ocrErr := ocrBackend.OCRPage(ctx, img)
-				os.Remove(img) // Clean up temp image
+				ocrText, ocrErr := runOCRWithCleanup(ctx, ocrBackend, img)
 
 				if ocrErr != nil {
 					slog.Warn("pdf: OCR failed for page, using sparse text",
@@ -64,4 +63,9 @@ func textDensity(text string) int {
 		}
 	}
 	return count
+}
+
+func runOCRWithCleanup(ctx context.Context, ocrBackend OCRBackend, img string) (string, error) {
+	defer os.Remove(img)
+	return ocrBackend.OCRPage(ctx, img)
 }

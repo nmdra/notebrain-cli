@@ -85,6 +85,15 @@ min-chunk-words = 10
 # Defaults to true
 skip-attachments = true
 
+# Enable text extraction from PDF attachments during ingestion using PDFium.
+# Defaults to false
+enable-pdf = false
+
+# Enable OCR fallback for scanned PDFs during ingestion (requires Tesseract).
+# This setting is ignored if enable-pdf is false.
+# Defaults to false
+enable-ocr = false
+
 # ------------------------------------------------------------------------------
 # Search and Traversal Settings
 # ------------------------------------------------------------------------------

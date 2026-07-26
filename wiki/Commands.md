@@ -132,7 +132,7 @@ notebrain search [<query>] [flags]
 
 #### Arguments
 
-- `[<query>]` _(optional)_: The semantic query string. (Can be omitted if `--interactive` or `--tag` is specified).
+- `[<query>]` _(optional)_: The semantic query string. (Can be omitted if `--tag` is specified).
 
 #### Command-Specific Flags
 
@@ -145,7 +145,6 @@ notebrain search [<query>] [flags]
 | `--has-tasks`   | `boolean` | `false`  | Only return chunks containing markdown task lists (`- [ ]`).                                   |
 | `--has-code`    | `boolean` | `false`  | Only return chunks containing code blocks.                                                     |
 | `--no-pdf`      | `boolean` | `false`  | Exclude PDF results from the search.                                                           |
-| `--interactive` | `boolean` | `false`  | Launch a live interactive search TUI where you can type queries and preview results.           |
 | `--split`       | `boolean` | `false`  | Split query string by delimiters (comma, pipe, semicolon) or execute multi-positional queries. |
 | `--split-by`    | `string`  | `,       | ;`                                                                                             | Delimiters used to split query strings when `--split` is active. |
 
@@ -166,9 +165,6 @@ notebrain search "redis, streams, pubsub" --split
 
 # Multi-query search with tags hidden in output
 notebrain search "redis, streams" --split --hide-tags
-
-# Launch live-search interactive terminal
-notebrain search --interactive
 ```
 
 #### How Multi-Query Matching & Ranking Works

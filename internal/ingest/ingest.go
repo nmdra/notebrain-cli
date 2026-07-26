@@ -258,7 +258,7 @@ func (p *Pipeline) collectFiles(vaultPath, glob string) ([]string, error) {
 		if d.IsDir() {
 			return nil
 		}
-		ext := filepath.Ext(path)
+		ext := strings.ToLower(filepath.Ext(path))
 		if ext == ".md" || (p.EnablePDF && ext == ".pdf") {
 			if glob != "" {
 				matched, _ := filepath.Match(glob, rel)
@@ -277,7 +277,7 @@ func (p *Pipeline) collectFiles(vaultPath, glob string) ([]string, error) {
 }
 
 func (p *Pipeline) processFile(ctx context.Context, vaultPath string, filePath string, knownHashes map[string]string) (*store.BatchIngestData, error) {
-	if filepath.Ext(filePath) == ".pdf" {
+	if strings.ToLower(filepath.Ext(filePath)) == ".pdf" {
 		return p.processPdfFile(ctx, vaultPath, filePath, knownHashes)
 	}
 
@@ -504,7 +504,11 @@ func (p *Pipeline) processPdfFile(ctx context.Context, vaultPath string, filePat
 	pdfChunks := pdfextract.ChunkPages(extractedPages, p.MinChunkWords, p.ChunkSize, p.ChunkOverlap)
 
 	if len(pdfChunks) == 0 {
-		return nil, nil
+		return &store.BatchIngestData{
+			NoteSlug:     slug,
+			ChunkRecords: nil,
+			Links:        nil,
+		}, nil
 	}
 
 	chunkRecords := make([]store.ChunkRecord, len(pdfChunks))

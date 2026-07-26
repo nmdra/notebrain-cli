@@ -23,8 +23,13 @@ func TitleFromPath(path string) string {
 		return ""
 	}
 	base := filepath.Base(path)
-	base = strings.TrimSuffix(base, ".md")
-	return strings.TrimSuffix(base, ".pdf")
+	if strings.HasSuffix(strings.ToLower(base), ".md") {
+		base = base[:len(base)-3]
+	}
+	if strings.HasSuffix(strings.ToLower(base), ".pdf") {
+		base = base[:len(base)-4]
+	}
+	return base
 }
 
 // Slugify converts a note name/filename to a URL-safe slug.

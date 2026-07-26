@@ -41,6 +41,10 @@ notebrain-cli/
 │   ├── embedder/      ← Embedding backends (MiniLM, Ollama)
 │   │   ├── embedder.go
 │   │   └── *_test.go
+│   ├── pdfextract/    ← WASM PDFium extraction & Tesseract OCR
+│   │   ├── backend.go
+│   │   ├── pdfextract.go
+│   │   └── *_test.go
 │   └── obsidian/      ← Obsidian CLI client
 │       ├── client.go
 │       └── *_test.go

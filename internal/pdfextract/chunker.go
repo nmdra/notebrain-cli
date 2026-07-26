@@ -18,7 +18,7 @@ func ChunkPages(pages []string, minWords, maxRunes, overlap int) []PDFChunk {
 
 	for i, page := range pages {
 		page = strings.TrimSpace(page)
-		if len(strings.Fields(page)) < minWords {
+		if len(strings.Fields(page)) < minWords && len([]rune(page)) < minWords*5 {
 			continue // skip empty or very sparse pages
 		}
 
@@ -66,7 +66,7 @@ func splitPageText(text string, maxRunes, overlap int) []string {
 			break
 		}
 
-		start = max(end-overlap, 0)
+		start = max(end-overlap, start+1)
 	}
 
 	return chunks

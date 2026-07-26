@@ -124,10 +124,12 @@ func (b *PDFiumBackend) RenderPage(_ context.Context, filePath string, pageNum i
 
 	if renderReq.Result.Image != nil {
 		if err := png.Encode(f, renderReq.Result.Image); err != nil {
+			f.Close()
 			os.Remove(f.Name())
 			return "", fmt.Errorf("failed to encode png: %w", err)
 		}
 	} else {
+		f.Close()
 		os.Remove(f.Name())
 		return "", fmt.Errorf("render returned nil image")
 	}

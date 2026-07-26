@@ -212,11 +212,7 @@ func printTextResults(w io.Writer, commandName, query string, filtered []store.R
 		if r.HeadingPath != "" {
 			displayTitle = fmt.Sprintf("%s (§ %s)", displayTitle, r.HeadingPath)
 		} else if noteCounts[r.NoteSlug] > 1 {
-			if r.FileType == "pdf" {
-				displayTitle = fmt.Sprintf("%s (Page %d)", displayTitle, r.ChunkIndex+1)
-			} else {
-				displayTitle = fmt.Sprintf("%s (chunk #%d)", displayTitle, r.ChunkIndex+1)
-			}
+			displayTitle = fmt.Sprintf("%s (chunk #%d)", displayTitle, r.ChunkIndex+1)
 		}
 
 		titleWidth := 42
