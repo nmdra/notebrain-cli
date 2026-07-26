@@ -83,8 +83,8 @@ notebrain ingest --vault-path "/path/to/your/Obsidian Vault" --enable-pdf --enab
 
 ```bash
 notebrain search "how do message brokers work?" --limit 5 --top-k 2
-# Exclude PDF results from search:
-notebrain search "message broker" --no-pdf
+# Include PDF results in search:
+notebrain search "message broker" --with-pdf
 ```
 
 <p align="center">

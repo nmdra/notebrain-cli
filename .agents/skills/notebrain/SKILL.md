@@ -48,7 +48,7 @@ notebrain stats --format=json
 
 7. **Keep Result Sets Small**: Default `--limit` and `--top-k` to 3–5. Larger result sets rarely add useful signal — they flood context with diminishing-relevance matches and inflate token costs. Only increase beyond 5 when the user explicitly asks for more results or the task requires exhaustive coverage (e.g., "list all notes tagged X").
 
-8. **PDF Filtering**: If the user wants to exclude PDFs from their search results (e.g. to focus purely on their written markdown notes), append the `--no-pdf` flag to `search` or `boosted` commands.
+8. **PDF Support**: By default, search results only return Markdown text. If the user explicitly asks to include PDF notes in their search results, append the `--with-pdf` flag to `search` or `boosted` commands.
 
 ## Progressive Retrieval Workflow (`notebrain search`)
 

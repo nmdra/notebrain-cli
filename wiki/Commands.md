@@ -144,7 +144,7 @@ notebrain search [<query>] [flags]
 | `--tag`         | `string`  | _(None)_ | Filter results by tag name (prefixed `#` is optional).                                         |
 | `--has-tasks`   | `boolean` | `false`  | Only return chunks containing markdown task lists (`- [ ]`).                                   |
 | `--has-code`    | `boolean` | `false`  | Only return chunks containing code blocks.                                                     |
-| `--no-pdf`      | `boolean` | `false`  | Exclude PDF results from the search.                                                           |
+| `--with-pdf`    | `boolean` | `false`  | Include PDF results in the search (default is markdown only).                                  |
 | `--split`       | `boolean` | `false`  | Split query string by delimiters (comma, pipe, semicolon) or execute multi-positional queries. |
 | `--split-by`    | `string`  | `,       | ;`                                                                                             | Delimiters used to split query strings when `--split` is active. |
 
@@ -348,9 +348,9 @@ notebrain boosted <query> --seed=STRING [flags]
 | Flag      | Type      | Default  | Description                                                     |
 | :-------- | :-------- | :------- | :-------------------------------------------------------------- |
 | `--seed`  | `string`  | _(None)_ | **Required.** The origin note slug or title for graph boosting. |
-| `--boost` | `float`   | `1.5`    | Multiplier applied to scores of graph-connected results.        |
+| `--boost` | `float`   | `1.5`    | Score multiplier for graph-connected results (e.g. 1.5 = 50% boost). |
 | `--limit` | `integer` | `10`     | Maximum number of results to return.                            |
-| `--no-pdf`| `boolean` | `false`  | Exclude PDF results from the search.                            |
+| `--with-pdf`| `boolean` | `false`  | Include PDF results in the search (default is markdown only).   |
 
 #### Examples
 

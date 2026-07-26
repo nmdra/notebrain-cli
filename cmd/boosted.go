@@ -31,15 +31,15 @@ import (
 
 type BoostedCmd struct {
 	ChunkDisplayFlags
-	Query string  `arg:"" help:"search query text"`
-	Limit int     `help:"maximum number of results" default:"10"`
-	Seed  string  `help:"seed note (slug, title, or path) whose graph neighbors get score boost" required:"true"`
-	Boost float64 `help:"score multiplier for graph-connected results (e.g. 1.5 = 50% boost)" default:"1.5"`
-	NoPDF bool    `help:"exclude PDF results from search"`
+	Query   string  `arg:"" help:"search query text"`
+	Limit   int     `help:"maximum number of results" default:"10"`
+	Seed    string  `help:"seed note (slug, title, or path) whose graph neighbors get score boost" required:"true"`
+	Boost   float64 `help:"score multiplier for graph-connected results (e.g. 1.5 = 50% boost)" default:"1.5"`
+	WithPDF bool    `help:"include PDF results in search"`
 }
 
 func (c *BoostedCmd) buildWhereFilter() chroma.WhereFilter {
-	if c.NoPDF {
+	if !c.WithPDF {
 		return chroma.EqString("file_type", "md")
 	}
 	return nil
