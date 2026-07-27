@@ -32,20 +32,20 @@ func New(model string) (Converter, error) {
 		return newOpenAICompatConverter("https://api.deepseek.com", apiKey, model, "deepseek", nil), nil
 	}
 
-	if strings.HasPrefix(model, "openrouter/") {
-		apiKey := os.Getenv("OPENROUTER_API_KEY")
-		apiKey = strings.Trim(apiKey, "\"'\t\n")
-		apiKey = strings.ReplaceAll(apiKey, " ", "")
-		if apiKey == "" {
-			return nil, fmt.Errorf("OPENROUTER_API_KEY not set for model %s", model)
-		}
-		actualModel := strings.TrimPrefix(model, "openrouter/")
-		headers := map[string]string{
-			"HTTP-Referer": "https://github.com/nmdra/notebrain-cli",
-			"X-Title":      "NoteBrain CLI",
-		}
-		return newOpenAICompatConverter("https://openrouter.ai/api/v1", apiKey, actualModel, "openrouter", headers), nil
+	// Treat anything that doesn't start with deepseek- as an OpenRouter model
+	apiKey := os.Getenv("OPENROUTER_API_KEY")
+	apiKey = strings.Trim(apiKey, "\"'\t\n")
+	apiKey = strings.ReplaceAll(apiKey, " ", "")
+	if apiKey == "" {
+		return nil, fmt.Errorf("OPENROUTER_API_KEY not set for model %s", model)
 	}
 
-	return nil, fmt.Errorf("unknown model prefix for %s. Expected deepseek-* or openrouter/*", model)
+	// Strip "openrouter/" prefix if the user added it manually
+	actualModel := strings.TrimPrefix(model, "openrouter/")
+
+	headers := map[string]string{
+		"HTTP-Referer": "https://github.com/nmdra/notebrain-cli",
+		"X-Title":      "NoteBrain CLI",
+	}
+	return newOpenAICompatConverter("https://openrouter.ai/api/v1", apiKey, actualModel, "openrouter", headers), nil
 }

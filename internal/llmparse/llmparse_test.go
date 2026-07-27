@@ -23,7 +23,7 @@ func TestNewFactory(t *testing.T) {
 	}{
 		{"deepseek-chat", "deepseek", false},
 		{"openrouter/anthropic/claude-sonnet", "openrouter", false},
-		{"unknown-model", "", true},
+		{"unknown-model", "openrouter", false},
 	}
 
 	for _, tt := range tests {

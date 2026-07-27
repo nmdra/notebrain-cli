@@ -512,12 +512,14 @@ func (p *Pipeline) processPdfFile(ctx context.Context, vaultPath string, filePat
 
 	pages, err := p.pdfBackend.ExtractText(ctx, filePath)
 	if err != nil {
-		return nil, fmt.Errorf("pdf extract text failed: %w", err)
+		slog.Warn("pdf extract text failed, skipping PDF", "file", relPath, "err", err)
+		return nil, nil
 	}
 	slog.Debug("sending PDF to LLM for markdown conversion", "file", relPath, "pages", len(pages))
 	markdown, err = p.llmConverter.Convert(ctx, pages)
 	if err != nil {
-		return nil, fmt.Errorf("LLM conversion failed: %w", err)
+		slog.Warn("LLM conversion failed, skipping PDF", "file", relPath, "err", err)
+		return nil, nil
 	}
 
 	astRes := parser.Parse(markdown, slug, p.ChunkSize, p.ChunkOverlap, p.SkipAttachments)
