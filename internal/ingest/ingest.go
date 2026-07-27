@@ -17,8 +17,8 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/nmdra/notebrain-cli/v2/internal/llmparse"
 	"github.com/nmdra/notebrain-cli/v2/internal/parser"
-	"github.com/nmdra/notebrain-cli/v2/internal/pdf2md"
 	"github.com/nmdra/notebrain-cli/v2/internal/pdfextract"
 	"github.com/nmdra/notebrain-cli/v2/internal/store"
 )
@@ -41,6 +41,8 @@ type Pipeline struct {
 	SkipAttachments bool
 	EnablePDF       bool
 	EnableOCR       bool
+	LLMModel        string
+	llmConverter    llmparse.Converter
 	pdfBackend      pdfextract.PDFBackend
 	ocrBackend      pdfextract.OCRBackend
 }
@@ -76,6 +78,17 @@ func (p *Pipeline) Run(ctx context.Context, vaultPath string, glob string, _ io.
 		}
 		p.pdfBackend = pb
 		defer pb.Close()
+
+		if p.LLMModel != "" {
+			converter, err := llmparse.New(p.LLMModel)
+			if err != nil {
+				return fmt.Errorf("LLM PDF parser: %w", err)
+			}
+			p.llmConverter = converter
+			slog.Info("LLM PDF parser enabled", "model", p.LLMModel, "backend", converter.Name())
+		} else {
+			return fmt.Errorf("--llm-model must be specified when --enable-pdf is used")
+		}
 
 		if p.EnableOCR {
 			ob := pdfextract.NewTesseractBackend("tesseract", "eng")
@@ -495,14 +508,17 @@ func (p *Pipeline) processPdfFile(ctx context.Context, vaultPath string, filePat
 		modTime = info.ModTime()
 	}
 
-	slog.Debug("extracting structured text from PDF", "file", relPath)
-	rects, err := p.pdfBackend.ExtractStructured(ctx, filePath)
-	if err != nil {
-		// Fallback to basic extraction or just fail? The prompt is to use pdf2md.
-		return nil, fmt.Errorf("pdf extract structured failed: %w", err)
-	}
+	var markdown string
 
-	markdown := pdf2md.Convert(rects)
+	pages, err := p.pdfBackend.ExtractText(ctx, filePath)
+	if err != nil {
+		return nil, fmt.Errorf("pdf extract text failed: %w", err)
+	}
+	slog.Debug("sending PDF to LLM for markdown conversion", "file", relPath, "pages", len(pages))
+	markdown, err = p.llmConverter.Convert(ctx, pages)
+	if err != nil {
+		return nil, fmt.Errorf("LLM conversion failed: %w", err)
+	}
 
 	astRes := parser.Parse(markdown, slug, p.ChunkSize, p.ChunkOverlap, p.SkipAttachments)
 

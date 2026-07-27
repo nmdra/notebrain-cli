@@ -39,6 +39,7 @@ type IngestCmd struct {
 	RespectExclude bool   `help:"respect Obsidian userIgnoreFilters and attachmentFolderPath settings during ingest" default:"false"`
 	EnablePDF      bool   `help:"enable indexing of PDF attachments" default:"false"`
 	EnableOCR      bool   `help:"enable OCR for scanned PDFs (requires tesseract)" default:"false"`
+	LLMModel       string `name:"llm-model" help:"LLM model to use for PDF parsing (e.g. openrouter/anthropic/claude-sonnet, deepseek-chat). Requires API key in env." default:""`
 }
 
 func (c *IngestCmd) Run(globals *Globals) error {
@@ -74,6 +75,7 @@ func (c *IngestCmd) Run(globals *Globals) error {
 	pipeline.SkipAttachments = globals.SkipAttachments
 	pipeline.EnablePDF = c.EnablePDF
 	pipeline.EnableOCR = c.EnableOCR
+	pipeline.LLMModel = c.LLMModel
 	// Allow flag/config overrides; 0 means "use the pipeline's built-in default".
 	if c.MinChunkWords > 0 {
 		pipeline.MinChunkWords = c.MinChunkWords

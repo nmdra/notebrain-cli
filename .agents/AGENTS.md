@@ -41,6 +41,11 @@ notebrain-cli/
 │   ├── embedder/      ← Embedding backends (MiniLM, Ollama)
 │   │   ├── embedder.go
 │   │   └── *_test.go
+│   ├── llmparse/      ← LLM-based PDF to Markdown conversion (OpenRouter, DeepSeek)
+│   │   ├── llmparse.go
+│   │   ├── openai_compat.go
+│   │   ├── prompt.go
+│   │   └── *_test.go
 │   ├── pdfextract/    ← WASM PDFium extraction & Tesseract OCR
 │   │   ├── backend.go
 │   │   ├── pdfextract.go
@@ -70,7 +75,7 @@ notebrain-cli/
 - Name test files `*_test.go` alongside the source file.
 - **Go Vendoring:** This repository uses Go vendoring (`vendor/`). Whenever dependencies in `go.mod` or `go.sum` are added, removed, or updated, you MUST run `go mod vendor` before running tests or builds.
 - **Strict Non-Regression Guardrails:** When refactoring or removing features, always add explicit assertion tests across `config/`, `internal/configfile/`, and `internal/store/` to verify that existing core functions, default settings, TOML key resolution, and database initialization do not regress or depend on removed parameters.
-- **CLI Testing & Flag Standards:** When executing CLI commands or writing automated tests/scripts for NoteBrain, strictly use the exact flag names `--vault-path` and `--chroma-path` (never `--vault` or `--db`). For graph and note commands (`backlinks`, `connections`, `hidden`, `tags`, `get`), pass exactly one positional argument: the note slug (`<note>`). For `boosted` search, always provide the required `--seed=<slug>` flag. When testing `hidden` connection discovery where already-linked notes should be included, pass `--include-linked`. Note that `backlinks` and `connections` canonicalize link targets by stripping `#heading` anchors and matching exact vault subfolders. When testing `reset` in automated scripts, pipe confirmation via stdin (`echo yes | ./notebrain reset`). To avoid contextual empty-result hints in automated scripts, always request machine formats (`--format=json`, `tsv`, or `--jsonpath`).
+- **CLI Testing & Flag Standards:** When executing CLI commands or writing automated tests/scripts for NoteBrain, strictly use the exact flag names `--vault-path` and `--chroma-path` (never `--vault` or `--db`). For graph and note commands (`backlinks`, `connections`, `hidden`, `tags`, `get`), pass exactly one positional argument: the note slug (`<note>`). For `boosted` search, always provide the required `--seed=<slug>` flag. When testing `hidden` connection discovery where already-linked notes should be included, pass `--include-linked`. Note that `backlinks` and `connections` canonicalize link targets by stripping `#heading` anchors and matching exact vault subfolders. When testing `reset` in automated scripts, pipe confirmation via stdin (`echo yes | ./notebrain reset`). To avoid contextual empty-result hints in automated scripts, always request machine formats (`--format=json`, `tsv`, or `--jsonpath`). When testing LLM-based PDF ingestion, use `--llm-model` and provide the required API key via environment variables (`DEEPSEEK_API_KEY`, or `OPENROUTER_API_KEY`).
 
 ## Coding Conventions
 
@@ -116,7 +121,7 @@ fix(ingest): handle empty frontmatter gracefully
 3. `nb_links` uses dummy 16-dimensional random float vectors in L2 space because Chroma requires non-empty vectors with uniform dimensions per collection, and flat zero-vectors or 1-dim vectors trigger HNSW index degeneracy/crashes.
 4. `DeleteNoteChunks` BEFORE `UpsertChunks` (not after) to handle interrupted re-ingests.
 5. Persistent client is single-writer — fine for CLI usage.
-6. **TOML-Only Configuration:** Configuration hierarchy is strictly 2-tier: CLI flags > TOML configuration file (`~/.notebrain/config/config.toml` or `--config`). No `.env` files or application environment variable fallbacks are permitted. TOML keys support normalized matching (`snake_case` and `kebab-case` match interchangeably).
+6. **TOML-Only Configuration:** Configuration hierarchy is strictly 2-tier: CLI flags > TOML configuration file (`~/.notebrain/config/config.toml` or `--config`). No `.env` files or application environment variable fallbacks are permitted **except for secret API keys** (`DEEPSEEK_API_KEY`, `OPENROUTER_API_KEY`) which must be provided exclusively via environment variables. TOML keys support normalized matching (`snake_case` and `kebab-case` match interchangeably).
 7. **Embedded Persistent Storage Only:** NoteBrain strictly embeds ChromaDB in persistent mode (`CGO_ENABLED=1`). Standalone HTTP server connections (`CGO_ENABLED=0`) are intentionally unsupported to keep the CLI lightweight, self-contained, and zero-setup.
 8. **OS-Level Scheduled Ingestion:** In line with Unix philosophy, periodic re-indexing is handled by standard OS schedulers (cron, systemd timers) rather than a custom persistent background watch daemon or file-watching loop. Recommended ingestion interval is every 3 hours.
 9. **Decoupled Automated Ingestion Logging:** Because `notebrain ingest` is frequently executed as an automated background task (cron, systemd timers, agentic workflows), it strictly uses structured logging (`log/slog`) for progress reporting to guarantee clean, machine-readable operational logs.

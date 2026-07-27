@@ -10,8 +10,6 @@ import (
 	"github.com/klippa-app/go-pdfium"
 	"github.com/klippa-app/go-pdfium/requests"
 	"github.com/klippa-app/go-pdfium/webassembly"
-
-	"github.com/nmdra/notebrain-cli/v2/internal/pdf2md"
 )
 
 // PDFiumBackend implements PDFBackend using go-pdfium via WASM.
@@ -78,76 +76,6 @@ func (b *PDFiumBackend) ExtractText(_ context.Context, filePath string) ([]strin
 			return nil, fmt.Errorf("failed to extract text from page %d: %w", i+1, err)
 		}
 		pages[i] = textReq.Text
-	}
-
-	return pages, nil
-}
-
-// ExtractStructured extracts structured text including font and position information.
-func (b *PDFiumBackend) ExtractStructured(_ context.Context, filePath string) ([][]pdf2md.TextRect, error) {
-	instance, err := b.pool.GetInstance(time.Second * 30)
-	if err != nil {
-		return nil, fmt.Errorf("could not get PDFium instance: %w", err)
-	}
-	defer instance.Close()
-
-	doc, err := instance.OpenDocument(&requests.OpenDocument{
-		FilePath: &filePath,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to open PDF: %w", err)
-	}
-	defer func() {
-		_, _ = instance.FPDF_CloseDocument(&requests.FPDF_CloseDocument{
-			Document: doc.Document,
-		})
-	}()
-
-	pageCountReq, err := instance.FPDF_GetPageCount(&requests.FPDF_GetPageCount{
-		Document: doc.Document,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to get page count: %w", err)
-	}
-
-	pages := make([][]pdf2md.TextRect, pageCountReq.PageCount)
-
-	for i := 0; i < pageCountReq.PageCount; i++ {
-		textReq, err := instance.GetPageTextStructured(&requests.GetPageTextStructured{
-			Page: requests.Page{
-				ByIndex: &requests.PageByIndex{
-					Document: doc.Document,
-					Index:    i,
-				},
-			},
-			Mode:                   requests.GetPageTextStructuredModeRects,
-			CollectFontInformation: true,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to extract structured text from page %d: %w", i+1, err)
-		}
-
-		var rects []pdf2md.TextRect
-		if textReq != nil && textReq.Rects != nil {
-			for _, r := range textReq.Rects {
-				if r.FontInformation == nil {
-					continue
-				}
-				rects = append(rects, pdf2md.TextRect{
-					Text:       r.Text,
-					FontSize:   r.FontInformation.RenderedSize,
-					FontWeight: r.FontInformation.Weight,
-					FontName:   r.FontInformation.Name,
-					FontFlags:  r.FontInformation.Flags,
-					Left:       r.PointPosition.Left,
-					Top:        r.PointPosition.Top,
-					Right:      r.PointPosition.Right,
-					Bottom:     r.PointPosition.Bottom,
-					PageNum:    i + 1,
-				})
-			}
-		}
-		pages[i] = rects
 	}
 
 	return pages, nil

@@ -7,8 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-
-	"github.com/nmdra/notebrain-cli/v2/internal/pdf2md"
 )
 
 type mockPDFBackend struct{}
@@ -17,20 +15,18 @@ func (m *mockPDFBackend) ExtractText(ctx context.Context, filePath string) ([]st
 	return []string{"This is a test PDF page with enough words to be extracted properly."}, nil
 }
 
-func (m *mockPDFBackend) ExtractStructured(ctx context.Context, filePath string) ([][]pdf2md.TextRect, error) {
-	return [][]pdf2md.TextRect{
-		{
-			{Text: "Dummy PDF Page", FontSize: 24, Top: 700, Bottom: 680, Left: 10},
-			{Text: "This is a test PDF page with enough words to be extracted properly.", FontSize: 12, Top: 600, Bottom: 588, Left: 10},
-		},
-	}, nil
-}
-
 func (m *mockPDFBackend) RenderPage(ctx context.Context, filePath string, pageNum int) (string, error) {
 	return "", nil
 }
 
 func (m *mockPDFBackend) Close() error { return nil }
+
+type mockLLMConverter struct{}
+
+func (m *mockLLMConverter) Convert(ctx context.Context, pages []string) (string, error) {
+	return "# Dummy PDF Page\n\nThis is a test PDF page with enough words to be extracted properly.", nil
+}
+func (m *mockLLMConverter) Name() string { return "mock" }
 
 func TestProcessPdfFile(t *testing.T) {
 	// Create a temp dummy PDF
@@ -43,6 +39,7 @@ func TestProcessPdfFile(t *testing.T) {
 	p := &Pipeline{
 		embedder:      &mockEmbedder{},
 		pdfBackend:    &mockPDFBackend{},
+		llmConverter:  &mockLLMConverter{},
 		MinChunkWords: 2,
 		ChunkSize:     800,
 		ChunkOverlap:  100,
@@ -87,8 +84,9 @@ func TestProcessPdfFile_SkipUnchanged(t *testing.T) {
 	importHash := fmt.Sprintf("%x", sha256.Sum256(importHashBytes))
 
 	p := &Pipeline{
-		embedder:   &mockEmbedder{},
-		pdfBackend: &mockPDFBackend{},
+		embedder:     &mockEmbedder{},
+		pdfBackend:   &mockPDFBackend{},
+		llmConverter: &mockLLMConverter{},
 	}
 
 	knownHashes := map[string]string{

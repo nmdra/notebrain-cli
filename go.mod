@@ -58,5 +58,6 @@ require (
 	golang.org/x/net v0.56.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/text v0.40.0 // indirect
+	google.golang.org/genai v1.65.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )

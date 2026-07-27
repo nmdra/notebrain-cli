@@ -4,8 +4,6 @@ import (
 	"context"
 	"strings"
 	"testing"
-
-	"github.com/nmdra/notebrain-cli/v2/internal/pdf2md"
 )
 
 type mockPDFBackend struct {
@@ -14,10 +12,6 @@ type mockPDFBackend struct {
 
 func (m *mockPDFBackend) ExtractText(ctx context.Context, filePath string) ([]string, error) {
 	return m.pages, nil
-}
-
-func (m *mockPDFBackend) ExtractStructured(ctx context.Context, filePath string) ([][]pdf2md.TextRect, error) {
-	return nil, nil
 }
 
 func (m *mockPDFBackend) RenderPage(ctx context.Context, filePath string, pageNum int) (string, error) {
