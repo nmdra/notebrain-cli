@@ -3,21 +3,31 @@ package pdf2md
 import (
 	"math"
 	"sort"
+	"strings"
 )
 
 // BuildLines groups TextRects into visual lines based on vertical position.
-// Rects within `tolerance` points of the same Top are grouped together.
 func BuildLines(rects []TextRect, tolerance float64) []Line {
 	if len(rects) == 0 {
 		return nil
 	}
 
-	// 1. Sort all rects primarily by Top (top-to-bottom), then by Left (left-to-right)
+	// To sort stably by line without violating transitivity, we quantize the vertical center
 	sortedRects := make([]TextRect, len(rects))
 	copy(sortedRects, rects)
 	sort.Slice(sortedRects, func(i, j int) bool {
-		if math.Abs(sortedRects[i].Top-sortedRects[j].Top) > tolerance {
-			return sortedRects[i].Top > sortedRects[j].Top
+		avgHeight := (sortedRects[i].Height() + sortedRects[j].Height()) / 2.0
+		if avgHeight == 0 {
+			avgHeight = 10.0
+		}
+		// Quantize center to chunks of ~40% of line height
+		// We use math.Round to put similar centers into the same bucket
+		bucketSize := avgHeight * 0.4
+		cI := math.Round(((sortedRects[i].Top + sortedRects[i].Bottom) / 2.0) / bucketSize)
+		cJ := math.Round(((sortedRects[j].Top + sortedRects[j].Bottom) / 2.0) / bucketSize)
+
+		if cI != cJ {
+			return cI < cJ // smaller Y (Top) comes first (top-to-bottom)
 		}
 		return sortedRects[i].Left < sortedRects[j].Left
 	})
@@ -25,7 +35,6 @@ func BuildLines(rects []TextRect, tolerance float64) []Line {
 	var lines []Line
 	var currentLine []TextRect
 
-	// Helper to finalize the current line
 	finalizeLine := func() {
 		if len(currentLine) == 0 {
 			return
@@ -35,7 +44,37 @@ func BuildLines(rects []TextRect, tolerance float64) []Line {
 			return currentLine[i].Left < currentLine[j].Left
 		})
 
-		// Find line Top/Bottom bounds
+		// Deduplicate overlapping rects (e.g., faux bold effects)
+		var dedup []TextRect
+		for _, r := range currentLine {
+			if len(dedup) == 0 {
+				dedup = append(dedup, r)
+				continue
+			}
+			lastIdx := len(dedup) - 1
+			last := &dedup[lastIdx]
+
+			overlap := math.Min(r.Right, last.Right) - math.Max(r.Left, last.Left)
+			if overlap > 0 {
+				lt := strings.TrimSpace(last.Text)
+				rt := strings.TrimSpace(r.Text)
+				if lt != "" && rt != "" {
+					if lt == rt {
+						continue
+					}
+					if strings.Contains(rt, lt) {
+						*last = r
+						continue
+					}
+					if strings.Contains(lt, rt) {
+						continue
+					}
+				}
+			}
+			dedup = append(dedup, r)
+		}
+		currentLine = dedup
+
 		maxTop := currentLine[0].Top
 		minBottom := currentLine[0].Bottom
 		for _, r := range currentLine {
@@ -62,10 +101,16 @@ func BuildLines(rects []TextRect, tolerance float64) []Line {
 			continue
 		}
 
-		// Check if rect belongs to the current line
-		// Use the first rect in currentLine as the anchor for the line's Top
-		anchorTop := currentLine[0].Top
-		if math.Abs(r.Top-anchorTop) <= tolerance {
+		// Use the vertical center of the current line to decide if this belongs
+		anchorCenter := 0.0
+		for _, cr := range currentLine {
+			anchorCenter += (cr.Top + cr.Bottom) / 2.0
+		}
+		anchorCenter /= float64(len(currentLine))
+
+		rCenter := (r.Top + r.Bottom) / 2.0
+
+		if math.Abs(rCenter-anchorCenter) <= r.Height()*0.4 {
 			currentLine = append(currentLine, r)
 		} else {
 			finalizeLine()

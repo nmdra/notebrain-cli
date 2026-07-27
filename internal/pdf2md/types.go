@@ -1,6 +1,9 @@
 package pdf2md
 
-import "strings"
+import (
+	"math"
+	"strings"
+)
 
 // TextRect represents a positioned text run extracted from a PDF page.
 type TextRect struct {
@@ -47,7 +50,7 @@ func (r *TextRect) IsFixedPitch() bool {
 
 // Height returns the vertical height of this text rect in points.
 func (r *TextRect) Height() float64 {
-	return r.Bottom - r.Top
+	return math.Abs(r.Bottom - r.Top)
 }
 
 // DocumentStats holds document-wide font/layout statistics used by heuristics.
@@ -68,13 +71,32 @@ type Line struct {
 	HeadingLevel int // 0 if not a heading, 1-6 for H1-H6
 }
 
-// FullText returns the concatenated text of all rects in the line, joined by spaces.
+// FullText returns the concatenated text of all rects in the line, intelligently inserting spaces based on horizontal gaps.
 func (l *Line) FullText() string {
-	var texts []string
-	for _, r := range l.Rects {
-		texts = append(texts, strings.TrimSpace(r.Text))
+	if len(l.Rects) == 0 {
+		return ""
 	}
-	return strings.Join(texts, " ")
+
+	var sb strings.Builder
+	sb.WriteString(l.Rects[0].Text)
+
+	for i := 1; i < len(l.Rects); i++ {
+		prev := l.Rects[i-1]
+		curr := l.Rects[i]
+
+		gap := curr.Left - prev.Right
+		// A typical space is around 0.2 to 0.3 em. Use 0.15 to be safe against kerning.
+		spaceThreshold := curr.FontSize * 0.15
+
+		if gap > spaceThreshold {
+			if !strings.HasSuffix(prev.Text, " ") && !strings.HasPrefix(curr.Text, " ") {
+				sb.WriteString(" ")
+			}
+		}
+
+		sb.WriteString(curr.Text)
+	}
+	return strings.TrimSpace(sb.String())
 }
 
 // MaxFontSize returns the largest font size among the line's rects.
