@@ -7,12 +7,23 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/nmdra/notebrain-cli/v2/internal/pdf2md"
 )
 
 type mockPDFBackend struct{}
 
 func (m *mockPDFBackend) ExtractText(ctx context.Context, filePath string) ([]string, error) {
 	return []string{"This is a test PDF page with enough words to be extracted properly."}, nil
+}
+
+func (m *mockPDFBackend) ExtractStructured(ctx context.Context, filePath string) ([][]pdf2md.TextRect, error) {
+	return [][]pdf2md.TextRect{
+		{
+			{Text: "Dummy PDF Page", FontSize: 24, Top: 700, Bottom: 680, Left: 10},
+			{Text: "This is a test PDF page with enough words to be extracted properly.", FontSize: 12, Top: 600, Bottom: 588, Left: 10},
+		},
+	}, nil
 }
 
 func (m *mockPDFBackend) RenderPage(ctx context.Context, filePath string, pageNum int) (string, error) {
@@ -59,8 +70,8 @@ func TestProcessPdfFile(t *testing.T) {
 	if chunk.FileType != "pdf" {
 		t.Errorf("expected FileType 'pdf', got %q", chunk.FileType)
 	}
-	if chunk.HeadingPath != "Page 1" {
-		t.Errorf("expected HeadingPath 'Page 1', got %q", chunk.HeadingPath)
+	if chunk.HeadingPath != "Dummy PDF Page" {
+		t.Errorf("expected HeadingPath 'Dummy PDF Page', got %q", chunk.HeadingPath)
 	}
 }
 

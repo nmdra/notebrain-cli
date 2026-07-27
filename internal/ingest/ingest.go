@@ -18,6 +18,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/nmdra/notebrain-cli/v2/internal/parser"
+	"github.com/nmdra/notebrain-cli/v2/internal/pdf2md"
 	"github.com/nmdra/notebrain-cli/v2/internal/pdfextract"
 	"github.com/nmdra/notebrain-cli/v2/internal/store"
 )
@@ -494,16 +495,18 @@ func (p *Pipeline) processPdfFile(ctx context.Context, vaultPath string, filePat
 		modTime = info.ModTime()
 	}
 
-	slog.Debug("extracting text from PDF", "file", relPath)
-	extractedPages, err := pdfextract.Extract(ctx, p.pdfBackend, p.ocrBackend, filePath)
+	slog.Debug("extracting structured text from PDF", "file", relPath)
+	rects, err := p.pdfBackend.ExtractStructured(ctx, filePath)
 	if err != nil {
-		return nil, fmt.Errorf("pdf extract failed: %w", err)
+		// Fallback to basic extraction or just fail? The prompt is to use pdf2md.
+		return nil, fmt.Errorf("pdf extract structured failed: %w", err)
 	}
 
-	// Chunk the pages
-	pdfChunks := pdfextract.ChunkPages(extractedPages, p.MinChunkWords, p.ChunkSize, p.ChunkOverlap)
+	markdown := pdf2md.Convert(rects)
 
-	if len(pdfChunks) == 0 {
+	astRes := parser.Parse(markdown, slug, p.ChunkSize, p.ChunkOverlap, p.SkipAttachments)
+
+	if len(astRes.Chunks) == 0 {
 		return &store.BatchIngestData{
 			NoteSlug:     slug,
 			ChunkRecords: nil,
@@ -511,11 +514,39 @@ func (p *Pipeline) processPdfFile(ctx context.Context, vaultPath string, filePat
 		}, nil
 	}
 
-	chunkRecords := make([]store.ChunkRecord, len(pdfChunks))
-	for i, c := range pdfChunks {
-		headingPath := fmt.Sprintf("Page %d", c.PageNum)
-		embedText := buildEmbedText(title, headingPath, nil, c.Text, p.MaxEmbedTokens)
+	validChunks := make([]parser.Chunk, 0, len(astRes.Chunks))
+	for _, c := range astRes.Chunks {
+		storedText := c.RichText
+		if storedText == "" {
+			storedText = c.Text
+		}
+		if len(strings.Fields(storedText)) < p.MinChunkWords {
+			continue
+		}
+		if c.RichText == "" && isCodeOnlyChunk(c.Text) {
+			continue
+		}
+		validChunks = append(validChunks, c)
+	}
 
+	chunkRecords := make([]store.ChunkRecord, len(validChunks))
+	for i, c := range validChunks {
+		headingPath := c.HeadingPath
+		if headingPath == "" {
+			headingPath = title
+		}
+
+		embedContent := c.Text
+		if isCodeOnlyChunk(c.Text) && c.RichText != "" {
+			embedContent = c.RichText
+		}
+
+		storedText := c.RichText
+		if storedText == "" {
+			storedText = c.Text
+		}
+
+		embedText := buildEmbedText(title, headingPath, astRes.Tags, embedContent, p.MaxEmbedTokens)
 		emb, err := p.embedder.Embed(ctx, embedText)
 		if err != nil {
 			return nil, err
@@ -527,12 +558,12 @@ func (p *Pipeline) processPdfFile(ctx context.Context, vaultPath string, filePat
 			Title:        title,
 			FilePath:     relPath,
 			ChunkIndex:   i,
-			Text:         c.Text,
-			Tags:         nil,
-			HasLinks:     false,
-			HeadingPath:  headingPath,
-			HeadingLevel: 1,
-			HasTask:      false,
+			Text:         storedText,
+			Tags:         astRes.Tags,
+			HasLinks:     len(astRes.Links) > 0,
+			HeadingPath:  c.HeadingPath,
+			HeadingLevel: c.Level,
+			HasTask:      c.HasTask,
 			FileType:     "pdf",
 			ModifiedMs:   modTime.UnixMilli(),
 			ContentHash:  hash,
@@ -543,6 +574,6 @@ func (p *Pipeline) processPdfFile(ctx context.Context, vaultPath string, filePat
 	return &store.BatchIngestData{
 		NoteSlug:     slug,
 		ChunkRecords: chunkRecords,
-		Links:        nil,
+		Links:        astRes.Links,
 	}, nil
 }
