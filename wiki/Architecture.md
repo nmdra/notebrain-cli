@@ -23,7 +23,7 @@ graph TD
         Obsidian["Obsidian CLI Client (obsidian/)"]
 
         subgraph IngestionPipeline ["Ingestion Pipeline"]
-            Parser["Markdown Parser & PDF/OCR Extractor (parser/ & pdfextract/)"]
+            Parser["Markdown Parser & PDF LLM Extractor (parser/ & llmparse/)"]
             Embedder["Embedding Backend: MiniLM / Ollama (embedder/)"]
             Ingest["Ingestion Coordinator (ingest/)"]
         end
@@ -154,7 +154,7 @@ Stores directed edges representing wikilinks and Markdown links between notes (`
 - **Configuration (`internal/configfile` & `config/`)**: Manages TOML configuration loading via Kong resolvers. Supports normalized key lookups (`snake_case` and `kebab-case`) and resolves flags without relying on `.env` files or application environment variables.
 - **Embedder (`internal/embedder`)**: Manages the local embedding models. Supports embedded ONNX MiniLM sentence embeddings or external Ollama service backends.
 - **Parser (`internal/parser`)**: Reads Markdown files from the Obsidian vault, extracts YAML frontmatter/properties, parses wikilinks and standard Markdown links, identifies task checkboxes and tables, and splits note text into semantic chunks. It strictly preserves structural Markdown syntax across chunks, including tight ordered/unordered lists (`1. `, `- `), task checkboxes (`[ ] `, `[x] `), multi-line blockquotes and callout headers (`> [!NOTE]`), and GFM tables with alignment separator rows (`| --- | --- |`). Distinct structural blocks (`paragraph`, `list`, `table`, `blockquote`, `code`) are cleanly separated by `\n\n`.
-- **PDF & OCR Extractor (`internal/pdfextract`)**: Extracts text from PDFs using a WASM-compiled PDFium backend. For scanned images or unextractable text, it gracefully falls back to OCR via Tesseract (if enabled). PDF documents are chunked on a per-page basis to preserve logical pagination in search results.
+- **PDF & OCR Extractor (`internal/pdfextract` & `internal/llmparse`)**: Extracts text from PDFs using a WASM-compiled PDFium backend and optional OCR via Tesseract. The raw text is then passed to an LLM API (OpenRouter or DeepSeek) via `llmparse` to convert it into perfectly structured markdown. This ensures PDF chunks share the same high-quality layout and heading structures as native markdown notes.
 - **Ingest (`internal/ingest`)**: Handles multi-worker concurrent directory walking. It reads `.md` and optionally `.pdf` files, calls the parser/extractor, generates embeddings, and coordinates atomic note updates (`DeleteNoteChunks` -> `UpsertChunks` -> `UpsertLinks` under a single store mutex lock).
 - **Store (`internal/store`)**: The ChromaDB wrapper that abstracts collection creation, chunk upsertion, link deduplication, and exposes all graph (BFS traversal in Go) and semantic queries.
 - **Obsidian Client (`internal/obsidian`)**: Interacts with the Obsidian CLI for vault operations and note inspection.

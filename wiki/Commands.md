@@ -102,8 +102,9 @@ notebrain ingest [<glob>] [flags]
 | `--min-chunk-words` | `integer` | `0`     | Skip chunks with fewer words than this (0 defaults to 10 words).                    |
 | `--chunk-size`      | `integer` | `0`     | Maximum runes per chunk for the parser (0 defaults to 800 runes).                   |
 | `--chunk-overlap`   | `integer` | `0`     | Overlap runes between sub-chunks when a section is split (0 defaults to 100 runes). |
-| `--enable-pdf`      | `boolean` | `false` | Enable PDF text extraction using PDFium.                                            |
+| `--enable-pdf`      | `boolean` | `false` | Enable PDF text extraction. Requires `--llm-model`.                                 |
 | `--enable-ocr`      | `boolean` | `false` | Enable OCR for scanned PDFs using Tesseract (requires `--enable-pdf`).              |
+| `--llm-model`       | `string`  | `""`    | LLM model to use for PDF parsing (e.g., `openrouter/inclusionai/ling-3.0-flash:free`). |
 
 #### Examples
 
