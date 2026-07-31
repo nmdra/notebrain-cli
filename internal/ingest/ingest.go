@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"io"
 	"io/fs"
 	"log/slog"
 	"os"
@@ -30,12 +29,16 @@ const (
 	// chunkSchemaVersion is bumped whenever chunk content semantics change so
 	// that already-ingested files are re-ingested even if their bytes are
 	// unchanged (e.g. the chunk-overlap duplication fix, has_code metadata).
-	chunkSchemaVersion = 3
+	// Version 4 covers the embedding-model hash salt: switching models must
+	// invalidate stored hashes to avoid dimension mismatches.
+	chunkSchemaVersion = 4
 )
 
 // Embedder abstracts vector embedding so the pipeline can be tested with mocks.
 type Embedder interface {
 	Embed(ctx context.Context, text string) ([]float32, error)
+	// Model identifies the embedding model so content hashes can be salted.
+	Model() string
 }
 
 // FailedFile records a file that failed during ingestion along with the failure reason.
@@ -105,7 +108,7 @@ func NewPipeline(s *store.Store, e Embedder, workers int) *Pipeline {
 
 // Run walks the vault directory, finds markdown files matching glob, and ingests
 // them into the store with structured logging for progress.
-func (p *Pipeline) Run(ctx context.Context, vaultPath string, glob string, _ io.Reader, _ io.Writer) error {
+func (p *Pipeline) Run(ctx context.Context, vaultPath string, glob string) error {
 	skipPDF := false
 	if p.EnablePDF {
 		if p.LLMModel == "" {
@@ -188,14 +191,9 @@ func (p *Pipeline) Run(ctx context.Context, vaultPath string, glob string, _ io.
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	var done atomic.Int32
-
 	var uiWg sync.WaitGroup
 	uiWg.Go(func() {
 		RunProgress(totalFiles, progressCh)
-		if done.Load() == 0 {
-			cancel() // Cancel workers if progress loop exits early
-		}
 	})
 
 	// Atomic counter for monotonically increasing progress
@@ -253,7 +251,6 @@ fileLoop:
 
 	// Wait for all workers to finish, then signal the UI to quit
 	workerWg.Wait()
-	done.Store(1)
 	close(progressCh)
 	uiWg.Wait()
 
@@ -342,13 +339,14 @@ func (p *Pipeline) collectFiles(vaultPath, glob string, skipPDF bool) ([]string,
 	return files, nil
 }
 
-// fileHash returns a content hash that also covers the chunking parameters and
-// the current chunk schema version. Changing any of them invalidates previously
-// stored hashes so unchanged files are still re-ingested.
-func fileHash(content []byte, chunkSize, chunkOverlap int) string {
+// fileHash returns a content hash that also covers the chunking parameters,
+// the embedding model, and the current chunk schema version. Changing any of
+// them invalidates previously stored hashes so unchanged files are still
+// re-ingested (e.g. switching embedding models must not leave stale vectors).
+func fileHash(content []byte, chunkSize, chunkOverlap int, embedModel string) string {
 	h := sha256.New()
 	h.Write(content)
-	_, _ = fmt.Fprintf(h, "\x00schema=%d\x00size=%d\x00overlap=%d\x00", chunkSchemaVersion, chunkSize, chunkOverlap)
+	_, _ = fmt.Fprintf(h, "\x00schema=%d\x00size=%d\x00overlap=%d\x00model=%s\x00", chunkSchemaVersion, chunkSize, chunkOverlap, embedModel)
 	return hex.EncodeToString(h.Sum(nil))
 }
 
@@ -369,7 +367,7 @@ func (p *Pipeline) processFile(ctx context.Context, vaultPath string, filePath s
 
 	slug := parser.Slugify(relPath)
 
-	hash := fileHash(content, p.ChunkSize, p.ChunkOverlap)
+	hash := fileHash(content, p.ChunkSize, p.ChunkOverlap, p.embedder.Model())
 	if knownHashes[slug] == hash {
 		return nil, nil
 	}
@@ -557,7 +555,7 @@ func (p *Pipeline) processPdfFile(ctx context.Context, vaultPath string, filePat
 	}
 
 	slug := parser.Slugify(relPath)
-	hash := fileHash(content, p.ChunkSize, p.ChunkOverlap)
+	hash := fileHash(content, p.ChunkSize, p.ChunkOverlap, p.embedder.Model())
 	if knownHashes[slug] == hash {
 		return nil, nil // Skip unchanged
 	}

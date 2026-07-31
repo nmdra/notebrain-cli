@@ -24,12 +24,10 @@ func TestLocalEmbedder(t *testing.T) {
 
 	ctx := context.Background()
 
-	t.Run("QuietInit", func(t *testing.T) {
-		quietEmb, err := embedder.NewLocalEmbedder(embedder.WithQuiet(true))
-		if err != nil {
-			t.Fatalf("NewLocalEmbedder with quiet failed: %v", err)
+	t.Run("Model", func(t *testing.T) {
+		if got := emb.Model(); got == "" {
+			t.Errorf("expected non-empty model identifier")
 		}
-		_ = quietEmb.Close()
 	})
 
 	t.Run("EmbedSingle", func(t *testing.T) {

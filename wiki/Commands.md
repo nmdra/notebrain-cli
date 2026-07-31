@@ -41,8 +41,8 @@ You can apply these flags to `notebrain` before a subcommand (for example, `note
 
 When you execute NoteBrain queries inside AI agent workflows, automated pipelines, or background scripts, you must control the token count. You must also hide interactive formatting.
 
-1. **Automatic quiet mode (`--quiet`)**:
-   If you specify a non-interactive machine format (`--format=json`, `tsv`, or `--jsonpath`), NoteBrain automatically activates the quiet mode (`embedder.WithQuiet`). This hides the background log output. As a result, stdout is clean and correct for JSON parsers and AI agents.
+1. **Clean stdout in machine formats**:
+   NoteBrain writes query results to stdout and all diagnostics (progress, warnings) to stderr. When you use a non-interactive machine format (`--format=json`, `tsv`, or `--jsonpath`), stdout is already clean and correct for JSON parsers and AI agents.
 2. **Compact JSON envelopes**:
    By default, the JSON output includes the necessary properties in a clean format. You can use `--show-file-path=false` to remove file paths. This decreases the token consumption for Large Language Models. The similarity scores (`score`) round to 4 decimal places (`0.8520`). The query headers (`query`) do not have terminal decorations.
 3. **Non-redundant context windows (`--context-window N`)**:

@@ -77,7 +77,7 @@ func TestProcessPdfFile_SkipUnchanged(t *testing.T) {
 	}
 
 	chunkSize, chunkOverlap := 800, 100
-	importHash := fileHash([]byte("%PDF-1.4 dummy"), chunkSize, chunkOverlap)
+	importHash := fileHash([]byte("%PDF-1.4 dummy"), chunkSize, chunkOverlap, "mock")
 
 	p := &Pipeline{
 		embedder:     &mockEmbedder{},

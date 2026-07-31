@@ -7,29 +7,17 @@ import (
 	"github.com/amikos-tech/chroma-go/pkg/embeddings/ort"
 )
 
+// embeddingModel identifies the ONNX model in use. It salts content hashes
+// so switching embedding models forces a re-ingest (dimension mismatches
+// would otherwise surface as stale-index errors).
+const embeddingModel = "minilm-l12-v2"
+
 type LocalEmbedder struct {
 	ef      *ort.DefaultEmbeddingFunction
 	destroy func() error
 }
 
-type Option func(*options)
-
-type options struct {
-	quiet bool
-}
-
-func WithQuiet(quiet bool) Option {
-	return func(o *options) {
-		o.quiet = quiet
-	}
-}
-
-func NewLocalEmbedder(opts ...Option) (*LocalEmbedder, error) {
-	var opt options
-	for _, o := range opts {
-		o(&opt)
-	}
-
+func NewLocalEmbedder() (*LocalEmbedder, error) {
 	var ef *ort.DefaultEmbeddingFunction
 	var destroy func() error
 	var err error
@@ -46,6 +34,12 @@ func NewLocalEmbedder(opts ...Option) (*LocalEmbedder, error) {
 		return nil, fmt.Errorf("init local embedder: %w", err)
 	}
 	return &LocalEmbedder{ef: ef, destroy: destroy}, nil
+}
+
+// Model returns the identifier of the embedding model, used to invalidate
+// previously stored content hashes when the model changes.
+func (e *LocalEmbedder) Model() string {
+	return embeddingModel
 }
 
 func (e *LocalEmbedder) Embed(ctx context.Context, text string) ([]float32, error) {

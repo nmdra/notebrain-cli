@@ -1,13 +1,12 @@
 package ingest
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/nmdra/notebrain-cli/v2/internal/store"
@@ -29,18 +28,26 @@ func (m *mockEmbedder) EmbedBatch(ctx context.Context, texts []string) ([][]floa
 
 func (m *mockEmbedder) Close() error { return nil }
 
+func (m *mockEmbedder) Model() string { return "mock" }
+
 // recordingEmbedder records every text sent to Embed so tests can inspect
-// exactly what the embedding model received.
+// exactly what the embedding model received. It is safe for concurrent use:
+// workers call Embed from multiple goroutines.
 type recordingEmbedder struct {
+	mu    sync.Mutex
 	texts []string
 }
 
 func (m *recordingEmbedder) Embed(ctx context.Context, text string) ([]float32, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.texts = append(m.texts, text)
 	return []float32{1.0, 0.0, 0.0}, nil
 }
 
 func (m *recordingEmbedder) EmbedBatch(ctx context.Context, texts []string) ([][]float32, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.texts = append(m.texts, texts...)
 	out := make([][]float32, len(texts))
 	for i := range texts {
@@ -50,6 +57,8 @@ func (m *recordingEmbedder) EmbedBatch(ctx context.Context, texts []string) ([][
 }
 
 func (m *recordingEmbedder) Close() error { return nil }
+
+func (m *recordingEmbedder) Model() string { return "mock" }
 
 func TestPipelineRun(t *testing.T) {
 	ctx := context.Background()
@@ -80,12 +89,7 @@ func TestPipelineRun(t *testing.T) {
 	p := NewPipeline(st, &mockEmbedder{}, 2)
 	p.MinChunkWords = 0
 
-	// Use an io.Pipe for stdin so Bubble Tea doesn't immediately exit due to EOF
-	pr, pw := io.Pipe()
-	defer func() { _ = pw.Close() }()
-
-	var stdout bytes.Buffer
-	err = p.Run(ctx, vaultDir, "", pr, &stdout)
+	err = p.Run(ctx, vaultDir, "")
 	if err != nil {
 		t.Fatalf("Pipeline.Run failed: %v", err)
 	}
@@ -120,10 +124,7 @@ func TestPipelineSyncDeleted(t *testing.T) {
 	p.MinChunkWords = 0
 
 	// Ingest initially
-	pr1, pw1 := io.Pipe()
-	go func() { _ = pw1.Close() }()
-	var stdout1 bytes.Buffer
-	if err := p.Run(ctx, vaultDir, "", pr1, &stdout1); err != nil {
+	if err := p.Run(ctx, vaultDir, ""); err != nil {
 		t.Fatalf("First run failed: %v", err)
 	}
 
@@ -138,10 +139,7 @@ func TestPipelineSyncDeleted(t *testing.T) {
 	}
 
 	// Ingest again
-	pr2, pw2 := io.Pipe()
-	go func() { _ = pw2.Close() }()
-	var stdout2 bytes.Buffer
-	if err := p.Run(ctx, vaultDir, "", pr2, &stdout2); err != nil {
+	if err := p.Run(ctx, vaultDir, ""); err != nil {
 		t.Fatalf("Second run failed: %v", err)
 	}
 
@@ -174,10 +172,7 @@ func TestPipeline_PreservesIndexWhenAllChunksFiltered(t *testing.T) {
 	run := func(minWords int) {
 		p := NewPipeline(st, &mockEmbedder{}, 1)
 		p.MinChunkWords = minWords
-		pr, pw := io.Pipe()
-		go func() { _ = pw.Close() }()
-		var stdout bytes.Buffer
-		if err := p.Run(ctx, vaultDir, "", pr, &stdout); err != nil {
+		if err := p.Run(ctx, vaultDir, ""); err != nil {
 			t.Fatalf("Pipeline.Run failed: %v", err)
 		}
 	}
@@ -215,10 +210,7 @@ func TestPipelineMinChunkWords(t *testing.T) {
 	p.MinChunkWords = 0
 	p.MinChunkWords = 5
 
-	pr, pw := io.Pipe()
-	go func() { _ = pw.Close() }()
-	var stdout bytes.Buffer
-	if err := p.Run(ctx, vaultDir, "", pr, &stdout); err != nil {
+	if err := p.Run(ctx, vaultDir, ""); err != nil {
 		t.Fatalf("Pipeline.Run failed: %v", err)
 	}
 
@@ -253,10 +245,7 @@ func TestPipelineRespectExclude(t *testing.T) {
 	p.MinChunkWords = 0
 	p.RespectExclude = true
 
-	pr, pw := io.Pipe()
-	go func() { _ = pw.Close() }()
-	var stdout bytes.Buffer
-	if err := p.Run(ctx, vaultDir, "", pr, &stdout); err != nil {
+	if err := p.Run(ctx, vaultDir, ""); err != nil {
 		t.Fatalf("Pipeline.Run failed: %v", err)
 	}
 
@@ -340,10 +329,7 @@ func TestPipeline_CodeOnlyNoteIngest(t *testing.T) {
 
 	p := NewPipeline(st, &mockEmbedder{}, 1)
 	p.MinChunkWords = 0
-	pr, pw := io.Pipe()
-	go func() { _ = pw.Close() }()
-	var stdout bytes.Buffer
-	if err := p.Run(ctx, vaultDir, "", pr, &stdout); err != nil {
+	if err := p.Run(ctx, vaultDir, ""); err != nil {
 		t.Fatalf("Pipeline.Run failed: %v", err)
 	}
 
@@ -389,10 +375,7 @@ func TestPipeline_PDFFallbackPreservesPDFs(t *testing.T) {
 	p.LLMModel = "" // Trigger fallback
 	p.MinChunkWords = 0
 
-	pr, pw := io.Pipe()
-	go func() { _ = pw.Close() }()
-	var stdout bytes.Buffer
-	if err := p.Run(ctx, vaultDir, "", pr, &stdout); err != nil {
+	if err := p.Run(ctx, vaultDir, ""); err != nil {
 		t.Fatalf("Pipeline.Run failed: %v", err)
 	}
 
@@ -467,10 +450,7 @@ func TestPipeline_StoredTextDedup_EmbedKeepsOverlap(t *testing.T) {
 	p.ChunkSize = 100
 	p.ChunkOverlap = 20
 
-	pr, pw := io.Pipe()
-	defer func() { _ = pw.Close() }()
-	var stdout bytes.Buffer
-	if err := p.Run(ctx, vaultDir, "", pr, &stdout); err != nil {
+	if err := p.Run(ctx, vaultDir, ""); err != nil {
 		t.Fatalf("Pipeline.Run failed: %v", err)
 	}
 
@@ -501,19 +481,23 @@ func TestPipeline_StoredTextDedup_EmbedKeepsOverlap(t *testing.T) {
 
 func TestFileHashIncludesChunkParams(t *testing.T) {
 	content := []byte("same content")
-	first := fileHash(content, 800, 100)
-	second := fileHash(content, 800, 100)
+	const model = "mock"
+	first := fileHash(content, 800, 100, model)
+	second := fileHash(content, 800, 100, model)
 	if first != second {
 		t.Error("hash should be stable for identical content and params")
 	}
-	if fileHash(content, 800, 100) == fileHash(content, 400, 100) {
+	if fileHash(content, 800, 100, model) == fileHash(content, 400, 100, model) {
 		t.Error("hash must change when chunk-size changes")
 	}
-	if fileHash(content, 800, 100) == fileHash(content, 800, 50) {
+	if fileHash(content, 800, 100, model) == fileHash(content, 800, 50, model) {
 		t.Error("hash must change when chunk-overlap changes")
 	}
-	if fileHash(content, 800, 100) == fileHash([]byte("other content"), 800, 100) {
+	if fileHash(content, 800, 100, model) == fileHash([]byte("other content"), 800, 100, model) {
 		t.Error("hash must change when content changes")
+	}
+	if fileHash(content, 800, 100, model) == fileHash(content, 800, 100, "other-model") {
+		t.Error("hash must change when the embedding model changes")
 	}
 }
 
@@ -538,10 +522,7 @@ func TestPipeline_ReingestsWhenChunkParamsChange(t *testing.T) {
 	p.MinChunkWords = 0
 
 	run := func() {
-		pr, pw := io.Pipe()
-		go func() { _ = pw.Close() }()
-		var stdout bytes.Buffer
-		if err := p.Run(ctx, vaultDir, "", pr, &stdout); err != nil {
+		if err := p.Run(ctx, vaultDir, ""); err != nil {
 			t.Fatalf("Pipeline.Run failed: %v", err)
 		}
 	}

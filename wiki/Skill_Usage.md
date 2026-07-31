@@ -19,7 +19,7 @@ The `notebrain-assistant` skill mandates a tiered retrieval workflow. This workf
    ```bash
    notebrain search "<query>" --context-window 1 --top-k 2 --include-text --format json
    ```
-   The `--format json` flag automatically starts quiet mode (`embedder.WithQuiet`). Quiet mode removes the loading spinner and background log output. Then, the agent receives clean machine JSON. The `--context-window N` flag gets adjacent chunks but removes the matched chunk from the context. This decreases token consumption.
+   NoteBrain writes results to stdout and all diagnostics (progress, warnings) to stderr, so `--format json` output is always clean machine JSON. The `--context-window N` flag gets adjacent chunks but removes the matched chunk from the context. This decreases token consumption.
    
 2. **Similarity Score Check**:
    The agent stops immediately if the top result has a similarity score of `score >= 0.75` (for example, `0.8520`) and gives enough context to answer you.

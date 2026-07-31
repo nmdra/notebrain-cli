@@ -78,7 +78,7 @@ func (c *HiddenCmd) Run(globals *Globals) error {
 		return nil
 	}
 
-	emb, err := embedder.NewLocalEmbedder(embedder.WithQuiet(globals.Format != formatText || globals.JSONPath != ""))
+	emb, err := embedder.NewLocalEmbedder()
 	if err != nil {
 		return err
 	}

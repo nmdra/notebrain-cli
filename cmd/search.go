@@ -83,7 +83,7 @@ func (c *SearchCmd) Run(globals *Globals) error {
 	}
 	defer func() { _ = st.Close() }()
 
-	emb, err := embedder.NewLocalEmbedder(embedder.WithQuiet(globals.Format != formatText || globals.JSONPath != ""))
+	emb, err := embedder.NewLocalEmbedder()
 	if err != nil {
 		return err
 	}

@@ -24,7 +24,6 @@ package cmd
 import (
 	"fmt"
 	"log/slog"
-	"os"
 
 	"github.com/nmdra/notebrain-cli/v2/internal/embedder"
 	"github.com/nmdra/notebrain-cli/v2/internal/ingest"
@@ -62,7 +61,7 @@ func (c *IngestCmd) Run(globals *Globals) error {
 	defer func() { _ = st.Close() }()
 
 	slog.Info("initializing embedded ONNX vector models")
-	emb, err := embedder.NewLocalEmbedder(embedder.WithQuiet(true))
+	emb, err := embedder.NewLocalEmbedder()
 	if err != nil {
 		return err
 	}
@@ -78,5 +77,5 @@ func (c *IngestCmd) Run(globals *Globals) error {
 	pipeline.MinChunkWords = c.MinChunkWords
 	pipeline.ChunkSize = c.ChunkSize
 	pipeline.ChunkOverlap = c.ChunkOverlap
-	return pipeline.Run(ctx, vaultPath, glob, os.Stdin, os.Stdout)
+	return pipeline.Run(ctx, vaultPath, glob)
 }

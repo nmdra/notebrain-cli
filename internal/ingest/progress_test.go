@@ -20,7 +20,7 @@ func TestRunProgress(t *testing.T) {
 
 	progressCh := make(chan ProgressUpdate, 10)
 	progressCh <- ProgressUpdate{Done: 50, Current: "note50.md"}
-	progressCh <- ProgressUpdate{Done: 100, Current: "note100.md", Final: true}
+	progressCh <- ProgressUpdate{Done: 100, Current: "note100.md"}
 	close(progressCh)
 
 	RunProgress(100, progressCh)
