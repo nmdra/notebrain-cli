@@ -155,6 +155,46 @@ func TestPipelineSyncDeleted(t *testing.T) {
 	}
 }
 
+// TestPipeline_PreservesIndexWhenAllChunksFiltered verifies that raising
+// --min-chunk-words does not delete previously indexed notes whose chunks
+// now fall below the threshold.
+func TestPipeline_PreservesIndexWhenAllChunksFiltered(t *testing.T) {
+	ctx := context.Background()
+	dbDir := t.TempDir()
+	st, err := store.Open(ctx, dbDir)
+	if err != nil {
+		t.Fatalf("Failed to open store: %v", err)
+	}
+	defer func() { _ = st.Close() }()
+
+	vaultDir := t.TempDir()
+	_ = os.WriteFile(filepath.Join(vaultDir, "note1.md"), []byte("short note"), 0644)
+	_ = os.WriteFile(filepath.Join(vaultDir, "note2.md"), []byte("this is a longer note containing several words"), 0644)
+
+	run := func(minWords int) {
+		p := NewPipeline(st, &mockEmbedder{}, 1)
+		p.MinChunkWords = minWords
+		pr, pw := io.Pipe()
+		go func() { _ = pw.Close() }()
+		var stdout bytes.Buffer
+		if err := p.Run(ctx, vaultDir, "", pr, &stdout); err != nil {
+			t.Fatalf("Pipeline.Run failed: %v", err)
+		}
+	}
+
+	run(0) // index everything
+	stats, _ := st.Stats(ctx)
+	if stats["chunks"] != 2 {
+		t.Fatalf("Expected 2 chunks after initial ingest, got %d", stats["chunks"])
+	}
+
+	run(50) // all chunks of note1 now filtered
+	stats, _ = st.Stats(ctx)
+	if stats["chunks"] != 2 {
+		t.Errorf("Expected previously indexed notes to be preserved, got %d chunks", stats["chunks"])
+	}
+}
+
 func TestPipelineMinChunkWords(t *testing.T) {
 	ctx := context.Background()
 	dbDir := t.TempDir()

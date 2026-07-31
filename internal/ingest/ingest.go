@@ -426,6 +426,14 @@ func (p *Pipeline) processFile(ctx context.Context, vaultPath string, filePath s
 		validChunks = append(validChunks, c)
 	}
 
+	// If every chunk was filtered out, skip the note entirely. Replacing it
+	// with an empty batch would delete its previously indexed chunks, and
+	// since the content hash is unchanged the deletion would be permanent
+	// (later ingests would skip the file as unmodified).
+	if len(validChunks) == 0 {
+		return nil, nil
+	}
+
 	chunkRecords := make([]store.ChunkRecord, len(validChunks))
 	for i, c := range validChunks {
 		// Preamble fix: the top-of-note section before the first heading has no
@@ -603,12 +611,10 @@ func (p *Pipeline) processPdfFile(ctx context.Context, vaultPath string, filePat
 
 	astRes := parser.Parse(markdown, slug, p.ChunkSize, p.ChunkOverlap, p.SkipAttachments)
 
+	// Empty LLM output is usually a transient conversion failure. Preserve the
+	// previously indexed PDF instead of deleting it from the index.
 	if len(astRes.Chunks) == 0 {
-		return &store.BatchIngestData{
-			NoteSlug:     slug,
-			ChunkRecords: nil,
-			Links:        nil,
-		}, nil
+		return nil, nil
 	}
 
 	validChunks := make([]parser.Chunk, 0, len(astRes.Chunks))
@@ -624,6 +630,12 @@ func (p *Pipeline) processPdfFile(ctx context.Context, vaultPath string, filePat
 			continue
 		}
 		validChunks = append(validChunks, c)
+	}
+
+	// Same preservation rule as markdown notes: an empty batch would delete
+	// the PDF's previously indexed chunks with no way to restore them.
+	if len(validChunks) == 0 {
+		return nil, nil
 	}
 
 	chunkRecords := make([]store.ChunkRecord, len(validChunks))

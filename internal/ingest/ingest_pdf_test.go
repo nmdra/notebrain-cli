@@ -111,6 +111,39 @@ func (m *mockFailingLLMConverter) Convert(ctx context.Context, pages []string) (
 }
 func (m *mockFailingLLMConverter) Name() string { return "mock-fail" }
 
+type mockEmptyLLMConverter struct{}
+
+func (m *mockEmptyLLMConverter) Convert(ctx context.Context, pages []string) (string, error) {
+	return "", nil
+}
+func (m *mockEmptyLLMConverter) Name() string { return "mock-empty" }
+
+// TestProcessPdfFile_EmptyMarkdownSkips verifies that an empty LLM conversion
+// result does not delete the previously indexed PDF.
+func TestProcessPdfFile_EmptyMarkdownSkips(t *testing.T) {
+	dir := t.TempDir()
+	pdfPath := filepath.Join(dir, "dummy.pdf")
+	if err := os.WriteFile(pdfPath, []byte("%PDF-1.4 dummy"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	p := &Pipeline{
+		embedder:     &mockEmbedder{},
+		pdfBackend:   &mockPDFBackend{},
+		llmConverter: &mockEmptyLLMConverter{},
+		ChunkSize:    800,
+		ChunkOverlap: 100,
+	}
+
+	res, err := p.processPdfFile(context.Background(), dir, pdfPath, make(map[string]string))
+	if err != nil {
+		t.Fatalf("processPdfFile failed: %v", err)
+	}
+	if res != nil {
+		t.Fatal("expected nil result for empty LLM conversion (note should be preserved)")
+	}
+}
+
 func TestProcessPdfFile_FailureRecording(t *testing.T) {
 	dir := t.TempDir()
 	pdfPath := filepath.Join(dir, "broken.pdf")
