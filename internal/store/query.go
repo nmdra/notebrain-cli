@@ -62,6 +62,12 @@ func (s *Store) SemanticSearch(ctx context.Context, queryVec []float32, limit in
 }
 
 func (s *Store) semanticSearch(ctx context.Context, queryVec []float32, limit int, topKPerNote int, whereFilter chroma.WhereFilter, includeText bool) ([]Result, error) {
+	if limit < 1 {
+		limit = 1
+	}
+	if topKPerNote < 1 {
+		topKPerNote = 1
+	}
 	// Fetch enough results to allow top-K deduplication across chunks
 	includes := []chroma.Include{chroma.IncludeMetadatas, chroma.IncludeDistances}
 	if includeText {
@@ -69,6 +75,10 @@ func (s *Store) semanticSearch(ctx context.Context, queryVec []float32, limit in
 	}
 
 	fetchCount := min(max(limit*3, limit*topKPerNote), ffiSafeSemanticLimit)
+	if limit > ffiSafeSemanticLimit {
+		slog.Warn("semantic search limit exceeds FFI-safe cap; results will be truncated",
+			"limit", limit, "cap", ffiSafeSemanticLimit)
+	}
 
 	opts := []chroma.QueryOption{
 		chroma.WithQueryEmbeddings(embeddings.NewEmbeddingFromFloat32(queryVec)),
@@ -102,7 +112,14 @@ func (s *Store) MultiSemanticSearch(ctx context.Context, queryVecs [][]float32, 
 		}
 		if len(queries) > 0 && queries[0] != "" {
 			for i := range res {
-				res[i].MatchedQueries = []string{queries[0]}
+				// Apply the same relevance thresholds as the multi-query
+				// path so MatchedQueries is populated consistently.
+				if res[i].Score <= 0.0 {
+					continue
+				}
+				if filterMatchedQueries(map[string]float32{queries[0]: float32(res[i].Score)}, float32(res[i].Score)) != nil {
+					res[i].MatchedQueries = []string{queries[0]}
+				}
 			}
 		}
 		return res, nil
@@ -453,25 +470,13 @@ func (s *Store) buildLinkTargetResolver(ctx context.Context) map[string]string {
 }
 
 // linkWhereFilters builds a Chroma WhereFilter matching both exact targetSlug and uncanonicalized candidates.
-func (s *Store) linkWhereFilters(ctx context.Context, targetSlug string, resolver map[string]string) chroma.WhereFilter {
+func (s *Store) linkWhereFilters(targetSlug string, resolver map[string]string) chroma.WhereFilter {
 	candidatesMap := map[string]struct{}{
 		targetSlug: {},
 	}
-	title, filePath, _, found := s.noteInfoForSlug(ctx, targetSlug)
-	if found {
-		if title != "" {
-			candidatesMap[title] = struct{}{}
-			candidatesMap[parser.Slugify(title)] = struct{}{}
-		}
-		if filePath != "" {
-			base := filepath.Base(filePath)
-			baseNoExt := strings.TrimSuffix(base, filepath.Ext(base))
-			if baseNoExt != "" {
-				candidatesMap[baseNoExt] = struct{}{}
-				candidatesMap[parser.Slugify(baseNoExt)] = struct{}{}
-			}
-		}
-	}
+	// The resolver already maps titles, basenames, and paths (with and
+	// without extension) to canonical slugs, so it covers the uncanonical
+	// link targets that pointed here.
 	for k, v := range resolver {
 		if v == targetSlug && k != "" {
 			candidatesMap[k] = struct{}{}
@@ -504,7 +509,7 @@ func (s *Store) Backlinks(ctx context.Context, targetSlug string) ([]Result, err
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	resolver := s.buildLinkTargetResolver(ctx)
-	res, err := paginatedGetMetadatas(ctx, s.links, s.linkWhereFilters(ctx, targetSlug, resolver))
+	res, err := paginatedGetMetadatas(ctx, s.links, s.linkWhereFilters(targetSlug, resolver))
 	if err != nil {
 		return nil, fmt.Errorf("backlinks: %w", wrapChromaErr(err))
 	}
@@ -609,7 +614,7 @@ func (s *Store) processOutgoingLinks(ctx context.Context, src string, hop int, r
 }
 
 func (s *Store) processIncomingLinks(ctx context.Context, src string, hop int, resolver map[string]string, visited map[string]int, next *[]string) error {
-	in, err := paginatedGetMetadatas(ctx, s.links, s.linkWhereFilters(ctx, src, resolver))
+	in, err := paginatedGetMetadatas(ctx, s.links, s.linkWhereFilters(src, resolver))
 	if err != nil {
 		return fmt.Errorf("connections in: %w", wrapChromaErr(err))
 	}
@@ -1182,7 +1187,7 @@ func (s *Store) linkedSlugs(ctx context.Context, slug string) (map[string]bool, 
 			}
 		}
 	}
-	in, err := paginatedGetMetadatas(ctx, s.links, s.linkWhereFilters(ctx, slug, resolver))
+	in, err := paginatedGetMetadatas(ctx, s.links, s.linkWhereFilters(slug, resolver))
 	if err != nil {
 		return nil, fmt.Errorf("connections in: %w", wrapChromaErr(err))
 	}
