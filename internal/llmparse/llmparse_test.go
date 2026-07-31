@@ -172,27 +172,62 @@ func TestOpenAICompatConverter_RetryOn429(t *testing.T) {
 func TestSplitByTokenBudget(t *testing.T) {
 	pages := []string{
 		strings.Repeat("a", 20), // 20 chars
-		strings.Repeat("b", 15), // 15 chars (total 35) -> should fit in chunk 1
-		strings.Repeat("c", 10), // 10 chars (total 45) -> exceeds 40, goes to chunk 2
-		strings.Repeat("d", 45), // 45 chars -> exceeds 40, single huge page, goes to chunk 3
+		strings.Repeat("b", 15), // 15 chars (20 + sep 7 + 15 = 42 > 40) -> starts chunk 1
+		strings.Repeat("c", 10), // 10 chars (15 + sep 7 + 10 = 32 <= 40) -> joins chunk 1
+		strings.Repeat("d", 45), // 45 chars -> exceeds 40, split into 40 + 5
 	}
 
 	chunks := splitByTokenBudget(pages, 10)
 
-	if len(chunks) != 3 {
-		t.Fatalf("expected 3 chunks, got %d", len(chunks))
+	if len(chunks) != 4 {
+		t.Fatalf("expected 4 chunks, got %d", len(chunks))
 	}
 
-	if chunks[0] != strings.Repeat("a", 20)+"\n\n---\n\n"+strings.Repeat("b", 15) {
+	if chunks[0] != strings.Repeat("a", 20) {
 		t.Errorf("unexpected chunk 0: %q", chunks[0])
 	}
 
-	if chunks[1] != strings.Repeat("c", 10) {
+	if chunks[1] != strings.Repeat("b", 15)+pageSeparator+strings.Repeat("c", 10) {
 		t.Errorf("unexpected chunk 1: %q", chunks[1])
 	}
 
-	if chunks[2] != strings.Repeat("d", 45) {
+	if chunks[2] != strings.Repeat("d", 40) {
 		t.Errorf("unexpected chunk 2: %q", chunks[2])
+	}
+
+	if chunks[3] != strings.Repeat("d", 5) {
+		t.Errorf("unexpected chunk 3: %q", chunks[3])
+	}
+}
+
+func TestSplitByTokenBudget_UnicodeRunes(t *testing.T) {
+	// Each 'é' is 2 bytes; budgets must be counted in runes, not bytes.
+	pages := []string{
+		strings.Repeat("é", 30), // 60 bytes but only 30 runes -> fits within 40 runes
+		strings.Repeat("é", 20), // 30 + sep 7 + 20 = 57 runes > 40 -> starts chunk 2
+	}
+
+	chunks := splitByTokenBudget(pages, 10)
+
+	if len(chunks) != 2 {
+		t.Fatalf("expected 2 chunks, got %d", len(chunks))
+	}
+	if chunks[0] != strings.Repeat("é", 30) {
+		t.Errorf("unexpected chunk 0: %q", chunks[0])
+	}
+	if chunks[1] != strings.Repeat("é", 20) {
+		t.Errorf("unexpected chunk 1: %q", chunks[1])
+	}
+}
+
+func TestSplitByTokenBudget_OversizeRunes(t *testing.T) {
+	// 41 two-byte runes with a 40-rune budget must split to 40 + 1.
+	chunks := splitByTokenBudget([]string{strings.Repeat("é", 41)}, 10)
+	if len(chunks) != 2 {
+		t.Fatalf("expected 2 chunks, got %d", len(chunks))
+	}
+	if chunks[0] != strings.Repeat("é", 40) || chunks[1] != "é" {
+		t.Errorf("unexpected split: %q / %q", chunks[0], chunks[1])
 	}
 }
 
@@ -288,8 +323,9 @@ func TestOpenAICompatConverter_MultiChunk(t *testing.T) {
 		t.Fatalf("Convert failed: %v", err)
 	}
 
-	if reqCount != 2 {
-		t.Errorf("expected 2 requests for multi-chunk, got %d", reqCount)
+	// Budget 4096 tokens -> 16384 chars; each 20000-char page splits in two.
+	if reqCount != 4 {
+		t.Errorf("expected 4 requests for multi-chunk, got %d", reqCount)
 	}
 
 	if !strings.Contains(result, "\n\n") {
