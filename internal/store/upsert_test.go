@@ -2,14 +2,13 @@ package store_test
 
 import (
 	"context"
-	"strconv"
 	"testing"
 	"time"
 
 	"github.com/nmdra/notebrain-cli/v2/internal/store"
 )
 
-func TestUpsertAndDeleteChunks(t *testing.T) {
+func TestBatchIngestChunkLifecycle(t *testing.T) {
 	ctx := context.Background()
 	st := newTestStore(t)
 
@@ -40,9 +39,9 @@ func TestUpsertAndDeleteChunks(t *testing.T) {
 		},
 	}
 
-	err := st.UpsertChunks(ctx, chunks)
-	if err != nil {
-		t.Fatalf("UpsertChunks failed: %v", err)
+	data := []store.BatchIngestData{{NoteSlug: "test-note", ChunkRecords: chunks}}
+	if err := st.BatchIngest(ctx, data, nil); err != nil {
+		t.Fatalf("BatchIngest failed: %v", err)
 	}
 
 	stats, _ := st.Stats(ctx)
@@ -50,10 +49,22 @@ func TestUpsertAndDeleteChunks(t *testing.T) {
 		t.Errorf("Expected 2 chunks, got %d", stats["chunks"])
 	}
 
-	// Delete
-	err = st.DeleteNoteChunks(ctx, "test-note")
-	if err != nil {
-		t.Fatalf("DeleteNoteChunks failed: %v", err)
+	// Re-ingest with a single chunk should replace the note's chunks.
+	data2 := []store.BatchIngestData{
+		{NoteSlug: "test-note", ChunkRecords: []store.ChunkRecord{chunks[0]}},
+	}
+	if err := st.BatchIngest(ctx, data2, nil); err != nil {
+		t.Fatalf("Re-ingest failed: %v", err)
+	}
+
+	stats, _ = st.Stats(ctx)
+	if stats["chunks"] != 1 {
+		t.Errorf("Expected 1 chunk after re-ingest, got %d", stats["chunks"])
+	}
+
+	// Delete the whole note via stale slugs.
+	if err := st.BatchIngest(ctx, nil, []string{"test-note"}); err != nil {
+		t.Fatalf("Stale delete failed: %v", err)
 	}
 
 	stats, _ = st.Stats(ctx)
@@ -62,15 +73,15 @@ func TestUpsertAndDeleteChunks(t *testing.T) {
 	}
 }
 
-func TestUpsertLinks(t *testing.T) {
+func TestBatchIngestLinkLifecycle(t *testing.T) {
 	ctx := context.Background()
 	st := newTestStore(t)
 
-	links := []string{"other-note"}
-
-	err := st.UpsertLinks(ctx, "test-note", links)
-	if err != nil {
-		t.Fatalf("UpsertLinks failed: %v", err)
+	data := []store.BatchIngestData{
+		{NoteSlug: "test-note", Links: []string{"other-note"}},
+	}
+	if err := st.BatchIngest(ctx, data, nil); err != nil {
+		t.Fatalf("BatchIngest failed: %v", err)
 	}
 
 	stats, _ := st.Stats(ctx)
@@ -78,20 +89,21 @@ func TestUpsertLinks(t *testing.T) {
 		t.Errorf("Expected 1 link, got %d", stats["links"])
 	}
 
-	// Upsert again should replace
-	err = st.UpsertLinks(ctx, "test-note", links)
-	if err != nil {
-		t.Fatalf("UpsertLinks twice failed: %v", err)
+	// Re-ingest should replace, not duplicate.
+	if err := st.BatchIngest(ctx, data, nil); err != nil {
+		t.Fatalf("BatchIngest twice failed: %v", err)
 	}
 	stats, _ = st.Stats(ctx)
 	if stats["links"] != 1 {
 		t.Errorf("Expected 1 link after replacement, got %d", stats["links"])
 	}
 
-	// Delete links
-	err = st.DeleteNoteLinks(ctx, "test-note")
-	if err != nil {
-		t.Fatalf("DeleteNoteLinks failed: %v", err)
+	// Delete links by re-ingesting without links.
+	data2 := []store.BatchIngestData{
+		{NoteSlug: "test-note", Links: []string{}},
+	}
+	if err := st.BatchIngest(ctx, data2, nil); err != nil {
+		t.Fatalf("BatchIngest without links failed: %v", err)
 	}
 	stats, _ = st.Stats(ctx)
 	if stats["links"] != 0 {
@@ -163,21 +175,5 @@ func TestBatchIngest(t *testing.T) {
 	// Total: chunks = 2 (note-a:0, note-c:0), links = 1 (note-a -> note-c)
 	if stats["chunks"] != 2 || stats["links"] != 1 {
 		t.Errorf("Expected 2 chunks, 1 link after updates/delete, got %v", stats)
-	}
-}
-
-func BenchmarkUpsertLinks(b *testing.B) {
-	ctx := context.Background()
-	st := newTestStore(b)
-
-	links := make([]string, 100)
-	for i := range 100 {
-		links[i] = "target-note-" + strconv.Itoa(i)
-	}
-
-	b.ResetTimer()
-	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
-		_ = st.UpsertLinks(ctx, "bench-note", links)
 	}
 }

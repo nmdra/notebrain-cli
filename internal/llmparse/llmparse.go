@@ -60,22 +60,6 @@ type Converter interface {
 	Name() string
 }
 
-// Option defines a functional option for configuring New.
-type Option func(*options)
-
-type options struct {
-	envLookup func(string) string
-}
-
-// WithEnvLookup configures custom environment variable lookup for testing.
-func WithEnvLookup(fn func(string) string) Option {
-	return func(o *options) {
-		if fn != nil {
-			o.envLookup = fn
-		}
-	}
-}
-
 // sanitizeAPIKey removes surrounding quotes, whitespace, and internal spaces.
 func sanitizeAPIKey(raw string) string {
 	val := strings.Trim(strings.TrimSpace(raw), "\"'\t\n")
@@ -83,16 +67,9 @@ func sanitizeAPIKey(raw string) string {
 }
 
 // New creates a Converter for the given model name.
-func New(model string, contextWindow int, opts ...Option) (Converter, error) {
+func New(model string, contextWindow int) (Converter, error) {
 	if contextWindow < 12288 { // 8192 reserve + 4096 min chunk size
 		return nil, fmt.Errorf("context window %d is too small (needs at least 12288 tokens)", contextWindow)
-	}
-
-	optsCfg := options{
-		envLookup: os.Getenv,
-	}
-	for _, opt := range opts {
-		opt(&optsCfg)
 	}
 
 	var selected *BackendConfig
@@ -102,12 +79,12 @@ func New(model string, contextWindow int, opts ...Option) (Converter, error) {
 	// Auto-detect based on API key presence
 	for i := range supportedBackends {
 		b := &supportedBackends[i]
-		val := optsCfg.envLookup(b.EnvKey)
+		val := os.Getenv(b.EnvKey)
 		val = sanitizeAPIKey(val)
 
 		// Special case for Ollama keyless API
 		if b.Name == backendOllama && val == "" {
-			if host := optsCfg.envLookup("OLLAMA_HOST"); host != "" {
+			if host := os.Getenv("OLLAMA_HOST"); host != "" {
 				val = "dummy"
 				host = strings.TrimSuffix(strings.TrimSpace(host), "/")
 				if !strings.HasSuffix(host, "/v1") {

@@ -217,14 +217,9 @@ func TestSanitizeAPIKey(t *testing.T) {
 }
 
 func TestNewWithEnvLookup(t *testing.T) {
-	env := map[string]string{
-		"OPENROUTER_API_KEY": "test-key-or",
-	}
-	lookup := func(key string) string {
-		return env[key]
-	}
+	t.Setenv("OPENROUTER_API_KEY", "test-key-or")
 
-	conv, err := New("model", 128000, WithEnvLookup(lookup))
+	conv, err := New("model", 128000)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -245,10 +240,8 @@ func TestOllamaHostPathSuffix(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		env := map[string]string{
-			"OLLAMA_HOST": tt.host,
-		}
-		conv, err := New("llama3", 128000, WithEnvLookup(func(k string) string { return env[k] }))
+		t.Setenv("OLLAMA_HOST", tt.host)
+		conv, err := New("llama3", 128000)
 		if err != nil {
 			t.Fatalf("New failed for host %q: %v", tt.host, err)
 		}

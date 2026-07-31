@@ -13,6 +13,27 @@ import (
 	"github.com/nmdra/notebrain-cli/v2/internal/store"
 )
 
+// seedChunks groups records by note slug and ingests them (with optional links)
+// in one BatchIngest call.
+func seedChunks(t *testing.T, ctx context.Context, st *store.Store, chunks []store.ChunkRecord, links map[string][]string) {
+	t.Helper()
+	bySlug := make(map[string][]store.ChunkRecord)
+	var order []string
+	for _, c := range chunks {
+		if _, ok := bySlug[c.NoteSlug]; !ok {
+			order = append(order, c.NoteSlug)
+		}
+		bySlug[c.NoteSlug] = append(bySlug[c.NoteSlug], c)
+	}
+	data := make([]store.BatchIngestData, 0, len(order))
+	for _, slug := range order {
+		data = append(data, store.BatchIngestData{NoteSlug: slug, ChunkRecords: bySlug[slug], Links: links[slug]})
+	}
+	if err := st.BatchIngest(ctx, data, nil); err != nil {
+		t.Fatalf("seed chunks: %v", err)
+	}
+}
+
 func setupTestData(t *testing.T, ctx context.Context, st *store.Store) {
 	chunks := []store.ChunkRecord{
 		{
@@ -40,15 +61,7 @@ func setupTestData(t *testing.T, ctx context.Context, st *store.Store) {
 			Embedding:  []float32{0.0, 1.0, 0.0},
 		},
 	}
-	err := st.UpsertChunks(ctx, chunks)
-	if err != nil {
-		t.Fatalf("setup chunks: %v", err)
-	}
-
-	links := []string{"note-b"}
-	if err := st.UpsertLinks(ctx, "note-a", links); err != nil {
-		t.Fatalf("setup links: %v", err)
-	}
+	seedChunks(t, ctx, st, chunks, map[string][]string{"note-a": {"note-b"}})
 }
 
 func setupStoreTest(t *testing.T) (context.Context, *store.Store, []float32) {
@@ -106,7 +119,7 @@ func TestHiddenConnections(t *testing.T) {
 			Embedding:  []float32{0.9, 0.0, 0.0},
 		},
 	}
-	_ = st.UpsertChunks(ctx, chunks)
+	seedChunks(t, ctx, st, chunks, nil)
 
 	hidden, err := st.HiddenConnections(ctx, qVec, "note-a", 10, false)
 	if err != nil {
@@ -132,7 +145,7 @@ func TestHiddenConnectionsDeep(t *testing.T) {
 			Embedding:  []float32{0.9, 0.0, 0.0},
 		},
 	}
-	_ = st.UpsertChunks(ctx, chunks)
+	seedChunks(t, ctx, st, chunks, nil)
 
 	hidden, seedChunks, err := st.HiddenConnectionsDeep(ctx, "note-a", 10, 3, false)
 	if err != nil {
@@ -219,7 +232,7 @@ func TestMultiSemanticSearch_ThresholdFiltering(t *testing.T) {
 			Embedding:  []float32{1.0, 0.0, 0.0},
 		},
 	}
-	_ = st.UpsertChunks(ctx, chunks)
+	seedChunks(t, ctx, st, chunks, nil)
 
 	queryVecs := [][]float32{
 		{1.0, 0.0, 0.0},
@@ -325,7 +338,7 @@ func TestResolveNoteSlug(t *testing.T) {
 		{ID: "ambig-1:0", NoteSlug: "ambig-1", Title: "Ambig Note", FilePath: "dir1/Ambig Note.md", ChunkIndex: 0, Embedding: []float32{1.0, 0.0, 0.0}},
 		{ID: "ambig-2:0", NoteSlug: "ambig-2", Title: "Ambig Note", FilePath: "dir2/Ambig Note.md", ChunkIndex: 0, Embedding: []float32{1.0, 0.0, 0.0}},
 	}
-	_ = st.UpsertChunks(ctx, ambigChunks)
+	seedChunks(t, ctx, st, ambigChunks, nil)
 
 	_, err := st.ResolveNoteSlug(ctx, "Ambig Note")
 	if err == nil || !strings.Contains(err.Error(), "matches multiple indexed notes") {
@@ -357,9 +370,7 @@ func TestMultiSemanticSearch_WithText(t *testing.T) {
 			Embedding:  []float32{0.9, 0.1, 0.0},
 		},
 	}
-	if err := st.UpsertChunks(ctx, chunks); err != nil {
-		t.Fatalf("UpsertChunks failed: %v", err)
-	}
+	seedChunks(t, ctx, st, chunks, nil)
 
 	queryVecs := [][]float32{
 		{1.0, 0.0, 0.0},
@@ -396,9 +407,7 @@ func TestSemanticSearch_WithoutText(t *testing.T) {
 			Embedding:  []float32{1.0, 0.0, 0.0},
 		},
 	}
-	if err := st.UpsertChunks(ctx, chunks); err != nil {
-		t.Fatalf("UpsertChunks failed: %v", err)
-	}
+	seedChunks(t, ctx, st, chunks, nil)
 
 	res, err := st.SemanticSearch(ctx, []float32{1.0, 0.0, 0.0}, 10, 1, nil, false)
 	if err != nil {
@@ -447,7 +456,7 @@ func TestTagWhereClause(t *testing.T) {
 	}
 }
 
-func TestGetNoteHashes(t *testing.T) {
+func TestGetNoteMetadataHash(t *testing.T) {
 	ctx := context.Background()
 	st := newTestStore(t)
 
@@ -462,15 +471,15 @@ func TestGetNoteHashes(t *testing.T) {
 			Embedding:   []float32{1.0, 0.0, 0.0},
 		},
 	}
-	_ = st.UpsertChunks(ctx, chunks)
+	seedChunks(t, ctx, st, chunks, nil)
 
-	hashes, err := st.GetNoteHashes(ctx)
+	metas, err := st.GetNoteMetadata(ctx)
 	if err != nil {
-		t.Fatalf("GetNoteHashes failed: %v", err)
+		t.Fatalf("GetNoteMetadata failed: %v", err)
 	}
 
-	if val, ok := hashes["note-hash-test"]; !ok || val != "abcdef123456" {
-		t.Errorf("GetNoteHashes returned unexpected or missing hash: %v", hashes)
+	if val, ok := metas["note-hash-test"]; !ok || val.Hash != "abcdef123456" {
+		t.Errorf("GetNoteMetadata returned unexpected or missing hash: %v", metas)
 	}
 }
 
@@ -490,7 +499,7 @@ func TestGetNoteMetadata(t *testing.T) {
 			Embedding:   []float32{1.0, 0.0, 0.0},
 		},
 	}
-	_ = st.UpsertChunks(ctx, chunks)
+	seedChunks(t, ctx, st, chunks, nil)
 
 	metas, err := st.GetNoteMetadata(ctx)
 	if err != nil {
@@ -551,9 +560,7 @@ func TestTagSearch(t *testing.T) {
 			Embedding:  []float32{0.0, 0.0, 1.0},
 		},
 	}
-	if err := st.UpsertChunks(ctx, extraChunks); err != nil {
-		t.Fatalf("upsert extra chunks failed: %v", err)
-	}
+	seedChunks(t, ctx, st, extraChunks, nil)
 
 	// 1. Test Exact Match
 	res, err := st.TagSearch(ctx, "vector", 10, false, nil, false)
@@ -673,9 +680,7 @@ func TestGetNote_WithHeadings(t *testing.T) {
 			Embedding:    []float32{1.0, 0.0, 0.0},
 		},
 	}
-	if err := st.UpsertChunks(ctx, chunks); err != nil {
-		t.Fatalf("UpsertChunks failed: %v", err)
-	}
+	seedChunks(t, ctx, st, chunks, nil)
 
 	note, err := st.GetNote(ctx, "heading-note")
 	if err != nil {
@@ -743,9 +748,7 @@ func TestSemanticSearch_TopKDeduplication(t *testing.T) {
 			Embedding:  []float32{0.97, 0.0, 0.0},
 		},
 	}
-	if err := st.UpsertChunks(ctx, chunks); err != nil {
-		t.Fatalf("UpsertChunks failed: %v", err)
-	}
+	seedChunks(t, ctx, st, chunks, nil)
 
 	// With topK=2, we should get exactly 2 chunks for note "multi".
 	res, err := st.SemanticSearch(ctx, []float32{1.0, 0.0, 0.0}, 10, 2, nil, false)
@@ -763,7 +766,7 @@ func TestSemanticSearch_TopKDeduplication(t *testing.T) {
 	}
 }
 
-func TestGetChunkWindow(t *testing.T) {
+func TestPopulateContext(t *testing.T) {
 	ctx := context.Background()
 	st := newTestStore(t)
 
@@ -805,23 +808,7 @@ func TestGetChunkWindow(t *testing.T) {
 			Embedding:  []float32{1.0, 0.0, 0.0},
 		},
 	}
-	if err := st.UpsertChunks(ctx, chunks); err != nil {
-		t.Fatalf("UpsertChunks failed: %v", err)
-	}
-
-	win, err := st.GetChunkWindow(ctx, "win", 1, 1)
-	if err != nil {
-		t.Fatalf("GetChunkWindow failed: %v", err)
-	}
-	if win == nil || win.MatchedIndex != 1 {
-		t.Fatalf("Expected window for matched index 1, got %v", win)
-	}
-	if len(win.Texts) != 3 {
-		t.Fatalf("Expected 3 texts in window, got %d: %v", len(win.Texts), win.Texts)
-	}
-	if win.Texts[0] != "chunk zero" || win.Texts[1] != "chunk one" || win.Texts[2] != "chunk two" {
-		t.Errorf("Unexpected window texts: %v", win.Texts)
-	}
+	seedChunks(t, ctx, st, chunks, nil)
 
 	res := []store.Result{
 		{NoteSlug: "win", ChunkIndex: 1},
@@ -850,7 +837,7 @@ func TestConcurrentReadWrite(t *testing.T) {
 			for range 5 {
 				_, _ = st.SemanticSearch(ctx, qVec, 5, 1, nil, false)
 				_, _ = st.GetNote(ctx, "note-a")
-				_, _ = st.GetNoteHashes(ctx)
+				_, _ = st.GetNoteMetadata(ctx)
 			}
 		})
 	}
@@ -873,8 +860,9 @@ func TestConcurrentReadWrite(t *testing.T) {
 						Embedding:  []float32{0.5, 0.5, 0.0},
 					},
 				}
-				_ = st.UpsertChunks(ctx, chunks)
-				_ = st.UpsertLinks(ctx, slug, []string{"note-a"})
+				_ = st.BatchIngest(ctx, []store.BatchIngestData{
+					{NoteSlug: slug, ChunkRecords: chunks, Links: []string{"note-a"}},
+				}, nil)
 			}
 		}(i)
 	}
@@ -906,16 +894,8 @@ func TestConnections_PhantomAndAttachment(t *testing.T) {
 			Embedding:  []float32{0.0, 1.0, 0.0},
 		},
 	}
-	if err := st.UpsertChunks(ctx, chunks); err != nil {
-		t.Fatalf("UpsertChunks failed: %v", err)
-	}
-
-	// Link to a real note, a phantom (uncreated) note, and an image attachment.
 	st.SkipAttachments = false
-	links := []string{"real-target", "Phantom Note", "image.webp"}
-	if err := st.UpsertLinks(ctx, "src-note", links); err != nil {
-		t.Fatalf("UpsertLinks failed: %v", err)
-	}
+	seedChunks(t, ctx, st, chunks, map[string][]string{"src-note": {"real-target", "Phantom Note", "image.webp"}})
 
 	// Case 1: SkipAttachments = true (default)
 	st.SkipAttachments = true
@@ -973,9 +953,8 @@ func TestBacklinks_Attachment(t *testing.T) {
 			Embedding:  []float32{1.0, 0.0, 0.0},
 		},
 	}
-	_ = st.UpsertChunks(ctx, chunks)
 	st.SkipAttachments = false
-	_ = st.UpsertLinks(ctx, "src-note", []string{"diagram.canvas"})
+	seedChunks(t, ctx, st, chunks, map[string][]string{"src-note": {"diagram.canvas"}})
 
 	st.SkipAttachments = true
 	res, err := st.Backlinks(ctx, "diagramcanvas")
@@ -1029,9 +1008,7 @@ func TestMultiSemanticSearch(t *testing.T) {
 			Embedding:  []float32{0.707, 0.707, 0.0},
 		},
 	}
-	if err := st.UpsertChunks(ctx, chunks); err != nil {
-		t.Fatalf("UpsertChunks failed: %v", err)
-	}
+	seedChunks(t, ctx, st, chunks, nil)
 
 	queryVecs := [][]float32{
 		{1.0, 0.0, 0.0},
@@ -1078,9 +1055,11 @@ func TestStoreOpen_WithSkipAttachments(t *testing.T) {
 	}
 	defer func() { _ = st.Close() }()
 
-	links := []string{"target-note", "image.png", "doc.pdf"}
-	if err := st.UpsertLinks(ctx, "source-note", links); err != nil {
-		t.Fatalf("UpsertLinks failed: %v", err)
+	// SkipAttachments defaults to true: attachment links are skipped at ingest.
+	if err := st.BatchIngest(ctx, []store.BatchIngestData{
+		{NoteSlug: "source-note", Links: []string{"target-note", "image.png", "doc.pdf"}},
+	}, nil); err != nil {
+		t.Fatalf("BatchIngest failed: %v", err)
 	}
 
 	backlinks, err := st.Backlinks(ctx, "target-note")
@@ -1128,14 +1107,9 @@ func TestBacklinks_SubfolderSlugResolution(t *testing.T) {
 			Embedding:  []float32{1.0, 0.0, 0.0},
 		},
 	}
-	if err := st.UpsertChunks(ctx, chunks); err != nil {
-		t.Fatalf("UpsertChunks: %v", err)
-	}
-
-	// Source note links to "02 - Scalability#Proxy" (title + heading anchor)
-	if err := st.UpsertLinks(ctx, "01projectssystem-designsystem-design", []string{"02 - Scalability#Proxy"}); err != nil {
-		t.Fatalf("UpsertLinks: %v", err)
-	}
+	seedChunks(t, ctx, st, chunks, map[string][]string{
+		"01projectssystem-designsystem-design": {"02 - Scalability#Proxy"},
+	})
 
 	// Backlinks query for the canonical target slug
 	res, err := st.Backlinks(ctx, "01projectssystem-design02-scalability")
@@ -1173,9 +1147,7 @@ func TestTagSearch_HierarchicalDeduplication(t *testing.T) {
 			Embedding:  []float32{1.0, 0.0, 0.0},
 		},
 	}
-	if err := st.UpsertChunks(ctx, chunks); err != nil {
-		t.Fatalf("UpsertChunks failed: %v", err)
-	}
+	seedChunks(t, ctx, st, chunks, nil)
 
 	res, err := st.TagSearch(ctx, "llm", 10, true, nil, false)
 	if err != nil {

@@ -5,6 +5,7 @@
 package parser
 
 import (
+	"fmt"
 	"reflect"
 	"slices"
 	"sort"
@@ -672,5 +673,128 @@ Final concluding paragraph with some more prose.
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		_ = Parse(body, "benchmark-note", 800, 100, false)
+	}
+}
+
+// boundaryOverlap returns how many runes at the head of b match the tail of a.
+func boundaryOverlap(a, b string) int {
+	ar := []rune(a)
+	br := []rune(b)
+	for n := min(len(ar), len(br)); n > 0; n-- {
+		if string(ar[len(ar)-n:]) == string(br[:n]) {
+			return n
+		}
+	}
+	return 0
+}
+
+func TestSplitAtBoundary_DisplayConcatsWithoutOverlap(t *testing.T) {
+	// Single space-free token stream so cuts land mid-token and no whitespace
+	// is trimmed at part edges; display concat must equal the source exactly.
+	var sb strings.Builder
+	for i := range 200 {
+		_, _ = fmt.Fprintf(&sb, "word%03d", i)
+	}
+	body := sb.String()
+	parts := splitAtBoundary([]rune(body), 100, 25)
+
+	if len(parts) < 3 {
+		t.Fatalf("expected multiple parts, got %d", len(parts))
+	}
+
+	var concat strings.Builder
+	for _, p := range parts {
+		concat.WriteString(p.displayRaw)
+	}
+	if concat.String() != body {
+		t.Errorf("display concat = %q, want %q", concat.String(), body)
+	}
+
+	for i := 1; i < len(parts); i++ {
+		if n := boundaryOverlap(parts[i-1].embedRaw, parts[i].embedRaw); n < 20 {
+			t.Errorf("embed part %d: expected >=20 runes of overlap, got %d", i, n)
+		}
+		if n := boundaryOverlap(parts[i-1].displayRaw, parts[i].displayRaw); n > 8 {
+			t.Errorf("display part %d: unexpected overlap of %d runes", i, n)
+		}
+	}
+}
+
+func TestParse_DisplayTextHasNoOverlapDuplicate(t *testing.T) {
+	sentences := make([]string, 0, 40)
+	for i := range 40 {
+		sentences = append(sentences, fmt.Sprintf("Sentence %03d carries distinct prose content that keeps the section long enough to split at boundary %03d. ", i, i))
+	}
+	body := strings.Join(sentences, " ")
+	res := Parse(body, "overlap-note", 100, 20, false)
+	if len(res.Chunks) < 2 {
+		t.Fatal("expected the section to be split into multiple chunks")
+	}
+	for i := 1; i < len(res.Chunks); i++ {
+		if n := boundaryOverlap(res.Chunks[i-1].Text, res.Chunks[i].Text); n > 8 {
+			t.Errorf("chunk %d: display text repeats %d runes across the boundary", i, n)
+		}
+		if n := boundaryOverlap(res.Chunks[i-1].EmbedText, res.Chunks[i].EmbedText); n < 15 {
+			t.Errorf("chunk %d: embed text missing overlap (got %d runes)", i, n)
+		}
+	}
+}
+
+func TestParse_UnsplitChunkDisplayEqualsEmbed(t *testing.T) {
+	res := Parse("A short note that will not be split at all.", "tiny", 2000, 100, false)
+	if len(res.Chunks) != 1 {
+		t.Fatalf("expected 1 chunk, got %d", len(res.Chunks))
+	}
+	c := res.Chunks[0]
+	if c.Text != c.EmbedText {
+		t.Errorf("unsplit chunk: Text %q != EmbedText %q", c.Text, c.EmbedText)
+	}
+}
+
+func TestSnapToPlaceholderStart(t *testing.T) {
+	spans := [][2]int{{50, 65}, {200, 214}}
+	tests := []struct {
+		pos  int
+		want int
+	}{
+		{pos: 0, want: 0},
+		{pos: 30, want: 30},
+		{pos: 55, want: 50}, // inside first placeholder -> snap to its start
+		{pos: 64, want: 50},
+		{pos: 50, want: 50}, // exactly at token start: not inside
+		{pos: 65, want: 65}, // exactly at token end: not inside
+		{pos: 205, want: 200},
+		{pos: 100, want: 100},
+	}
+	for _, tt := range tests {
+		if got := snapToPlaceholderStart(spans, tt.pos); got != tt.want {
+			t.Errorf("snapToPlaceholderStart(%d) = %d, want %d", tt.pos, got, tt.want)
+		}
+	}
+}
+
+func TestParse_OverlapNeverLeaksPlaceholders(t *testing.T) {
+	for _, filler := range []int{10, 12, 14, 16, 18, 20} {
+		body := "prefix text to push the section. " +
+			strings.Repeat("filler words arranged to place the code block near a split boundary. ", filler) +
+			"\n\n```go\nfunc main() { fmt.Println(\"hi\") }\n```\n\n" +
+			strings.Repeat("more filler words to continue the section well beyond the code block. ", filler)
+		res := Parse(body, "ph-note", 150, 40, false)
+		if len(res.Chunks) < 2 {
+			t.Errorf("filler=%d: expected section to be split", filler)
+			continue
+		}
+		for _, c := range res.Chunks {
+			fields := map[string]string{
+				"Text":      c.Text,
+				"RichText":  c.RichText,
+				"EmbedText": c.EmbedText,
+			}
+			for name, text := range fields {
+				if strings.Contains(text, "\x00") {
+					t.Errorf("filler=%d: %s contains a leaked placeholder: %q", filler, name, text)
+				}
+			}
+		}
 	}
 }

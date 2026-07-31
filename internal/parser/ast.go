@@ -24,10 +24,17 @@ import (
 
 // Chunk is one section of a note, bounded by heading structure.
 type Chunk struct {
-	NoteSlug    string
-	Index       int
-	Text        string // clean prose text for embedding (code blocks replaced with placeholders)
-	RichText    string // full text with actual code inline (for storage/retrieval)
+	NoteSlug string
+	Index    int
+	// Text and RichText are the overlap-free display text used for storage and
+	// retrieval output. Text is clean prose (code blocks replaced with
+	// placeholders); RichText keeps actual code and markdown inline.
+	Text     string
+	RichText string
+	// EmbedText is the text fed to the embedding model. For split sections it
+	// includes the configured chunk-overlap so sentence-level continuity across
+	// sub-chunk boundaries survives embedding. It is never stored or displayed.
+	EmbedText   string
 	HeadingPath string // e.g. "Architecture > Data Flow > Ingest"
 	Level       int    // depth of the deepest heading in this chunk (1-6)
 	HasTask     bool
@@ -449,6 +456,7 @@ func buildChunks(sections []section, noteSlug string, maxRunes, overlapRunes int
 				Index:       idx,
 				Text:        cleanText,
 				RichText:    richText,
+				EmbedText:   cleanText,
 				HeadingPath: sec.headingPath,
 				Level:       sec.level,
 				HasTask:     hasTask,
@@ -458,15 +466,14 @@ func buildChunks(sections []section, noteSlug string, maxRunes, overlapRunes int
 		}
 
 		rawRunes := []rune(rawText)
-		subTexts := splitAtBoundary(rawRunes, maxRunes, overlapRunes)
-		for _, sub := range subTexts {
-			subClean := formatChunkText(sub, codeInfos, inlineRegistry, false)
-			subRich := formatChunkText(sub, codeInfos, inlineRegistry, true)
+		subParts := splitAtBoundary(rawRunes, maxRunes, overlapRunes)
+		for _, sub := range subParts {
 			chunks = append(chunks, Chunk{
 				NoteSlug:    noteSlug,
 				Index:       idx,
-				Text:        subClean,
-				RichText:    subRich,
+				Text:        formatChunkText(sub.displayRaw, codeInfos, inlineRegistry, false),
+				RichText:    formatChunkText(sub.displayRaw, codeInfos, inlineRegistry, true),
+				EmbedText:   formatChunkText(sub.embedRaw, codeInfos, inlineRegistry, false),
 				HeadingPath: sec.headingPath,
 				Level:       sec.level,
 				HasTask:     hasTask,
@@ -477,17 +484,31 @@ func buildChunks(sections []section, noteSlug string, maxRunes, overlapRunes int
 	return chunks
 }
 
+// splitPart is one sub-chunk of a split section.
+// embedRaw carries the configured overlap at its start (embedding continuity);
+// displayRaw is overlap-free and concatenates losslessly with the other parts.
+type splitPart struct {
+	embedRaw   string // raw runes for embedding (overlap repeated from previous part)
+	displayRaw string // raw runes for display (no overlap)
+}
+
 // splitAtBoundary splits a rune slice into parts of at most maxRunes runes each,
 // preferring sentence boundaries (./!/?) or newlines as break points.
-// overlapRunes runes from the previous part are repeated at the start of each new part
-// to preserve sentence-level continuity across sub-chunk boundaries.
-func splitAtBoundary(runes []rune, maxRunes, overlapRunes int) []string {
-	parts := make([]string, 0, (len(runes)/maxRunes)+1)
+// overlapRunes from the previous part are repeated at the start of each new
+// part's embedRaw only, so display output never duplicates content.
+// The overlap rewind never lands inside a \x00...\x00 placeholder token.
+func splitAtBoundary(runes []rune, maxRunes, overlapRunes int) []splitPart {
+	spans := placeholderSpans(runes)
+	parts := make([]splitPart, 0, (len(runes)/maxRunes)+1)
 	start := 0
+	displayStart := 0
 	for start < len(runes) {
 		end := start + maxRunes
 		if end >= len(runes) {
-			parts = append(parts, strings.TrimSpace(string(runes[start:])))
+			parts = append(parts, splitPart{
+				embedRaw:   strings.TrimSpace(string(runes[start:])),
+				displayRaw: strings.TrimSpace(string(runes[displayStart:])),
+			})
 			break
 		}
 		breakAt := end
@@ -502,17 +523,56 @@ func splitAtBoundary(runes []rune, maxRunes, overlapRunes int) []string {
 				break
 			}
 		}
-		parts = append(parts, strings.TrimSpace(string(runes[start:breakAt])))
+		parts = append(parts, splitPart{
+			embedRaw:   strings.TrimSpace(string(runes[start:breakAt])),
+			displayRaw: strings.TrimSpace(string(runes[displayStart:breakAt])),
+		})
 
-		// Apply overlap: back up by overlapRunes so the next chunk shares context.
-		// Safety floor: nextStart must advance beyond start to prevent infinite loops.
+		// Apply overlap: back up by overlapRunes so the next chunk's embed text
+		// shares context. Safety floor: nextStart must advance beyond start to
+		// prevent infinite loops.
 		nextStart := breakAt - overlapRunes
 		if nextStart <= start {
 			nextStart = breakAt
 		}
+		// Never rewind into the middle of a placeholder token; snap to its
+		// start so formatChunkText can still resolve it.
+		nextStart = snapToPlaceholderStart(spans, nextStart)
 		start = nextStart
+		displayStart = breakAt
 	}
 	return parts
+}
+
+// placeholderSpans returns rune-index spans [start, end) of \x00...\x00
+// placeholder tokens in raw, so splits never land mid-token.
+func placeholderSpans(raw []rune) [][2]int {
+	var spans [][2]int
+	for i := 0; i < len(raw); i++ {
+		if raw[i] != '\x00' {
+			continue
+		}
+		j := i + 1
+		for j < len(raw) && raw[j] != '\x00' {
+			j++
+		}
+		if j < len(raw) {
+			spans = append(spans, [2]int{i, j + 1})
+			i = j
+		}
+	}
+	return spans
+}
+
+// snapToPlaceholderStart returns the start of the placeholder token containing
+// pos, or pos unchanged when pos is not inside any placeholder token.
+func snapToPlaceholderStart(spans [][2]int, pos int) int {
+	for _, sp := range spans {
+		if pos > sp[0] && pos < sp[1] {
+			return sp[0]
+		}
+	}
+	return pos
 }
 
 func handleInlineNode(node ast.Node, entering bool, src []byte, registry *[]inlineInfo, buf *bytes.Buffer, breakChar byte) (ast.WalkStatus, bool) {

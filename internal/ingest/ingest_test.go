@@ -3,6 +3,7 @@ package ingest
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -27,6 +28,28 @@ func (m *mockEmbedder) EmbedBatch(ctx context.Context, texts []string) ([][]floa
 }
 
 func (m *mockEmbedder) Close() error { return nil }
+
+// recordingEmbedder records every text sent to Embed so tests can inspect
+// exactly what the embedding model received.
+type recordingEmbedder struct {
+	texts []string
+}
+
+func (m *recordingEmbedder) Embed(ctx context.Context, text string) ([]float32, error) {
+	m.texts = append(m.texts, text)
+	return []float32{1.0, 0.0, 0.0}, nil
+}
+
+func (m *recordingEmbedder) EmbedBatch(ctx context.Context, texts []string) ([][]float32, error) {
+	m.texts = append(m.texts, texts...)
+	out := make([][]float32, len(texts))
+	for i := range texts {
+		out[i] = []float32{1.0, 0.0, 0.0}
+	}
+	return out, nil
+}
+
+func (m *recordingEmbedder) Close() error { return nil }
 
 func TestPipelineRun(t *testing.T) {
 	ctx := context.Background()
@@ -303,18 +326,23 @@ func TestPipeline_PDFFallbackPreservesPDFs(t *testing.T) {
 	_ = os.WriteFile(filepath.Join(vaultDir, "doc.md"), []byte("MD Note"), 0644)
 
 	// Seed store with a PDF note
-	_ = st.UpsertChunks(ctx, []store.ChunkRecord{
+	_ = st.BatchIngest(ctx, []store.BatchIngestData{
 		{
-			ID:          "pdf-doc:0",
-			NoteSlug:    "pdf-doc",
-			Title:       "PDF Document",
-			FilePath:    "PDF Document.pdf",
-			ChunkIndex:  0,
-			ContentHash: "abcdef",
-			FileType:    fileTypePDF,
-			Embedding:   []float32{1.0, 0.0, 0.0},
+			NoteSlug: "pdf-doc",
+			ChunkRecords: []store.ChunkRecord{
+				{
+					ID:          "pdf-doc:0",
+					NoteSlug:    "pdf-doc",
+					Title:       "PDF Document",
+					FilePath:    "PDF Document.pdf",
+					ChunkIndex:  0,
+					ContentHash: "abcdef",
+					FileType:    fileTypePDF,
+					Embedding:   []float32{1.0, 0.0, 0.0},
+				},
+			},
 		},
-	})
+	}, nil)
 
 	p := NewPipeline(st, &mockEmbedder{}, 1)
 	p.EnablePDF = true
@@ -359,5 +387,149 @@ func BenchmarkBuildEmbedText(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		_ = buildEmbedText(title, heading, tags, body, 256)
+	}
+}
+
+func tailRunes(s string, n int) string {
+	r := []rune(s)
+	if len(r) <= n {
+		return s
+	}
+	return string(r[len(r)-n:])
+}
+
+// TestPipeline_StoredTextDedup_EmbedKeepsOverlap verifies the core fix:
+// stored/displayed chunk text is overlap-free (each source sentence appears
+// exactly once when the note is joined), while the embedding still receives
+// the overlapping boundary tail of the previous chunk.
+func TestPipeline_StoredTextDedup_EmbedKeepsOverlap(t *testing.T) {
+	ctx := context.Background()
+	dbDir := t.TempDir()
+	st, err := store.Open(ctx, dbDir)
+	if err != nil {
+		t.Fatalf("Failed to open store: %v", err)
+	}
+	defer func() { _ = st.Close() }()
+
+	vaultDir := t.TempDir()
+	sentences := make([]string, 0, 100)
+	for i := range 100 {
+		sentences = append(sentences, fmt.Sprintf("Sentence %03d is a distinct chunk of prose. ", i))
+	}
+	body := strings.Join(sentences, " ")
+	if err := os.WriteFile(filepath.Join(vaultDir, "long.md"), []byte(body), 0o644); err != nil {
+		t.Fatalf("write note: %v", err)
+	}
+
+	rec := &recordingEmbedder{}
+	p := NewPipeline(st, rec, 2)
+	p.MinChunkWords = 0
+	p.ChunkSize = 100
+	p.ChunkOverlap = 20
+
+	pr, pw := io.Pipe()
+	defer func() { _ = pw.Close() }()
+	var stdout bytes.Buffer
+	if err := p.Run(ctx, vaultDir, "", pr, &stdout); err != nil {
+		t.Fatalf("Pipeline.Run failed: %v", err)
+	}
+
+	note, err := st.GetNote(ctx, "long")
+	if err != nil {
+		t.Fatalf("GetNote failed: %v", err)
+	}
+	for _, s := range sentences {
+		s = strings.TrimSpace(s)
+		if n := strings.Count(note.Text, s); n != 1 {
+			t.Errorf("sentence %q appears %d times in stored text; want exactly 1", s, n)
+		}
+	}
+
+	if len(rec.texts) != note.Chunks {
+		t.Fatalf("embed calls %d != chunks %d", len(rec.texts), note.Chunks)
+	}
+	for i := 1; i < len(rec.texts); i++ {
+		tail := tailRunes(rec.texts[i-1], 12)
+		if tail == "" {
+			continue
+		}
+		if !strings.Contains(rec.texts[i], tail) {
+			t.Errorf("embed input %d is missing the boundary tail of embed input %d (%q)", i, i-1, tail)
+		}
+	}
+}
+
+func TestFileHashIncludesChunkParams(t *testing.T) {
+	content := []byte("same content")
+	first := fileHash(content, 800, 100)
+	second := fileHash(content, 800, 100)
+	if first != second {
+		t.Error("hash should be stable for identical content and params")
+	}
+	if fileHash(content, 800, 100) == fileHash(content, 400, 100) {
+		t.Error("hash must change when chunk-size changes")
+	}
+	if fileHash(content, 800, 100) == fileHash(content, 800, 50) {
+		t.Error("hash must change when chunk-overlap changes")
+	}
+	if fileHash(content, 800, 100) == fileHash([]byte("other content"), 800, 100) {
+		t.Error("hash must change when content changes")
+	}
+}
+
+// TestPipeline_ReingestsWhenChunkParamsChange verifies a hash change caused by
+// chunk parameters forces re-ingestion of an otherwise unchanged file.
+func TestPipeline_ReingestsWhenChunkParamsChange(t *testing.T) {
+	ctx := context.Background()
+	dbDir := t.TempDir()
+	st, err := store.Open(ctx, dbDir)
+	if err != nil {
+		t.Fatalf("Failed to open store: %v", err)
+	}
+	defer func() { _ = st.Close() }()
+
+	vaultDir := t.TempDir()
+	body := strings.Repeat("Long paragraph content with enough words that the section will definitely exceed the configured chunk size limit and split into multiple chunks. ", 30)
+	if err := os.WriteFile(filepath.Join(vaultDir, "long.md"), []byte(body), 0o644); err != nil {
+		t.Fatalf("write note: %v", err)
+	}
+
+	p := NewPipeline(st, &mockEmbedder{}, 2)
+	p.MinChunkWords = 0
+
+	run := func() {
+		pr, pw := io.Pipe()
+		go func() { _ = pw.Close() }()
+		var stdout bytes.Buffer
+		if err := p.Run(ctx, vaultDir, "", pr, &stdout); err != nil {
+			t.Fatalf("Pipeline.Run failed: %v", err)
+		}
+	}
+
+	run() // initial ingest
+	meta1, err := st.GetNoteMetadata(ctx)
+	if err != nil {
+		t.Fatalf("GetNoteMetadata failed: %v", err)
+	}
+	hash1 := meta1["long"].Hash
+
+	run() // unchanged -> skip
+	meta2, err := st.GetNoteMetadata(ctx)
+	if err != nil {
+		t.Fatalf("GetNoteMetadata failed: %v", err)
+	}
+	if meta2["long"].Hash != hash1 {
+		t.Error("expected no re-ingest when content and chunk params are unchanged")
+	}
+
+	p.ChunkSize = 400
+	p.ChunkOverlap = 50
+	run() // chunk params changed -> re-ingest
+	meta3, err := st.GetNoteMetadata(ctx)
+	if err != nil {
+		t.Fatalf("GetNoteMetadata failed: %v", err)
+	}
+	if meta3["long"].Hash == hash1 {
+		t.Error("expected re-ingest when chunk params change")
 	}
 }

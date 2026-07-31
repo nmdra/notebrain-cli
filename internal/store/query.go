@@ -332,22 +332,6 @@ func (s *Store) GetNoteMetadata(ctx context.Context) (map[string]NoteMeta, error
 	return hashes, nil
 }
 
-// GetNoteHashes fetches the content_hash for all notes by reading chunk_index=0.
-// Returns a map of note_slug -> content_hash.
-//
-// Deprecated: use GetNoteMetadata instead.
-func (s *Store) GetNoteHashes(ctx context.Context) (map[string]string, error) {
-	metaMap, err := s.GetNoteMetadata(ctx)
-	if err != nil {
-		return nil, err
-	}
-	hashes := make(map[string]string, len(metaMap))
-	for k, v := range metaMap {
-		hashes[k] = v.Hash
-	}
-	return hashes, nil
-}
-
 // paginatedGetMetadatas is a helper to fetch metadata from any collection safely across FFI limits.
 func paginatedGetMetadatas(ctx context.Context, col chroma.Collection, where chroma.WhereFilter) ([]chroma.DocumentMetadata, error) {
 	var all []chroma.DocumentMetadata
@@ -1442,71 +1426,6 @@ func (s *Store) GetNote(ctx context.Context, slugOrPath string) (*NoteContent, e
 		Text:     fullText,
 		Chunks:   len(chunks),
 	}, nil
-}
-
-// ChunkWindow contains a matched chunk with its surrounding context.
-type ChunkWindow struct {
-	MatchedIndex int      `json:"matched_index"`
-	Texts        []string `json:"texts"`
-	Indices      []int    `json:"indices"`
-}
-
-// GetChunkWindow fetches ±windowSize adjacent chunks around the given chunk index.
-func (s *Store) GetChunkWindow(ctx context.Context, noteSlug string, chunkIndex int, windowSize int) (*ChunkWindow, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.getChunkWindow(ctx, noteSlug, chunkIndex, windowSize)
-}
-
-func (s *Store) getChunkWindow(ctx context.Context, noteSlug string, chunkIndex int, windowSize int) (*ChunkWindow, error) {
-	if windowSize <= 0 {
-		return nil, nil
-	}
-
-	minIdx := max(0, chunkIndex-windowSize)
-	maxIdx := chunkIndex + windowSize
-
-	res, err := s.chunks.Get(ctx,
-		chroma.WithWhere(chroma.And(
-			chroma.EqString("note_slug", noteSlug),
-			chroma.GteInt("chunk_index", minIdx),
-			chroma.LteInt("chunk_index", maxIdx),
-		)),
-		chroma.WithInclude(chroma.IncludeMetadatas, chroma.IncludeDocuments),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("get chunk window: %w", wrapChromaErr(err))
-	}
-
-	metas := res.GetMetadatas()
-	texts := res.GetDocuments()
-	if len(metas) == 0 {
-		return nil, nil
-	}
-
-	type indexedChunk struct {
-		index int
-		text  string
-	}
-	var allChunks []indexedChunk
-	for i, m := range metas {
-		idx := metaInt(m, "chunk_index")
-		txt := ""
-		if len(texts) > i && texts[i] != nil {
-			txt = texts[i].ContentString()
-		}
-		allChunks = append(allChunks, indexedChunk{index: idx, text: txt})
-	}
-
-	sort.Slice(allChunks, func(i, j int) bool { return allChunks[i].index < allChunks[j].index })
-
-	window := &ChunkWindow{MatchedIndex: chunkIndex}
-	for _, c := range allChunks {
-		window.Texts = append(window.Texts, c.text)
-		window.Indices = append(window.Indices, c.index)
-	}
-
-	return window, nil
 }
 
 // PopulateContext fetches adjacent chunks for each result when windowSize > 0.

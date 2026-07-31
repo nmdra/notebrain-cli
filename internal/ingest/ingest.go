@@ -27,6 +27,11 @@ import (
 const (
 	fileTypeMD  = "md"
 	fileTypePDF = "pdf"
+
+	// chunkSchemaVersion is bumped whenever chunk content semantics change so
+	// that already-ingested files are re-ingested even if their bytes are
+	// unchanged (e.g. the chunk-overlap duplication fix).
+	chunkSchemaVersion = 2
 )
 
 // Embedder abstracts vector embedding so the pipeline can be tested with mocks.
@@ -352,6 +357,16 @@ func (p *Pipeline) collectFiles(vaultPath, glob string, skipPDF bool) ([]string,
 	return files, nil
 }
 
+// fileHash returns a content hash that also covers the chunking parameters and
+// the current chunk schema version. Changing any of them invalidates previously
+// stored hashes so unchanged files are still re-ingested.
+func fileHash(content []byte, chunkSize, chunkOverlap int) string {
+	h := sha256.New()
+	h.Write(content)
+	_, _ = fmt.Fprintf(h, "\x00schema=%d\x00size=%d\x00overlap=%d\x00", chunkSchemaVersion, chunkSize, chunkOverlap)
+	return hex.EncodeToString(h.Sum(nil))
+}
+
 func (p *Pipeline) processFile(ctx context.Context, vaultPath string, filePath string, knownHashes map[string]string) (*store.BatchIngestData, error) {
 	if strings.ToLower(filepath.Ext(filePath)) == ".pdf" {
 		return p.processPdfFile(ctx, vaultPath, filePath, knownHashes)
@@ -369,8 +384,7 @@ func (p *Pipeline) processFile(ctx context.Context, vaultPath string, filePath s
 
 	slug := parser.Slugify(relPath)
 
-	sum := sha256.Sum256(content)
-	hash := hex.EncodeToString(sum[:])
+	hash := fileHash(content, p.ChunkSize, p.ChunkOverlap)
 	if knownHashes[slug] == hash {
 		return nil, nil
 	}
@@ -421,8 +435,10 @@ func (p *Pipeline) processFile(ctx context.Context, vaultPath string, filePath s
 			headingPath = title
 		}
 
-		embedContent := c.Text
-		if isCodeOnlyChunk(c.Text) && c.RichText != "" {
+		// Embed from the overlap-full variant so chunk-boundary context
+		// survives embedding; store the overlap-free display text.
+		embedContent := c.EmbedText
+		if isCodeOnlyChunk(c.EmbedText) && c.RichText != "" {
 			embedContent = c.RichText
 		}
 
@@ -556,8 +572,7 @@ func (p *Pipeline) processPdfFile(ctx context.Context, vaultPath string, filePat
 	}
 
 	slug := parser.Slugify(relPath)
-	sum := sha256.Sum256(content)
-	hash := hex.EncodeToString(sum[:])
+	hash := fileHash(content, p.ChunkSize, p.ChunkOverlap)
 	if knownHashes[slug] == hash {
 		return nil, nil // Skip unchanged
 	}
@@ -618,8 +633,8 @@ func (p *Pipeline) processPdfFile(ctx context.Context, vaultPath string, filePat
 			headingPath = title
 		}
 
-		embedContent := c.Text
-		if isCodeOnlyChunk(c.Text) && c.RichText != "" {
+		embedContent := c.EmbedText
+		if isCodeOnlyChunk(c.EmbedText) && c.RichText != "" {
 			embedContent = c.RichText
 		}
 

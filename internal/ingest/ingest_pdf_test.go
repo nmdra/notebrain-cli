@@ -2,7 +2,6 @@ package ingest
 
 import (
 	"context"
-	"crypto/sha256"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -81,13 +80,15 @@ func TestProcessPdfFile_SkipUnchanged(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	importHashBytes := []byte("%PDF-1.4 dummy")
-	importHash := fmt.Sprintf("%x", sha256.Sum256(importHashBytes))
+	chunkSize, chunkOverlap := 800, 100
+	importHash := fileHash([]byte("%PDF-1.4 dummy"), chunkSize, chunkOverlap)
 
 	p := &Pipeline{
 		embedder:     &mockEmbedder{},
 		pdfBackend:   &mockPDFBackend{},
 		llmConverter: &mockLLMConverter{},
+		ChunkSize:    chunkSize,
+		ChunkOverlap: chunkOverlap,
 	}
 
 	knownHashes := map[string]string{

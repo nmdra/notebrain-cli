@@ -67,8 +67,16 @@ func TestStats_UniqueNotesCount(t *testing.T) {
 		},
 	}
 
-	if err := st.UpsertChunks(ctx, chunks); err != nil {
-		t.Fatalf("UpsertChunks failed: %v", err)
+	bySlug := make(map[string][]ChunkRecord)
+	for _, c := range chunks {
+		bySlug[c.NoteSlug] = append(bySlug[c.NoteSlug], c)
+	}
+	data := make([]BatchIngestData, 0, len(bySlug))
+	for slug, recs := range bySlug {
+		data = append(data, BatchIngestData{NoteSlug: slug, ChunkRecords: recs})
+	}
+	if err := st.BatchIngest(ctx, data, nil); err != nil {
+		t.Fatalf("BatchIngest failed: %v", err)
 	}
 
 	stats, err := st.Stats(ctx)

@@ -136,14 +136,6 @@ func buildSlugFilter(slugs []string, key string) chroma.WhereFilter {
 	return chroma.Or(filters...)
 }
 
-// UpsertChunks stores a batch of chunks (upsert = insert or replace by ID).
-// Call DeleteNoteChunks first to cleanly re-ingest a note.
-func (s *Store) UpsertChunks(ctx context.Context, chunks []ChunkRecord) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.upsertChunks(ctx, chunks)
-}
-
 // upsertChunks is the unlocked implementation. Caller must hold s.mu.
 func (s *Store) upsertChunks(ctx context.Context, chunks []ChunkRecord) error {
 	if len(chunks) == 0 {
@@ -180,31 +172,6 @@ func (s *Store) upsertChunks(ctx context.Context, chunks []ChunkRecord) error {
 	}
 
 	return nil
-}
-
-// DeleteNoteChunks removes all chunks belonging to a note (before re-ingest).
-func (s *Store) DeleteNoteChunks(ctx context.Context, noteSlug string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.chunks.Delete(ctx,
-		chroma.WithWhere(chroma.EqString("note_slug", noteSlug)),
-	)
-}
-
-// DeleteNoteLinks removes all outgoing links for a note.
-func (s *Store) DeleteNoteLinks(ctx context.Context, noteSlug string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.links.Delete(ctx,
-		chroma.WithWhere(chroma.EqString("source_slug", noteSlug)),
-	)
-}
-
-// UpsertLinks replaces all outgoing links for a note.
-func (s *Store) UpsertLinks(ctx context.Context, noteSlug string, links []string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.upsertLinks(ctx, noteSlug, links, s.buildLinkTargetResolver(ctx))
 }
 
 // upsertLinks is the unlocked implementation. Caller must hold s.mu.
