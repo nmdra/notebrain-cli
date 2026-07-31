@@ -359,6 +359,33 @@ func paginatedGetMetadatas(ctx context.Context, col chroma.Collection, where chr
 	return all, nil
 }
 
+// paginatedGetIDs fetches document IDs matching the where filter across pages
+// so no single Get response exceeds the embedded FFI 1 MiB ceiling.
+func paginatedGetIDs(ctx context.Context, col chroma.Collection, where chroma.WhereFilter) ([]chroma.DocumentID, error) {
+	var all []chroma.DocumentID
+	offset := 0
+	for {
+		res, err := col.Get(ctx,
+			chroma.WithWhere(where),
+			chroma.WithLimit(ffiSafePageSize),
+			chroma.WithOffset(offset),
+		)
+		if err != nil {
+			return nil, err
+		}
+		ids := res.GetIDs()
+		if len(ids) == 0 {
+			break
+		}
+		all = append(all, ids...)
+		if len(ids) < ffiSafePageSize {
+			break
+		}
+		offset += ffiSafePageSize
+	}
+	return all, nil
+}
+
 func (s *Store) paginatedZeroIndexMetadatas(ctx context.Context) ([]chroma.DocumentMetadata, error) {
 	return paginatedGetMetadatas(ctx, s.chunks, chroma.EqInt("chunk_index", 0))
 }
@@ -559,54 +586,44 @@ func (s *Store) Connections(ctx context.Context, seedSlug string, maxHops int) (
 }
 
 func (s *Store) processOutgoingLinks(ctx context.Context, src string, hop int, resolver map[string]string, visited map[string]int, next *[]string) error {
-	out, err := s.links.Get(ctx,
-		chroma.WithWhere(chroma.EqString("source_slug", src)),
-		chroma.WithInclude(chroma.IncludeMetadatas),
-	)
+	out, err := paginatedGetMetadatas(ctx, s.links, chroma.EqString("source_slug", src))
 	if err != nil {
 		return fmt.Errorf("connections out: %w", wrapChromaErr(err))
 	}
-	if out != nil {
-		for _, meta := range out.GetMetadatas() {
-			if s.SkipAttachments && (parser.IsAttachmentLink(metaString(meta, "target_path")) || parser.IsAttachmentLink(metaString(meta, "display_text"))) {
-				continue
-			}
-			tgt := metaString(meta, "target_slug")
-			if canon, ok := resolver[tgt]; ok && canon != "" {
-				tgt = canon
-			} else if canon, ok := resolver[metaString(meta, "target_path")]; ok && canon != "" {
-				tgt = canon
-			}
-			if _, ok := visited[tgt]; !ok {
-				visited[tgt] = hop
-				*next = append(*next, tgt)
-			}
+	for _, meta := range out {
+		if s.SkipAttachments && (parser.IsAttachmentLink(metaString(meta, "target_path")) || parser.IsAttachmentLink(metaString(meta, "display_text"))) {
+			continue
+		}
+		tgt := metaString(meta, "target_slug")
+		if canon, ok := resolver[tgt]; ok && canon != "" {
+			tgt = canon
+		} else if canon, ok := resolver[metaString(meta, "target_path")]; ok && canon != "" {
+			tgt = canon
+		}
+		if _, ok := visited[tgt]; !ok {
+			visited[tgt] = hop
+			*next = append(*next, tgt)
 		}
 	}
 	return nil
 }
 
 func (s *Store) processIncomingLinks(ctx context.Context, src string, hop int, resolver map[string]string, visited map[string]int, next *[]string) error {
-	in, err := s.links.Get(ctx,
-		chroma.WithWhere(s.linkWhereFilters(ctx, src, resolver)),
-		chroma.WithInclude(chroma.IncludeMetadatas),
-	)
+	in, err := paginatedGetMetadatas(ctx, s.links, s.linkWhereFilters(ctx, src, resolver))
 	if err != nil {
 		return fmt.Errorf("connections in: %w", wrapChromaErr(err))
 	}
-	if in != nil {
-		for _, meta := range in.GetMetadatas() {
-			if s.SkipAttachments && (parser.IsAttachmentLink(metaString(meta, "target_path")) || parser.IsAttachmentLink(metaString(meta, "display_text"))) {
-				continue
-			}
-			tgt := metaString(meta, "source_slug")
-			if canon, ok := resolver[tgt]; ok && canon != "" {
-				tgt = canon
-			}
-			if _, ok := visited[tgt]; !ok {
-				visited[tgt] = hop
-				*next = append(*next, tgt)
-			}
+	for _, meta := range in {
+		if s.SkipAttachments && (parser.IsAttachmentLink(metaString(meta, "target_path")) || parser.IsAttachmentLink(metaString(meta, "display_text"))) {
+			continue
+		}
+		tgt := metaString(meta, "source_slug")
+		if canon, ok := resolver[tgt]; ok && canon != "" {
+			tgt = canon
+		}
+		if _, ok := visited[tgt]; !ok {
+			visited[tgt] = hop
+			*next = append(*next, tgt)
 		}
 	}
 	return nil

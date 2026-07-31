@@ -59,35 +59,29 @@ func (s *Store) BatchIngest(ctx context.Context, data []BatchIngestData, staleSl
 
 			whereFilter := buildSlugFilter(batchSlugs, "note_slug")
 
-			// Fetch existing chunk IDs
-			resChunks, err := s.chunks.Get(ctx,
-				chroma.WithWhere(whereFilter),
-				chroma.WithInclude(chroma.IncludeMetadatas),
-			)
+			// Fetch existing chunk IDs (paginated to stay under the FFI response ceiling)
+			chunkIDs, err := paginatedGetIDs(ctx, s.chunks, whereFilter)
 			if err != nil {
 				return fmt.Errorf("fetch chunk IDs for cleanup: %w", err)
 			}
 
 			// Delete existing chunks
-			if len(resChunks.GetIDs()) > 0 {
-				if derr := s.chunks.Delete(ctx, chroma.WithIDs(resChunks.GetIDs()...)); derr != nil {
+			if len(chunkIDs) > 0 {
+				if derr := s.chunks.Delete(ctx, chroma.WithIDs(chunkIDs...)); derr != nil {
 					return fmt.Errorf("delete chunks batch: %w", derr)
 				}
 			}
 
 			linksWhereFilter := buildSlugFilter(batchSlugs, "source_slug")
 
-			resLinks, err := s.links.Get(ctx,
-				chroma.WithWhere(linksWhereFilter),
-				chroma.WithInclude(chroma.IncludeMetadatas),
-			)
+			linkIDs, err := paginatedGetIDs(ctx, s.links, linksWhereFilter)
 			if err != nil {
 				return fmt.Errorf("fetch links IDs for cleanup: %w", err)
 			}
 
 			// Delete existing links
-			if len(resLinks.GetIDs()) > 0 {
-				if err := s.links.Delete(ctx, chroma.WithIDs(resLinks.GetIDs()...)); err != nil {
+			if len(linkIDs) > 0 {
+				if err := s.links.Delete(ctx, chroma.WithIDs(linkIDs...)); err != nil {
 					return fmt.Errorf("delete links batch: %w", err)
 				}
 			}
