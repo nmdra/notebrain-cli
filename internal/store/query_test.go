@@ -1121,6 +1121,105 @@ func TestBacklinks_SubfolderSlugResolution(t *testing.T) {
 	}
 }
 
+func TestTagSearch_TagCountCapped(t *testing.T) {
+	ctx := context.Background()
+	st := newTestStore(t)
+
+	manyTags := make([]string, 25)
+	for i := range manyTags {
+		manyTags[i] = fmt.Sprintf("tag-%02d", i)
+	}
+	chunks := []store.ChunkRecord{
+		{
+			ID:         "note-manytags:0",
+			NoteSlug:   "note-manytags",
+			Title:      "Many Tags",
+			FilePath:   "Many Tags.md",
+			ChunkIndex: 0,
+			Text:       "lots of tags",
+			Tags:       manyTags,
+			Embedding:  []float32{1.0, 0.0, 0.0},
+		},
+	}
+	seedChunks(t, ctx, st, chunks, nil)
+
+	// Tags beyond maxNoteTags must not be written: searching for them in
+	// exact mode (database-level) must return nothing.
+	res, err := st.TagSearch(ctx, "tag-20", 10, false, nil, false)
+	if err != nil {
+		t.Fatalf("TagSearch failed: %v", err)
+	}
+	if len(res) != 0 {
+		t.Errorf("expected no results for tag beyond the cap, got %v", res)
+	}
+
+	// First maxNoteTags tags remain queryable.
+	res, err = st.TagSearch(ctx, "tag-00", 10, false, nil, false)
+	if err != nil {
+		t.Fatalf("TagSearch failed: %v", err)
+	}
+	if len(res) != 1 || res[0].NoteSlug != "note-manytags" {
+		t.Errorf("expected note-manytags for tag-00, got %v", res)
+	}
+}
+
+func TestBacklinks_DeterministicTitleCollision(t *testing.T) {
+	ctx := context.Background()
+	st := newTestStore(t)
+
+	// Two notes share the same title and basename. A link chunk points at
+	// the ambiguous title "Shared Title".
+	seedChunks(t, ctx, st, []store.ChunkRecord{
+		{
+			ID:         "note-aaa:0",
+			NoteSlug:   "note-aaa",
+			Title:      "Shared Title",
+			FilePath:   "Shared Title.md",
+			ChunkIndex: 0,
+			Text:       "aaa",
+			Embedding:  []float32{0.5, 0.0, 0.0},
+		},
+		{
+			ID:         "note-zzz:0",
+			NoteSlug:   "note-zzz",
+			Title:      "Shared Title",
+			FilePath:   "Shared Title.md",
+			ChunkIndex: 0,
+			Text:       "zzz",
+			Embedding:  []float32{0.5, 0.0, 0.0},
+		},
+		{
+			ID:         "note-src:0",
+			NoteSlug:   "note-src",
+			Title:      "Source",
+			FilePath:   "Source.md",
+			ChunkIndex: 0,
+			Text:       "src",
+			Embedding:  []float32{0.5, 0.0, 0.0},
+		},
+	}, map[string][]string{"note-src": {"Shared Title"}})
+
+	// The ambiguous title must deterministically resolve to the lowest
+	// slug (note-aaa), not to whichever note was ingested last.
+	for i := range 3 {
+		res, err := st.Backlinks(ctx, "note-aaa")
+		if err != nil {
+			t.Fatalf("Backlinks failed: %v", err)
+		}
+		if len(res) != 1 || res[0].NoteSlug != "note-src" {
+			t.Errorf("run %d: expected note-src as backlink of note-aaa, got %v", i, res)
+		}
+	}
+
+	res, err := st.Backlinks(ctx, "note-zzz")
+	if err != nil {
+		t.Fatalf("Backlinks failed: %v", err)
+	}
+	if len(res) != 0 {
+		t.Errorf("expected no backlinks for note-zzz, got %v", res)
+	}
+}
+
 func TestTagSearch_HierarchicalDeduplication(t *testing.T) {
 	ctx := context.Background()
 	st := newTestStore(t)

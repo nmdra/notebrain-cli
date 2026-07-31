@@ -313,10 +313,17 @@ func buildChunkMeta(c ChunkRecord) map[string]any {
 		"file_type":     c.FileType,
 		"modified_ms":   c.ModifiedMs,
 		"content_hash":  c.ContentHash,
-		"tag_count":     len(c.Tags),
 	}
 	// Encode tags as tag_0, tag_1, tag_2, ...
-	for i, tag := range c.Tags {
+	// Cap at maxNoteTags so every written tag is queryable by
+	// TagWhereClause, and keep tag_count consistent with the written
+	// count so decodeTags does not produce empty entries.
+	tags := c.Tags
+	if len(tags) > maxNoteTags {
+		tags = tags[:maxNoteTags]
+	}
+	meta["tag_count"] = len(tags)
+	for i, tag := range tags {
 		meta["tag_"+strconv.Itoa(i)] = tag
 	}
 	return meta

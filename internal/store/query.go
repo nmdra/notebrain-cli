@@ -426,6 +426,8 @@ func (s *Store) paginatedDistinctSlugs(ctx context.Context, where chroma.WhereFi
 }
 
 // buildLinkTargetResolver builds a mapping of link targets (titles, basenames, file paths) to canonical note slugs.
+// When two notes share a title or basename, the mapping is ambiguous; the
+// lowest note_slug wins so resolution is deterministic across runs.
 func (s *Store) buildLinkTargetResolver(ctx context.Context) map[string]string {
 	resolver := make(map[string]string)
 	if ctx == nil {
@@ -435,6 +437,20 @@ func (s *Store) buildLinkTargetResolver(ctx context.Context) map[string]string {
 	if err != nil {
 		return resolver
 	}
+
+	sort.Slice(metas, func(i, j int) bool {
+		return metaString(metas[i], "note_slug") < metaString(metas[j], "note_slug")
+	})
+
+	add := func(key, slug string) {
+		if key == "" {
+			return
+		}
+		if existing, taken := resolver[key]; !taken || existing == slug {
+			resolver[key] = slug
+		}
+	}
+
 	for _, m := range metas {
 		slug := metaString(m, "note_slug")
 		title := metaString(m, "title")
@@ -444,25 +460,25 @@ func (s *Store) buildLinkTargetResolver(ctx context.Context) map[string]string {
 		}
 		resolver[slug] = slug
 		if title != "" {
-			resolver[title] = slug
-			resolver[strings.ToLower(title)] = slug
-			resolver[parser.Slugify(title)] = slug
+			add(title, slug)
+			add(strings.ToLower(title), slug)
+			add(parser.Slugify(title), slug)
 		}
 		if path != "" {
-			resolver[path] = slug
-			resolver[strings.ToLower(path)] = slug
-			resolver[parser.Slugify(path)] = slug
+			add(path, slug)
+			add(strings.ToLower(path), slug)
+			add(parser.Slugify(path), slug)
 			base := filepath.Base(path)
 			if base != "" {
-				resolver[base] = slug
-				resolver[strings.ToLower(base)] = slug
-				resolver[parser.Slugify(base)] = slug
+				add(base, slug)
+				add(strings.ToLower(base), slug)
+				add(parser.Slugify(base), slug)
 			}
 			baseNoExt := strings.TrimSuffix(base, filepath.Ext(base))
 			if baseNoExt != "" && baseNoExt != base {
-				resolver[baseNoExt] = slug
-				resolver[strings.ToLower(baseNoExt)] = slug
-				resolver[parser.Slugify(baseNoExt)] = slug
+				add(baseNoExt, slug)
+				add(strings.ToLower(baseNoExt), slug)
+				add(parser.Slugify(baseNoExt), slug)
 			}
 		}
 	}
