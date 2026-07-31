@@ -248,10 +248,32 @@ func TestBuildChunks_CodeOnlyChunk(t *testing.T) {
 			if c.RichText == "" {
 				t.Error("code chunk should have non-empty RichText")
 			}
+			if !c.HasCode {
+				t.Error("code chunk should have HasCode=true")
+			}
 		}
 	}
 	if !found {
 		t.Error("expected a chunk with code blocks")
+	}
+}
+
+func TestBuildChunks_HasCodeFlag(t *testing.T) {
+	prose := Parse("# Prose\n\nJust a paragraph without any code.\n", "test-note", 2000, 0, false)
+	for _, c := range prose.Chunks {
+		if c.HasCode {
+			t.Errorf("prose chunk should have HasCode=false: %q", c.Text)
+		}
+	}
+
+	code := Parse("# Mixed\n\nSome prose.\n\n```go\nfmt.Println(\"hi\")\n```\n", "test-note", 2000, 0, false)
+	if len(code.Chunks) == 0 {
+		t.Fatal("expected at least 1 chunk")
+	}
+	for _, c := range code.Chunks {
+		if !c.HasCode {
+			t.Errorf("mixed chunk should have HasCode=true: %q", c.Text)
+		}
 	}
 }
 

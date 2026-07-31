@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	chroma "github.com/amikos-tech/chroma-go/pkg/api/v2"
+
 	"github.com/nmdra/notebrain-cli/v2/internal/store"
 )
 
@@ -175,5 +177,44 @@ func TestBatchIngest(t *testing.T) {
 	// Total: chunks = 2 (note-a:0, note-c:0), links = 1 (note-a -> note-c)
 	if stats["chunks"] != 2 || stats["links"] != 1 {
 		t.Errorf("Expected 2 chunks, 1 link after updates/delete, got %v", stats)
+	}
+}
+
+// TestBatchIngest_HasCodeMetadata verifies that has_code metadata is persisted
+// and queryable, so the --has-code search filter returns results.
+func TestBatchIngest_HasCodeMetadata(t *testing.T) {
+	ctx := context.Background()
+	st := newTestStore(t)
+	defer func() { _ = st.Close() }()
+
+	embed := func(v float32) []float32 { return []float32{v, 0, 0} }
+	err := st.BatchIngest(ctx, []store.BatchIngestData{
+		{
+			NoteSlug: "prose-note",
+			ChunkRecords: []store.ChunkRecord{
+				{ID: "prose-note:0", NoteSlug: "prose-note", ChunkIndex: 0, Text: "prose", Embedding: embed(0.1)},
+			},
+		},
+		{
+			NoteSlug: "code-note",
+			ChunkRecords: []store.ChunkRecord{
+				{ID: "code-note:0", NoteSlug: "code-note", ChunkIndex: 0, Text: "code", HasCode: true, Embedding: embed(0.2)},
+			},
+		},
+	}, nil)
+	if err != nil {
+		t.Fatalf("BatchIngest failed: %v", err)
+	}
+
+	where := chroma.EqBool("has_code", true)
+	results, err := st.SemanticSearch(ctx, embed(1), 10, 1, where, false)
+	if err != nil {
+		t.Fatalf("SemanticSearch failed: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected exactly 1 code chunk, got %d", len(results))
+	}
+	if results[0].NoteSlug != "code-note" {
+		t.Errorf("expected code-note, got %q", results[0].NoteSlug)
 	}
 }

@@ -30,8 +30,8 @@ const (
 
 	// chunkSchemaVersion is bumped whenever chunk content semantics change so
 	// that already-ingested files are re-ingested even if their bytes are
-	// unchanged (e.g. the chunk-overlap duplication fix).
-	chunkSchemaVersion = 2
+	// unchanged (e.g. the chunk-overlap duplication fix, has_code metadata).
+	chunkSchemaVersion = 3
 )
 
 // Embedder abstracts vector embedding so the pipeline can be tested with mocks.
@@ -475,6 +475,7 @@ func (p *Pipeline) processFile(ctx context.Context, vaultPath string, filePath s
 			HeadingPath:  c.HeadingPath,
 			HeadingLevel: c.Level,
 			HasTask:      c.HasTask,
+			HasCode:      c.HasCode,
 			FileType:     fileTypeMD,
 			ModifiedMs:   modTime.UnixMilli(),
 			ContentHash:  hash,
@@ -673,6 +674,7 @@ func (p *Pipeline) processPdfFile(ctx context.Context, vaultPath string, filePat
 			HeadingPath:  c.HeadingPath,
 			HeadingLevel: c.Level,
 			HasTask:      c.HasTask,
+			HasCode:      c.HasCode,
 			FileType:     fileTypePDF,
 			ModifiedMs:   modTime.UnixMilli(),
 			ContentHash:  hash,

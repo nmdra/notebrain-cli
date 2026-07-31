@@ -38,6 +38,7 @@ type Chunk struct {
 	HeadingPath string // e.g. "Architecture > Data Flow > Ingest"
 	Level       int    // depth of the deepest heading in this chunk (1-6)
 	HasTask     bool
+	HasCode     bool // true when the chunk contains a fenced code block
 }
 
 // Result is the output from parsing the full document, containing the chunks and metadata.
@@ -460,6 +461,7 @@ func buildChunks(sections []section, noteSlug string, maxRunes, overlapRunes int
 				HeadingPath: sec.headingPath,
 				Level:       sec.level,
 				HasTask:     hasTask,
+				HasCode:     codeCount > 0,
 			})
 			idx++
 			continue
@@ -477,6 +479,7 @@ func buildChunks(sections []section, noteSlug string, maxRunes, overlapRunes int
 				HeadingPath: sec.headingPath,
 				Level:       sec.level,
 				HasTask:     hasTask,
+				HasCode:     strings.Contains(sub.displayRaw, "\x00CODE:"),
 			})
 			idx++
 		}

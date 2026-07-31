@@ -26,6 +26,7 @@ type ChunkRecord struct {
 	HeadingPath  string
 	HeadingLevel int
 	HasTask      bool
+	HasCode      bool
 	ModifiedMs   int64
 	ContentHash  string
 	Embedding    []float32
@@ -308,6 +309,7 @@ func buildChunkMeta(c ChunkRecord) map[string]any {
 		"heading_path":  c.HeadingPath,
 		"heading_level": c.HeadingLevel,
 		"has_task":      c.HasTask,
+		"has_code":      c.HasCode,
 		"file_type":     c.FileType,
 		"modified_ms":   c.ModifiedMs,
 		"content_hash":  c.ContentHash,
