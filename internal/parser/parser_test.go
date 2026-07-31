@@ -30,6 +30,10 @@ func TestSlugify(t *testing.T) {
 		{name: "empty string", input: "", want: ""},
 		{name: "only special chars", input: "!!!", want: ""},
 		{name: "mixed case and numbers", input: "Note 42 Test", want: "note-42-test"},
+		{name: "accented letters preserved", input: "Café Note", want: "café-note"},
+		{name: "cjk preserved", input: "日本語メモ", want: "日本語メモ"},
+		{name: "emoji removed", input: "Emoji 😀 Note", want: "emoji-note"},
+		{name: "accents do not collide", input: "Cafe", want: "cafe"},
 	}
 
 	for _, tt := range tests {
@@ -79,6 +83,11 @@ func TestIsAttachmentLink(t *testing.T) {
 		{name: "png image with alias", target: "image.png|My Image", want: true},
 		{name: "pdf document", target: "docs/spec.pdf", want: false},
 		{name: "canvas file", target: "architecture.canvas", want: true},
+		{name: "dotted note name", target: "Note 1.2.3", want: false},
+		{name: "dotted note with folder", target: "Projects/Release 2.0.1", want: false},
+		{name: "uppercase image extension", target: "photo.JPG", want: true},
+		{name: "archive", target: "backup.zip", want: true},
+		{name: "unknown extension", target: "data.xyz", want: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
