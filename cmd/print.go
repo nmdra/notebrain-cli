@@ -17,10 +17,9 @@ import (
 )
 
 const (
-	formatText   = "text"
-	formatJSON   = "json"
-	formatNDJSON = "ndjson"
-	formatTSV    = "tsv"
+	formatText = "text"
+	formatJSON = "json"
+	formatTSV  = "tsv"
 )
 
 var getTerminalWidth = func() int {
