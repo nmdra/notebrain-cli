@@ -46,7 +46,7 @@ notebrain-cli/
 │   │   ├── openai_compat.go
 │   │   ├── prompt.go
 │   │   └── *_test.go
-│   ├── pdfextract/    ← WASM PDFium extraction & Tesseract OCR
+│   ├── pdfextract/    ← WASM PDFium extraction
 │   │   ├── backend.go
 │   │   ├── pdfextract.go
 │   │   └── *_test.go

@@ -101,11 +101,11 @@ notebrain ingest [<glob>] [flags]
 | `--min-chunk-words` | `integer` | `10`    | Does not include chunks that have fewer words than this value.                                                 |
 | `--chunk-size`      | `integer` | `800`   | The maximum number of runes per chunk for the parser.                                                 |
 | `--chunk-overlap`   | `integer` | `100`   | The number of overlap runes between sub-chunks when the parser splits a section.                               |
-| `--enable-pdf`      | `boolean` | `false` | Enables the extraction of PDF text (and auto-OCR). This requires `--llm-model`.                      |
+| `--enable-pdf`      | `boolean` | `false` | Enables the extraction of PDF text. This requires `--llm-model`.                      |
 | `--llm-model`       | `string`  | `""`    | The LLM model to parse PDFs (for example, `openrouter/inclusionai/ling-3.0-flash:free`). |
 | `--llm-context-window` | `integer` | `128000` | The total context window size of the LLM in tokens.                                         |
 
-> Note: If `--enable-pdf` is active and `tesseract` is in `$PATH`, the tool automatically detects OCR through Tesseract. During the index procedure, the tool excludes attachment links from the graph edges.
+> Note: During the index procedure, the tool excludes attachment links from the graph edges.
 
 #### Examples
 
@@ -372,7 +372,7 @@ notebrain doctor [flags]
 
 ### `init`
 
-This command starts an interactive wizard to create or update your `config.toml` file. It automatically finds your vault path. It lets you enable or disable PDF and OCR support.
+This command starts an interactive wizard to create or update your `config.toml` file. It automatically finds your vault path. It lets you enable or disable PDF support.
 
 #### Usage
 

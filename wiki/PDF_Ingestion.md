@@ -1,11 +1,10 @@
 # PDF Ingestion with LLMs
 
-NoteBrain indexes your PDF attachments with Large Language Models (LLMs). The LLMs parse text and structural metadata. When you combine this with Optical Character Recognition (via Tesseract), you can do semantic searches on your scanned documents, research papers, and ebooks.
+NoteBrain indexes your PDF attachments with Large Language Models (LLMs). The LLMs parse text and structural metadata, enabling semantic searches on your documents, research papers, and ebooks.
 
 ## Requirements
 
 1. **LLM API Key**
-2. **`tesseract`** (optional, to do Optical Character Recognition on scanned PDFs).
 
 ## Supported LLM Providers
 

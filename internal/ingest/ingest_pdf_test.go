@@ -15,10 +15,6 @@ func (m *mockPDFBackend) ExtractText(ctx context.Context, filePath string) ([]st
 	return []string{"This is a test PDF page with enough words to be extracted properly."}, nil
 }
 
-func (m *mockPDFBackend) RenderPage(ctx context.Context, filePath string, pageNum int) (string, error) {
-	return "", nil
-}
-
 func (m *mockPDFBackend) Close() error { return nil }
 
 type mockLLMConverter struct{}

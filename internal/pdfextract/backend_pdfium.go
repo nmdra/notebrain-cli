@@ -3,8 +3,6 @@ package pdfextract
 import (
 	"context"
 	"fmt"
-	"image/png"
-	"os"
 	"time"
 
 	"github.com/klippa-app/go-pdfium"
@@ -79,62 +77,6 @@ func (b *PDFiumBackend) ExtractText(_ context.Context, filePath string) ([]strin
 	}
 
 	return pages, nil
-}
-
-// RenderPage renders the specified page of a PDF document to a JPEG image file in a temporary directory.
-func (b *PDFiumBackend) RenderPage(_ context.Context, filePath string, pageNum int) (string, error) {
-	instance, err := b.pool.GetInstance(time.Second * 30)
-	if err != nil {
-		return "", fmt.Errorf("could not get PDFium instance: %w", err)
-	}
-	defer instance.Close()
-
-	doc, err := instance.OpenDocument(&requests.OpenDocument{
-		FilePath: &filePath,
-	})
-	if err != nil {
-		return "", fmt.Errorf("failed to open PDF: %w", err)
-	}
-	defer func() {
-		_, _ = instance.FPDF_CloseDocument(&requests.FPDF_CloseDocument{
-			Document: doc.Document,
-		})
-	}()
-
-	// Render page to image
-	renderReq, err := instance.RenderPageInDPI(&requests.RenderPageInDPI{
-		Page: requests.Page{
-			ByIndex: &requests.PageByIndex{
-				Document: doc.Document,
-				Index:    pageNum - 1,
-			},
-		},
-		DPI: 300,
-	})
-	if err != nil {
-		return "", fmt.Errorf("failed to render page %d: %w", pageNum, err)
-	}
-
-	// Create temp file for the image
-	f, err := os.CreateTemp("", "notebrain-ocr-*.png")
-	if err != nil {
-		return "", fmt.Errorf("failed to create temp file for image: %w", err)
-	}
-	defer f.Close()
-
-	if renderReq.Result.Image != nil {
-		if err := png.Encode(f, renderReq.Result.Image); err != nil {
-			f.Close()
-			os.Remove(f.Name())
-			return "", fmt.Errorf("failed to encode png: %w", err)
-		}
-	} else {
-		f.Close()
-		os.Remove(f.Name())
-		return "", fmt.Errorf("render returned nil image")
-	}
-
-	return f.Name(), nil
 }
 
 // Close releases the PDFium instance and pool.

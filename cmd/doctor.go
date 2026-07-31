@@ -1,14 +1,11 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 
 	"charm.land/lipgloss/v2"
-
-	"github.com/nmdra/notebrain-cli/v2/internal/pdfextract"
 )
 
 type DoctorCmd struct{}
@@ -52,21 +49,6 @@ func (c *DoctorCmd) Run(globals *Globals) error {
 				printSuccess("ChromaDB Path", fmt.Sprintf("Writable (%s)", chromaPath))
 			}
 		}
-	}
-
-	// 3. Tesseract OCR Dependency
-	ocr := pdfextract.NewTesseractBackend("tesseract", "eng")
-	if ocr.Available() {
-		printSuccess("Tesseract OCR", "tesseract binary found in PATH")
-
-		err := ocr.ValidateLang(context.Background())
-		if err != nil {
-			printWarning("Tesseract OCR Language", fmt.Sprintf("Validation failed: %v", err))
-		} else {
-			printSuccess("Tesseract OCR Language", "Default language data ('eng') is available")
-		}
-	} else {
-		printWarning("Tesseract OCR", "tesseract binary not found in PATH. OCR for PDFs will not work.")
 	}
 
 	fmt.Println()

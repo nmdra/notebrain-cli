@@ -40,7 +40,7 @@ NoteBrain includes an [AI agent skill](wiki/Skill_Usage.md) and an [OpenCode Age
 
 ### Internals
 
-- **PDF Support**: NoteBrain extracts text from PDFs with **[PDFium-go](https://github.com/klippa-app/go-pdfium)** and **Tesseract** (for OCR). It converts the raw text into structured Markdown with an LLM API (OpenRouter or DeepSeek). This makes high-quality chunks that match native markdown notes.
+- **PDF Support**: NoteBrain extracts text from PDFs with **[PDFium-go](https://github.com/klippa-app/go-pdfium)**. It converts the raw text into structured Markdown with an LLM API (OpenRouter or DeepSeek). This makes high-quality chunks that match native markdown notes.
 - **Goldmark AST-Aware Chunking**: NoteBrain splits markdown by header hierarchy. It preserves lists, GFM tables, blockquotes, callouts, and code blocks.
 - **Embedded ChromaDB**: NoteBrain writes vectors to the disk with [`chroma-go`](https://github.com/amikos-tech/chroma-go).
 - **Incremental Ingestion**: NoteBrain calculates SHA-256 content hashes. It ignores unmodified notes in milliseconds during subsequent runs.
@@ -75,7 +75,7 @@ Read the [Installation Guide](wiki/Installation.md) for full instructions.
 notebrain init
 ```
 
-This command starts an interactive wizard. The wizard configures your vault path, PDF settings, and OCR settings.
+This command starts an interactive wizard. The wizard configures your vault path and PDF settings.
 
 **2. Index your vault:**
 

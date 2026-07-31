@@ -61,7 +61,6 @@ type Pipeline struct {
 	LLMContextWindow int
 	llmConverter     llmparse.Converter
 	pdfBackend       pdfextract.PDFBackend
-	ocrBackend       pdfextract.OCRBackend
 	failedFilesMu    sync.Mutex
 	failedFiles      []FailedFile
 }
@@ -135,19 +134,6 @@ func (p *Pipeline) Run(ctx context.Context, vaultPath string, glob string, _ io.
 			if !skipPDF {
 				p.llmConverter = converter
 				slog.Info("LLM PDF parser enabled", "model", p.LLMModel, "backend", converter.Name())
-
-				// Auto-detect OCR support when PDF ingestion is enabled
-				ob := pdfextract.NewTesseractBackend("tesseract", "eng")
-				if ob.Available() {
-					if err := ob.ValidateLang(ctx); err != nil {
-						slog.Warn("tesseract found but language validation failed, skipping OCR", "err", err)
-					} else {
-						p.ocrBackend = ob
-						slog.Info("OCR backend auto-detected (tesseract)")
-					}
-				} else {
-					slog.Debug("tesseract not found in PATH, OCR unavailable for scanned PDFs")
-				}
 			}
 		}
 	}
