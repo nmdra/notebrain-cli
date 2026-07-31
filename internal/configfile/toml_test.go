@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/alecthomas/kong"
+	"github.com/pelletier/go-toml/v2"
 )
 
 type ConfigStruct struct {
@@ -161,6 +162,27 @@ log_level = "warn"
 
 	if cli.LogLevel != "warn" {
 		t.Errorf("Expected LogLevel 'warn', got %q", cli.LogLevel)
+	}
+}
+
+func TestTOMLResolver_NormalizeCollisionIsDeterministic(t *testing.T) {
+	tomlData := []byte(`
+show_tags = true
+show-tags = false
+`)
+
+	// buildNormalizedKeys must resolve the collision identically on every run:
+	// "show-tags" sorts before "show_tags", so the first wins.
+	want := map[string]any{"showtags": false}
+	for i := range 20 {
+		parsed := make(map[string]any)
+		if err := toml.NewDecoder(bytes.NewReader(tomlData)).Decode(&parsed); err != nil {
+			t.Fatalf("decode failed: %v", err)
+		}
+		got := buildNormalizedKeys(parsed)
+		if got["showtags"] != want["showtags"] {
+			t.Fatalf("run %d: expected show-tags=%v to win, got %v", i, want["showtags"], got["showtags"])
+		}
 	}
 }
 

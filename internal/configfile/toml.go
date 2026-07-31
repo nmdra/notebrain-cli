@@ -5,6 +5,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/alecthomas/kong"
@@ -24,6 +25,30 @@ func normalizeKey(s string) string {
 	return strings.ToLower(s)
 }
 
+// buildNormalizedKeys flattens parsed TOML keys through normalizeKey in a
+// deterministic order. If two keys collide (e.g. "show-tags" and "show_tags")
+// the lexicographically first one wins and the duplicates are dropped with a
+// warning; without the sort, map iteration order would decide the winner
+// randomly per run.
+func buildNormalizedKeys(parsed map[string]any) map[string]any {
+	keys := make([]string, 0, len(parsed))
+	for k := range parsed {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	normalized := make(map[string]any, len(parsed))
+	for _, k := range keys {
+		nk := normalizeKey(k)
+		if _, dup := normalized[nk]; dup {
+			slog.Warn("ambiguous config keys normalize to the same flag; keeping the lexicographically first", "key", k)
+			continue
+		}
+		normalized[nk] = parsed[k]
+	}
+	return normalized
+}
+
 // TOMLResolver is a kong.ConfigurationLoader that parses TOML files.
 func TOMLResolver(r io.Reader) (kong.Resolver, error) {
 	var parsed map[string]any
@@ -32,10 +57,7 @@ func TOMLResolver(r io.Reader) (kong.Resolver, error) {
 		return nil, fmt.Errorf("failed to parse TOML: %w", err)
 	}
 
-	normalized := make(map[string]any, len(parsed))
-	for k, v := range parsed {
-		normalized[normalizeKey(k)] = v
-	}
+	normalized := buildNormalizedKeys(parsed)
 
 	return kong.ResolverFunc(func(_ *kong.Context, _ *kong.Path, flag *kong.Flag) (any, error) {
 		name := flag.Name
