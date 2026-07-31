@@ -1,9 +1,8 @@
 package requests
 
 import (
-	"io"
-
 	"github.com/klippa-app/go-pdfium/references"
+	"io"
 )
 
 type FPDFAvail_Create struct {

@@ -24,10 +24,8 @@ type FPDF_FS_QUADPOINTSF struct {
 }
 
 // FPDF_FS_MATRIX is a matrix that is composed as:
-//
-//	| A C E |
-//	| B D F |
-//
+//   | A C E |
+//   | B D F |
 // and can be used to scale, rotate, shear and translate.
 type FPDF_FS_MATRIX struct {
 	A float32

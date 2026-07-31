@@ -82,8 +82,8 @@ func NewDeque(capacity int) *LinkedBlockingDeque {
 	return &LinkedBlockingDeque{capacity: capacity, lock: lock, notEmpty: concurrent.NewTimeoutCond(lock), notFull: concurrent.NewTimeoutCond(lock)}
 }
 
-// Links provided element as first element, or returns false if full.
-// return true if successful, otherwise false
+//Links provided element as first element, or returns false if full.
+//return true if successful, otherwise false
 func (q *LinkedBlockingDeque) linkFirst(e interface{}) bool {
 	if q.count >= q.capacity {
 		return false
@@ -101,8 +101,8 @@ func (q *LinkedBlockingDeque) linkFirst(e interface{}) bool {
 	return true
 }
 
-// Links provided element as last element, or returns false if full.
-// return true} if successful, otherwise false
+//Links provided element as last element, or returns false if full.
+//return true} if successful, otherwise false
 func (q *LinkedBlockingDeque) linkLast(e interface{}) bool {
 	// assert lock.isHeldByCurrentThread();
 	if q.count >= q.capacity {
@@ -121,7 +121,7 @@ func (q *LinkedBlockingDeque) linkLast(e interface{}) bool {
 	return true
 }
 
-// Removes and returns the first element, or nil if empty.
+//Removes and returns the first element, or nil if empty.
 func (q *LinkedBlockingDeque) unlinkFirst() interface{} {
 	// assert lock.isHeldByCurrentThread();
 	f := q.first
@@ -143,7 +143,7 @@ func (q *LinkedBlockingDeque) unlinkFirst() interface{} {
 	return item
 }
 
-// Removes and returns the last element, or nil if empty.
+//Removes and returns the last element, or nil if empty.
 func (q *LinkedBlockingDeque) unlinkLast() interface{} {
 	l := q.last
 	if l == nil {
@@ -164,7 +164,7 @@ func (q *LinkedBlockingDeque) unlinkLast() interface{} {
 	return item
 }
 
-// Unlink the provided node.
+//Unlink the provided node.
 func (q *LinkedBlockingDeque) unlink(x *Node) {
 	// assert lock.isHeldByCurrentThread();
 	p := x.prev
@@ -387,9 +387,7 @@ func (q *LinkedBlockingDeque) PeekLast() interface{} {
 // RemoveFirstOccurrence removes the first occurrence of the specified element from this deque.
 // If the deque does not contain the element, it is unchanged.
 // More formally, removes the first element item such that
-//
-//	o == item
-//
+//		o == item
 // (if such an element exists).
 // Returns true if this deque contained the specified element
 // (or equivalently, if this deque changed as a result of the call).
@@ -411,9 +409,7 @@ func (q *LinkedBlockingDeque) RemoveFirstOccurrence(item interface{}) bool {
 // RemoveLastOccurrence removes the last occurrence of the specified element from this deque.
 // If the deque does not contain the element, it is unchanged.
 // More formally, removes the last element item such that
-//
-//	o == item
-//
+//		o == item
 // (if such an element exists).
 // Returns true if this deque contained the specified element
 // (or equivalently, if this deque changed as a result of the call).

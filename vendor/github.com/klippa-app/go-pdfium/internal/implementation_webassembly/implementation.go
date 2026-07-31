@@ -8,11 +8,12 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/google/uuid"
 	pdfium_errors "github.com/klippa-app/go-pdfium/errors"
 	"github.com/klippa-app/go-pdfium/references"
 	"github.com/klippa-app/go-pdfium/requests"
 	"github.com/klippa-app/go-pdfium/responses"
+
+	"github.com/google/uuid"
 	"github.com/tetratelabs/wazero/api"
 )
 

@@ -5,8 +5,9 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/tetratelabs/wazero/experimental/sys"
 	"golang.org/x/sys/windows"
+
+	"github.com/tetratelabs/wazero/experimental/sys"
 )
 
 const (

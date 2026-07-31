@@ -2,7 +2,6 @@ package implementation_webassembly
 
 import (
 	"errors"
-
 	"github.com/klippa-app/go-pdfium/references"
 )
 

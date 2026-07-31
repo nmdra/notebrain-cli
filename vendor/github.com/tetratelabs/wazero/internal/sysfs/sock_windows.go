@@ -7,9 +7,10 @@ import (
 	"syscall"
 	"unsafe"
 
+	"golang.org/x/sys/windows"
+
 	"github.com/tetratelabs/wazero/experimental/sys"
 	socketapi "github.com/tetratelabs/wazero/internal/sock"
-	"golang.org/x/sys/windows"
 )
 
 const (

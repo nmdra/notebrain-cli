@@ -9,6 +9,7 @@ import (
 	"github.com/klippa-app/go-pdfium/references"
 	"github.com/klippa-app/go-pdfium/requests"
 	"github.com/klippa-app/go-pdfium/responses"
+
 	"github.com/tetratelabs/wazero/api"
 )
 

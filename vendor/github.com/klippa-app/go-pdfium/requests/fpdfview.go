@@ -1,11 +1,10 @@
 package requests
 
 import (
-	"io"
-
 	"github.com/klippa-app/go-pdfium/enums"
 	"github.com/klippa-app/go-pdfium/references"
 	"github.com/klippa-app/go-pdfium/structs"
+	"io"
 )
 
 type FPDF_LoadDocument struct {

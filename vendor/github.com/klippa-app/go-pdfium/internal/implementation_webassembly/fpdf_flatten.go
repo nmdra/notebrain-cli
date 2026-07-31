@@ -1,10 +1,9 @@
 package implementation_webassembly
 
 import (
-	"unsafe"
-
 	"github.com/klippa-app/go-pdfium/requests"
 	"github.com/klippa-app/go-pdfium/responses"
+	"unsafe"
 )
 
 // FPDFPage_Flatten makes annotations and form fields become part of the page contents itself.

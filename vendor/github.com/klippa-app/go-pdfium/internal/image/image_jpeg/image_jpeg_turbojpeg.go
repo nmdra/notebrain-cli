@@ -2,20 +2,20 @@
 
 package image_jpeg
 
-/*
-#cgo pkg-config: libturbojpeg
-#include <turbojpeg.h>
-*/
-import "C"
-
 import (
 	"bufio"
-	"fmt"
 	"image"
 	"image/jpeg"
 	"io"
 	"unsafe"
 )
+
+/*
+#cgo pkg-config: libturbojpeg
+#include <turbojpeg.h>
+*/
+import "C"
+import "fmt"
 
 type Sampling C.int
 

@@ -2,10 +2,10 @@ package implementation_webassembly
 
 import (
 	"errors"
-	"unsafe"
-
 	"github.com/google/uuid"
 	"github.com/klippa-app/go-pdfium/references"
+	"unsafe"
+
 	"github.com/klippa-app/go-pdfium/requests"
 	"github.com/klippa-app/go-pdfium/responses"
 )

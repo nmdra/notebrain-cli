@@ -25,10 +25,11 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/gabriel-vasile/mimetype"
-	urn "github.com/leodido/go-urn"
 	"golang.org/x/crypto/sha3"
 	"golang.org/x/text/language"
+
+	"github.com/gabriel-vasile/mimetype"
+	urn "github.com/leodido/go-urn"
 )
 
 // Func accepts a FieldLevel interface for all validation needs. The return
@@ -3509,3 +3510,4 @@ var (
 	errMethodReturnNoValues    = errors.New(`method return o values (void)`)
 	errMethodReturnInvalidType = errors.New(`method should return invalid type`)
 )
+

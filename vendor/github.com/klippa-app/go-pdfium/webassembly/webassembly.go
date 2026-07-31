@@ -13,15 +13,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
-	pool "github.com/jolestar/go-commons-pool/v2"
 	"github.com/klippa-app/go-pdfium"
 	"github.com/klippa-app/go-pdfium/internal/implementation_webassembly"
 	"github.com/klippa-app/go-pdfium/webassembly/imports"
+
+	"github.com/google/uuid"
+	pool "github.com/jolestar/go-commons-pool/v2"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/experimental"
-	"github.com/tetratelabs/wazero/experimental/logging"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"golang.org/x/net/context"
 )
@@ -38,6 +37,10 @@ type worker struct {
 }
 
 type Config struct {
+	// Context is used to initialize the wazero runtime and as the parent
+	// context for its workers. It must remain valid for the lifetime of the
+	// pool. If nil, context.Background is used.
+	Context       goctx.Context
 	MinIdle       int
 	MaxIdle       int
 	MaxTotal      int
@@ -69,11 +72,25 @@ var multiThreadedMutex = &sync.Mutex{}
 // allow it. If the pool has been exhausted. It will wait until a worker becomes
 // available. So it's important that you close instances when you're done with them.
 func Init(config Config) (pdfium.Pool, error) {
-	// Set config defaults.
 	if config.WASM == nil {
 		config.WASM = pdfiumWasm
 	}
+	return initWithConfig(config)
+}
 
+// InitWithWASM will return a multithreaded webassembly pool using the module in
+// Config.WASM. Unlike Init, it does not reference the embedded default module,
+// allowing applications that provide their own module to omit it at link time.
+// This causes Go not to embed the default WASM file, saving about ~5MB in the
+// resulting binary file.
+func InitWithWASM(config Config) (pdfium.Pool, error) {
+	if config.WASM == nil {
+		return nil, errors.New("webassembly module must be provided")
+	}
+	return initWithConfig(config)
+}
+
+func initWithConfig(config Config) (pdfium.Pool, error) {
 	// Mount the full root by default.
 	if config.FSConfig == nil {
 		config.FSConfig = wazero.NewFSConfig()
@@ -111,11 +128,10 @@ func Init(config Config) (pdfium.Pool, error) {
 		config.RuntimeConfig = wazero.NewRuntimeConfig()
 	}
 
-	poolContext := experimental.WithFunctionListenerFactory(context.Background(), logging.NewLoggingListenerFactory(os.Stdout))
-
-	// Uncomment the line below if you want function call logging,
-	// useful for debugging.
-	poolContext = context.Background()
+	poolContext := config.Context
+	if poolContext == nil {
+		poolContext = context.Background()
+	}
 
 	runtime := wazero.NewRuntimeWithConfig(poolContext, config.RuntimeConfig)
 

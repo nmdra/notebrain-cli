@@ -3,10 +3,11 @@ package implementation_webassembly
 import (
 	"errors"
 
-	"github.com/google/uuid"
 	pdfium_errors "github.com/klippa-app/go-pdfium/errors"
 	"github.com/klippa-app/go-pdfium/references"
 	"github.com/klippa-app/go-pdfium/requests"
+
+	"github.com/google/uuid"
 )
 
 // loadPage changes the active page if it's different from what's currently
