@@ -7,7 +7,7 @@ import (
 )
 
 func TestPDFiumBackend_ExtractText(t *testing.T) {
-	backend, err := NewPDFiumBackend()
+	backend, err := NewPDFiumBackend(1)
 	if err != nil {
 		t.Fatalf("Failed to initialize PDFium backend: %v", err)
 	}

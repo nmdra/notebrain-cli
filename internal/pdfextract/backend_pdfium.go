@@ -3,7 +3,6 @@ package pdfextract
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/klippa-app/go-pdfium"
 	"github.com/klippa-app/go-pdfium/requests"
@@ -16,12 +15,19 @@ type PDFiumBackend struct {
 }
 
 // NewPDFiumBackend initializes a new PDFium WebAssembly backend.
-func NewPDFiumBackend() (*PDFiumBackend, error) {
+// poolSize sizes the WASM instance pool to the number of concurrent
+// workers that will extract PDFs. GetInstanceWithContext blocks until
+// an instance is free, so a pool smaller than the worker count would
+// serialize extraction and time out under load.
+func NewPDFiumBackend(poolSize int) (*PDFiumBackend, error) {
+	if poolSize <= 0 {
+		poolSize = 1
+	}
 	// Initialize the WebAssembly pool
 	pool, err := webassembly.Init(webassembly.Config{
-		MinIdle:  1,
-		MaxIdle:  1,
-		MaxTotal: 1,
+		MinIdle:  poolSize,
+		MaxIdle:  poolSize,
+		MaxTotal: poolSize,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not init PDFium WASM pool: %w", err)
@@ -33,8 +39,8 @@ func NewPDFiumBackend() (*PDFiumBackend, error) {
 }
 
 // ExtractText returns the text of each page in the PDF document as a slice of strings.
-func (b *PDFiumBackend) ExtractText(_ context.Context, filePath string) ([]string, error) {
-	instance, err := b.pool.GetInstance(time.Second * 30)
+func (b *PDFiumBackend) ExtractText(ctx context.Context, filePath string) ([]string, error) {
+	instance, err := b.pool.GetInstanceWithContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("could not get PDFium instance: %w", err)
 	}

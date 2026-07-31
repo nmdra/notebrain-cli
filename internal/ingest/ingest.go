@@ -113,8 +113,8 @@ func (p *Pipeline) Run(ctx context.Context, vaultPath string, glob string, _ io.
 			slog.Warn("PDF ingestion requested via --enable-pdf, but no --llm-model was provided. Skipping PDF ingestion (previously ingested PDFs will be preserved). (hint: use --llm-model)")
 			skipPDF = true
 		} else {
-			slog.Info("initializing PDF extractor backend")
-			pb, err := pdfextract.NewPDFiumBackend()
+			slog.Info("initializing PDF extractor backend", "pool_size", p.workers)
+			pb, err := pdfextract.NewPDFiumBackend(p.workers)
 			if err != nil {
 				return fmt.Errorf("failed to initialize PDF backend: %w", err)
 			}
