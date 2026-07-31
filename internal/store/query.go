@@ -158,12 +158,14 @@ func (s *Store) MultiSemanticSearch(ctx context.Context, queryVecs [][]float32, 
 	}
 
 	if includeText && len(out) > 0 {
-		s.populateTextLocked(ctx, out)
+		if err := s.populateTextLocked(ctx, out); err != nil {
+			return nil, err
+		}
 	}
 	return out, nil
 }
 
-func (s *Store) populateTextLocked(ctx context.Context, results []Result) {
+func (s *Store) populateTextLocked(ctx context.Context, results []Result) error {
 	ids := make([]chroma.DocumentID, len(results))
 	idToIndex := make(map[string]int, len(results))
 	for i := range results {
@@ -182,7 +184,7 @@ func (s *Store) populateTextLocked(ctx context.Context, results []Result) {
 			chroma.WithOffset(offset),
 		)
 		if err != nil {
-			break
+			return fmt.Errorf("populate chunk text: %w", wrapChromaErr(err))
 		}
 		if res.Count() == 0 {
 			break
@@ -195,7 +197,7 @@ func (s *Store) populateTextLocked(ctx context.Context, results []Result) {
 		offset += ffiSafePageSize
 	}
 	if len(resDocs) == 0 {
-		return
+		return nil
 	}
 	for j, id := range resIDs {
 		if j < len(resDocs) && resDocs[j] != nil {
@@ -204,6 +206,7 @@ func (s *Store) populateTextLocked(ctx context.Context, results []Result) {
 			}
 		}
 	}
+	return nil
 }
 
 type mergedChunk struct {
@@ -544,7 +547,10 @@ func (s *Store) Backlinks(ctx context.Context, targetSlug string) ([]Result, err
 			continue
 		}
 		seen[slug] = true
-		title, filePath, fileType, found := s.noteInfoForSlug(ctx, slug)
+		title, filePath, fileType, found, err := s.noteInfoForSlug(ctx, slug)
+		if err != nil {
+			return nil, fmt.Errorf("backlinks: %w", err)
+		}
 		out = append(out, Result{
 			NoteSlug:  slug,
 			Title:     title,
@@ -586,7 +592,10 @@ func (s *Store) Connections(ctx context.Context, seedSlug string, maxHops int) (
 	delete(visited, seedSlug)
 	var out []Result
 	for slug, hop := range visited {
-		title, filePath, fileType, found := s.noteInfoForSlug(ctx, slug)
+		title, filePath, fileType, found, err := s.noteInfoForSlug(ctx, slug)
+		if err != nil {
+			return nil, fmt.Errorf("connections: %w", err)
+		}
 		out = append(out, Result{
 			NoteSlug:  slug,
 			Title:     title,
@@ -836,7 +845,10 @@ func (s *Store) SharedTags(ctx context.Context, noteSlug string, minShared int) 
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	// 1. Get tags of the seed note (from its first chunk)
-	seedTags := s.tagsForNote(ctx, noteSlug)
+	seedTags, err := s.tagsForNote(ctx, noteSlug)
+	if err != nil {
+		return nil, fmt.Errorf("shared tags: %w", err)
+	}
 	if len(seedTags) == 0 {
 		return nil, nil
 	}
@@ -846,7 +858,10 @@ func (s *Store) SharedTags(ctx context.Context, noteSlug string, minShared int) 
 	noteTagNames := map[string][]string{} // slug → which tags are shared
 
 	for _, tag := range seedTags {
-		slugs := s.notesWithTag(ctx, tag)
+		slugs, err := s.notesWithTag(ctx, tag)
+		if err != nil {
+			return nil, fmt.Errorf("shared tags: %w", err)
+		}
 		for _, slug := range slugs {
 			if slug == noteSlug {
 				continue
@@ -862,7 +877,10 @@ func (s *Store) SharedTags(ctx context.Context, noteSlug string, minShared int) 
 		if count < minShared {
 			continue
 		}
-		title, filePath, fileType, found := s.noteInfoForSlug(ctx, slug)
+		title, filePath, fileType, found, err := s.noteInfoForSlug(ctx, slug)
+		if err != nil {
+			return nil, fmt.Errorf("shared tags: %w", err)
+		}
 		out = append(out, Result{
 			NoteSlug:  slug,
 			Title:     title,
@@ -1220,7 +1238,7 @@ func (s *Store) linkedSlugs(ctx context.Context, slug string) (map[string]bool, 
 }
 
 // tagsForNote fetches the tags of the first chunk of noteSlug.
-func (s *Store) tagsForNote(ctx context.Context, noteSlug string) []string {
+func (s *Store) tagsForNote(ctx context.Context, noteSlug string) ([]string, error) {
 	res, err := s.chunks.Get(ctx,
 		chroma.WithWhere(chroma.And(
 			chroma.EqString("note_slug", noteSlug),
@@ -1228,20 +1246,22 @@ func (s *Store) tagsForNote(ctx context.Context, noteSlug string) []string {
 		)),
 		chroma.WithInclude(chroma.IncludeMetadatas),
 	)
-	if err != nil || len(res.GetMetadatas()) == 0 {
-		return nil
+	if err != nil {
+		return nil, fmt.Errorf("tags for note %s: %w", noteSlug, wrapChromaErr(err))
 	}
-	return decodeTags(res.GetMetadatas()[0])
+	if len(res.GetMetadatas()) == 0 {
+		return nil, nil
+	}
+	return decodeTags(res.GetMetadatas()[0]), nil
 }
 
 // notesWithTag returns distinct note slugs that have the given tag.
-func (s *Store) notesWithTag(ctx context.Context, tag string) []string {
-	slugs, _ := s.paginatedDistinctSlugs(ctx, TagWhereClause(tag))
-	return slugs
+func (s *Store) notesWithTag(ctx context.Context, tag string) ([]string, error) {
+	return s.paginatedDistinctSlugs(ctx, TagWhereClause(tag))
 }
 
 // noteInfoForSlug fetches the title and file path of a note's first chunk.
-func (s *Store) noteInfoForSlug(ctx context.Context, slug string) (title, filePath, fileType string, found bool) {
+func (s *Store) noteInfoForSlug(ctx context.Context, slug string) (title, filePath, fileType string, found bool, err error) {
 	res, err := s.chunks.Get(ctx,
 		chroma.WithWhere(chroma.And(
 			chroma.EqString("note_slug", slug),
@@ -1249,8 +1269,11 @@ func (s *Store) noteInfoForSlug(ctx context.Context, slug string) (title, filePa
 		)),
 		chroma.WithInclude(chroma.IncludeMetadatas),
 	)
-	if err != nil || len(res.GetMetadatas()) == 0 {
-		return slug, "", "", false
+	if err != nil {
+		return slug, "", "", false, fmt.Errorf("info for note %s: %w", slug, wrapChromaErr(err))
+	}
+	if len(res.GetMetadatas()) == 0 {
+		return slug, "", "", false, nil
 	}
 	m := res.GetMetadatas()[0]
 	title = metaString(m, "title")
@@ -1259,7 +1282,7 @@ func (s *Store) noteInfoForSlug(ctx context.Context, slug string) (title, filePa
 	}
 	filePath = metaString(m, "file_path")
 	fileType = metaString(m, "file_type")
-	return title, filePath, fileType, true
+	return title, filePath, fileType, true, nil
 }
 
 // metaString safely reads a string from a DocumentMetadata.
@@ -1467,9 +1490,9 @@ func (s *Store) GetNote(ctx context.Context, slugOrPath string) (*NoteContent, e
 }
 
 // PopulateContext fetches adjacent chunks for each result when windowSize > 0.
-func (s *Store) PopulateContext(ctx context.Context, results []Result, windowSize int) {
+func (s *Store) PopulateContext(ctx context.Context, results []Result, windowSize int) error {
 	if windowSize <= 0 || len(results) == 0 {
-		return
+		return nil
 	}
 	// Group results by NoteSlug to deduplicate and minimize queries
 	type noteRange struct {
@@ -1494,7 +1517,7 @@ func (s *Store) PopulateContext(ctx context.Context, results []Result, windowSiz
 	}
 
 	if len(noteRanges) == 0 {
-		return
+		return nil
 	}
 
 	var clauses []chroma.WhereClause
@@ -1526,7 +1549,7 @@ func (s *Store) PopulateContext(ctx context.Context, results []Result, windowSiz
 			chroma.WithOffset(offset),
 		)
 		if err != nil {
-			break
+			return fmt.Errorf("populate context: %w", wrapChromaErr(err))
 		}
 		if res.Count() == 0 {
 			break
@@ -1540,7 +1563,7 @@ func (s *Store) PopulateContext(ctx context.Context, results []Result, windowSiz
 	}
 
 	if len(metas) == 0 {
-		return
+		return nil
 	}
 
 	type chunkInfo struct {
@@ -1580,6 +1603,7 @@ func (s *Store) PopulateContext(ctx context.Context, results []Result, windowSiz
 			results[i].Context = ctxTexts
 		}
 	}
+	return nil
 }
 
 func findSlugMatches(metas []chroma.DocumentMetadata, cleanInput, slug string) (pathMatches, titleMatches, suffixMatches []string) {

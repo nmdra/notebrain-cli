@@ -15,7 +15,6 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
-	"time"
 	"unicode/utf8"
 
 	"github.com/nmdra/notebrain-cli/v2/internal/llmparse"
@@ -386,13 +385,6 @@ func (p *Pipeline) processFile(ctx context.Context, vaultPath string, filePath s
 		astRes.Chunks = []parser.Chunk{{NoteSlug: slug, Index: 0, Text: " "}}
 	}
 
-	// Stat the file once, outside the chunk loop
-	info, _ := os.Stat(filePath)
-	modTime := time.Now()
-	if info != nil {
-		modTime = info.ModTime()
-	}
-
 	// Filter chunks: discard those below the minimum word threshold.
 	// For code-only chunks (where Text is only placeholders), check word count
 	// against RichText so code notes are preserved.
@@ -457,13 +449,11 @@ func (p *Pipeline) processFile(ctx context.Context, vaultPath string, filePath s
 			ChunkIndex:   i,
 			Text:         storedText,
 			Tags:         astRes.Tags,
-			HasLinks:     len(astRes.Links) > 0,
 			HeadingPath:  c.HeadingPath,
 			HeadingLevel: c.Level,
 			HasTask:      c.HasTask,
 			HasCode:      c.HasCode,
 			FileType:     fileTypeMD,
-			ModifiedMs:   modTime.UnixMilli(),
 			ContentHash:  hash,
 			Embedding:    emb,
 		}
@@ -574,12 +564,6 @@ func (p *Pipeline) processPdfFile(ctx context.Context, vaultPath string, filePat
 
 	title := parser.TitleFromPath(relPath)
 
-	info, _ := os.Stat(filePath)
-	modTime := time.Now()
-	if info != nil {
-		modTime = info.ModTime()
-	}
-
 	var markdown string
 
 	pages, err := p.pdfBackend.ExtractText(ctx, filePath)
@@ -656,13 +640,11 @@ func (p *Pipeline) processPdfFile(ctx context.Context, vaultPath string, filePat
 			ChunkIndex:   i,
 			Text:         storedText,
 			Tags:         astRes.Tags,
-			HasLinks:     len(astRes.Links) > 0,
 			HeadingPath:  c.HeadingPath,
 			HeadingLevel: c.Level,
 			HasTask:      c.HasTask,
 			HasCode:      c.HasCode,
 			FileType:     fileTypePDF,
-			ModifiedMs:   modTime.UnixMilli(),
 			ContentHash:  hash,
 			Embedding:    emb,
 		}

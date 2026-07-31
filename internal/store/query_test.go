@@ -6,7 +6,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
 	chroma "github.com/amikos-tech/chroma-go/pkg/api/v2"
 
@@ -44,8 +43,6 @@ func setupTestData(t *testing.T, ctx context.Context, st *store.Store) {
 			ChunkIndex: 0,
 			Text:       "text about golang and chroma",
 			Tags:       []string{"go", "vector"},
-			HasLinks:   true,
-			ModifiedMs: time.Now().UnixMilli(),
 			Embedding:  []float32{1.0, 0.0, 0.0},
 		},
 		{
@@ -56,8 +53,6 @@ func setupTestData(t *testing.T, ctx context.Context, st *store.Store) {
 			ChunkIndex: 0,
 			Text:       "some other text",
 			Tags:       []string{"go"},
-			HasLinks:   false,
-			ModifiedMs: time.Now().UnixMilli(),
 			Embedding:  []float32{0.0, 1.0, 0.0},
 		},
 	}
@@ -115,7 +110,6 @@ func TestHiddenConnections(t *testing.T) {
 			ChunkIndex: 0,
 			Text:       "text about golang",
 			Tags:       []string{"go"},
-			HasLinks:   false,
 			Embedding:  []float32{0.9, 0.0, 0.0},
 		},
 	}
@@ -141,7 +135,6 @@ func TestHiddenConnectionsDeep(t *testing.T) {
 			ChunkIndex: 0,
 			Text:       "text about golang",
 			Tags:       []string{"go"},
-			HasLinks:   false,
 			Embedding:  []float32{0.9, 0.0, 0.0},
 		},
 	}
@@ -534,7 +527,6 @@ func TestTagSearch(t *testing.T) {
 			ChunkIndex: 0,
 			Text:       "k8s note",
 			Tags:       []string{"kubernetes"},
-			ModifiedMs: time.Now().UnixMilli(),
 			Embedding:  []float32{0.0, 0.0, 1.0},
 		},
 		{
@@ -545,7 +537,6 @@ func TestTagSearch(t *testing.T) {
 			ChunkIndex: 0,
 			Text:       "k8s cka prep",
 			Tags:       []string{"kubernetes/cka"},
-			ModifiedMs: time.Now().UnixMilli(),
 			Embedding:  []float32{0.0, 0.0, 1.0},
 		},
 		{
@@ -556,7 +547,6 @@ func TestTagSearch(t *testing.T) {
 			ChunkIndex: 0,
 			Text:       "python web dev",
 			Tags:       []string{"django"},
-			ModifiedMs: time.Now().UnixMilli(),
 			Embedding:  []float32{0.0, 0.0, 1.0},
 		},
 	}
@@ -640,7 +630,6 @@ func TestGetNote_WithHeadings(t *testing.T) {
 			Text:         "This is the overview.",
 			HeadingPath:  "Overview",
 			HeadingLevel: 1,
-			ModifiedMs:   time.Now().UnixMilli(),
 			Embedding:    []float32{1.0, 0.0, 0.0},
 		},
 		{
@@ -652,7 +641,6 @@ func TestGetNote_WithHeadings(t *testing.T) {
 			Text:         "Second paragraph of overview.",
 			HeadingPath:  "Overview",
 			HeadingLevel: 1,
-			ModifiedMs:   time.Now().UnixMilli(),
 			Embedding:    []float32{1.0, 0.0, 0.0},
 		},
 		{
@@ -664,7 +652,6 @@ func TestGetNote_WithHeadings(t *testing.T) {
 			Text:         "Architectural details.",
 			HeadingPath:  "Overview > Architecture",
 			HeadingLevel: 2,
-			ModifiedMs:   time.Now().UnixMilli(),
 			Embedding:    []float32{1.0, 0.0, 0.0},
 		},
 		{
@@ -676,7 +663,6 @@ func TestGetNote_WithHeadings(t *testing.T) {
 			Text:         "Component A details.",
 			HeadingPath:  "Overview > Architecture > Component A",
 			HeadingLevel: 3,
-			ModifiedMs:   time.Now().UnixMilli(),
 			Embedding:    []float32{1.0, 0.0, 0.0},
 		},
 	}
@@ -813,7 +799,9 @@ func TestPopulateContext(t *testing.T) {
 	res := []store.Result{
 		{NoteSlug: "win", ChunkIndex: 1},
 	}
-	st.PopulateContext(ctx, res, 1)
+	if err := st.PopulateContext(ctx, res, 1); err != nil {
+		t.Fatalf("PopulateContext failed: %v", err)
+	}
 	if len(res[0].Context) != 2 {
 		t.Fatalf("Expected PopulateContext to fill 2 texts (excluding matched chunk), got %d: %v", len(res[0].Context), res[0].Context)
 	}
@@ -1092,7 +1080,6 @@ func TestBacklinks_SubfolderSlugResolution(t *testing.T) {
 			FilePath:   "01.Projects/System Design/02 - Scalability.md",
 			ChunkIndex: 0,
 			Text:       "Scalability notes",
-			ModifiedMs: time.Now().UnixMilli(),
 			Embedding:  []float32{1.0, 0.0, 0.0},
 		},
 		{
@@ -1102,8 +1089,6 @@ func TestBacklinks_SubfolderSlugResolution(t *testing.T) {
 			FilePath:   "01.Projects/System Design/System Design.md",
 			ChunkIndex: 0,
 			Text:       "Overview link [[02 - Scalability#Proxy]]",
-			HasLinks:   true,
-			ModifiedMs: time.Now().UnixMilli(),
 			Embedding:  []float32{1.0, 0.0, 0.0},
 		},
 	}

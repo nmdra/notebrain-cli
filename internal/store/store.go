@@ -152,7 +152,10 @@ func (s *Store) Stats(ctx context.Context) (map[string]int64, error) {
 				chroma.WithOffset(offset),
 				chroma.WithInclude(chroma.IncludeMetadatas),
 			)
-			if err != nil || res == nil {
+			if err != nil {
+				return nil, fmt.Errorf("stats distinct notes: %w", err)
+			}
+			if res == nil {
 				break
 			}
 			metas := res.GetMetadatas()
@@ -181,7 +184,10 @@ func (s *Store) Stats(ctx context.Context) (map[string]int64, error) {
 					chroma.WithOffset(offset),
 					chroma.WithInclude(chroma.IncludeMetadatas),
 				)
-				if err != nil || res == nil {
+				if err != nil {
+					return nil, fmt.Errorf("stats distinct notes (fallback): %w", err)
+				}
+				if res == nil {
 					break
 				}
 				metas := res.GetMetadatas()

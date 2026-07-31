@@ -3,7 +3,6 @@ package store_test
 import (
 	"context"
 	"testing"
-	"time"
 
 	chroma "github.com/amikos-tech/chroma-go/pkg/api/v2"
 
@@ -23,8 +22,6 @@ func TestBatchIngestChunkLifecycle(t *testing.T) {
 			ChunkIndex: 0,
 			Text:       "hello world",
 			Tags:       []string{"test", "go"},
-			HasLinks:   true,
-			ModifiedMs: time.Now().UnixMilli(),
 			Embedding:  []float32{0.1, 0.2, 0.3},
 		},
 		{
@@ -35,8 +32,6 @@ func TestBatchIngestChunkLifecycle(t *testing.T) {
 			ChunkIndex: 1,
 			Text:       "more text here",
 			Tags:       []string{"test"},
-			HasLinks:   false,
-			ModifiedMs: time.Now().UnixMilli(),
 			Embedding:  []float32{0.4, 0.5, 0.6},
 		},
 	}
