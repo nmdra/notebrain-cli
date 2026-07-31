@@ -19,6 +19,10 @@ const (
 	initialBackoff = 2 * time.Second
 )
 
+// maxRetryAfter caps how long a Retry-After header can stall the retry.
+// It is a var so tests can shrink it without sleeping.
+var maxRetryAfter = 60 * time.Second
+
 type openAICompatConverter struct {
 	baseURL       string
 	apiKey        string
@@ -82,10 +86,6 @@ func parseRetryAfter(header string) time.Duration {
 
 func (o *openAICompatConverter) Convert(ctx context.Context, pages []string) (string, error) {
 	budget := o.contextWindow - reservedTokens
-	if budget < 4096 {
-		slog.Warn("calculated chunk budget is extremely small", "budget", budget)
-		budget = 4096
-	}
 
 	chunks := splitByTokenBudget(pages, budget)
 	totalChunks := len(chunks)
@@ -143,7 +143,11 @@ func (o *openAICompatConverter) convertChunk(ctx context.Context, chunk string) 
 func (o *openAICompatConverter) doWithRetry(ctx context.Context, reqURL string, bodyBytes []byte) ([]byte, error) {
 	backoff := initialBackoff
 
-	for attempt := 0; attempt <= maxRetries; attempt++ {
+	for attempt := 0; ; attempt++ {
+		if attempt > maxRetries {
+			return nil, fmt.Errorf("request failed after %d attempts", maxRetries+1)
+		}
+
 		req, err := http.NewRequestWithContext(ctx, "POST", reqURL, bytes.NewReader(bodyBytes))
 		if err != nil {
 			return nil, fmt.Errorf("create request: %w", err)
@@ -192,7 +196,7 @@ func (o *openAICompatConverter) doWithRetry(ctx context.Context, reqURL string, 
 		if (resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500) && attempt < maxRetries {
 			sleepDuration := backoff
 			if ra := parseRetryAfter(resp.Header.Get("Retry-After")); ra > 0 {
-				sleepDuration = ra
+				sleepDuration = min(ra, maxRetryAfter)
 			}
 			errMsg := extractErrorMessage(chatResp, respBody)
 			slog.Warn("rate limited or server error, retrying", "backend", o.name, "status", resp.StatusCode, "err", errMsg, "attempt", attempt+1, "backoff", sleepDuration)
@@ -206,8 +210,6 @@ func (o *openAICompatConverter) doWithRetry(ctx context.Context, reqURL string, 
 		errMsg := extractErrorMessage(chatResp, respBody)
 		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, errMsg)
 	}
-
-	return nil, fmt.Errorf("request failed after retries")
 }
 
 func extractErrorMessage(chatResp chatResponse, respBody []byte) string {

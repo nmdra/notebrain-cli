@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestNewAutoDetection(t *testing.T) {
@@ -330,6 +331,134 @@ func TestOpenAICompatConverter_MultiChunk(t *testing.T) {
 
 	if !strings.Contains(result, "\n\n") {
 		t.Errorf("expected multi-chunk output joined with newlines, got %q", result)
+	}
+}
+
+func TestNewExplicitBackendPrefix(t *testing.T) {
+	os.Clearenv()
+	defer os.Clearenv()
+
+	// 1. Model names ollama but no ollama config -> ErrNoAPIKey
+	_, err := New("ollama/llama3", 128000)
+	if !errors.Is(err, ErrNoAPIKey) {
+		t.Errorf("expected ErrNoAPIKey for unconfigured ollama model, got %v", err)
+	}
+
+	// 2. Explicit ollama prefix with OLLAMA_HOST
+	os.Setenv("OLLAMA_HOST", "http://remote:11434")
+	conv, err := New("ollama/llama3", 128000)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if conv.Name() != "ollama" {
+		t.Errorf("expected backend ollama, got %s", conv.Name())
+	}
+	cStruct, ok := conv.(*openAICompatConverter)
+	if !ok {
+		t.Fatalf("expected *openAICompatConverter")
+	}
+	if cStruct.baseURL != "http://remote:11434/v1" {
+		t.Errorf("expected OLLAMA_HOST baseURL, got %q", cStruct.baseURL)
+	}
+
+	// 3. Explicit deepseek prefix beats env-detected openrouter
+	os.Clearenv()
+	os.Setenv("OPENROUTER_API_KEY", "test-or")
+	os.Setenv("DEEPSEEK_API_KEY", "sk-ds")
+	conv, err = New("deepseek-v4-flash", 128000)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if conv.Name() != "deepseek" {
+		t.Errorf("expected deepseek for explicit prefix, got %s", conv.Name())
+	}
+	cStruct, _ = conv.(*openAICompatConverter)
+	if cStruct.model != "deepseek-v4-flash" {
+		t.Errorf("dash-prefixed model name must be passed through intact, got %q", cStruct.model)
+	}
+
+	// 4. Explicit openrouter prefix strips the namespace only
+	os.Clearenv()
+	os.Setenv("OPENROUTER_API_KEY", "test-or")
+	conv, err = New("openrouter/tencent/hy3", 128000)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	cStruct, _ = conv.(*openAICompatConverter)
+	if cStruct.model != "tencent/hy3" {
+		t.Errorf("expected model tencent/hy3, got %q", cStruct.model)
+	}
+
+	// 5. Explicit prefix for a configured cloud backend requires its key
+	os.Clearenv()
+	os.Setenv("DEEPSEEK_API_KEY", "sk-ds")
+	_, err = New("gemini-2.0-flash", 128000)
+	if err != nil {
+		t.Fatalf("expected fallback to env detection when gemini is unconfigured, got %v", err)
+	}
+}
+
+func TestNewOllamaHostHonoredWithKey(t *testing.T) {
+	os.Clearenv()
+	defer os.Clearenv()
+
+	os.Setenv("OLLAMA_API_KEY", "sk-local")
+	os.Setenv("OLLAMA_HOST", "http://my-ollama:9999")
+
+	conv, err := New("llama3", 128000)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	cStruct, ok := conv.(*openAICompatConverter)
+	if !ok {
+		t.Fatalf("expected *openAICompatConverter")
+	}
+	if cStruct.baseURL != "http://my-ollama:9999/v1" {
+		t.Errorf("expected OLLAMA_HOST baseURL even with OLLAMA_API_KEY set, got %q", cStruct.baseURL)
+	}
+}
+
+func TestRetryAfterIsCapped(t *testing.T) {
+	old := maxRetryAfter
+	maxRetryAfter = time.Millisecond
+	defer func() { maxRetryAfter = old }()
+
+	attempts := 0
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		if attempts == 1 {
+			w.Header().Set("Retry-After", "99999")
+			w.WriteHeader(http.StatusTooManyRequests)
+			return
+		}
+		resp := chatResponse{}
+		resp.Choices = append(resp.Choices, struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		}{
+			Message: struct {
+				Content string `json:"content"`
+			}{Content: "recovered"},
+		})
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer mockServer.Close()
+
+	start := time.Now()
+	conv := newOpenAICompatConverter(mockServer.URL, "test-key", "test-model", "test-backend", 128000, nil)
+	result, err := conv.Convert(context.Background(), []string{"raw text"})
+	if err != nil {
+		t.Fatalf("Convert failed: %v", err)
+	}
+	if result != "recovered" {
+		t.Errorf("expected 'recovered', got %q", result)
+	}
+	if attempts != 2 {
+		t.Errorf("expected 2 attempts, got %d", attempts)
+	}
+	if elapsed := time.Since(start); elapsed > 2*time.Second {
+		t.Errorf("Retry-After was not capped; retry took %v", elapsed)
 	}
 }
 

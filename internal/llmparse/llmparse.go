@@ -12,6 +12,11 @@ import (
 // ErrNoAPIKey is returned when no valid API key is found for LLM parsing.
 var ErrNoAPIKey = errors.New("no valid API key found")
 
+// minContextWindow is the smallest context window accepted by New:
+// 8192 tokens reserved for the system prompt and output, plus the
+// 4096-token minimum chunk size.
+const minContextWindow = 12288
+
 // API Endpoints
 const (
 	EndpointDeepSeek   = "https://api.deepseek.com"
@@ -66,50 +71,123 @@ func sanitizeAPIKey(raw string) string {
 	return strings.ReplaceAll(val, " ", "")
 }
 
-// New creates a Converter for the given model name.
-func New(model string, contextWindow int) (Converter, error) {
-	if contextWindow < 12288 { // 8192 reserve + 4096 min chunk size
-		return nil, fmt.Errorf("context window %d is too small (needs at least 12288 tokens)", contextWindow)
-	}
-
-	var selected *BackendConfig
-	var apiKey string
-	var baseURL string
-
-	// Auto-detect based on API key presence
-	for i := range supportedBackends {
-		b := &supportedBackends[i]
-		val := os.Getenv(b.EnvKey)
-		val = sanitizeAPIKey(val)
-
-		// Special case for Ollama keyless API
-		if b.Name == backendOllama && val == "" {
-			if host := os.Getenv("OLLAMA_HOST"); host != "" {
-				val = "dummy"
-				host = strings.TrimSuffix(strings.TrimSpace(host), "/")
-				if !strings.HasSuffix(host, "/v1") {
-					host += "/v1"
-				}
-				baseURL = host
-			}
+// backendHintFromModel returns the backend name suggested by the model
+// string, e.g. "ollama/llama3" -> "ollama", "deepseek-v4-flash" -> "deepseek".
+// It returns "" when the model does not name a backend.
+func backendHintFromModel(model string) string {
+	for _, b := range supportedBackends {
+		if strings.HasPrefix(model, b.Name+"/") || strings.HasPrefix(model, b.Name+"-") {
+			return b.Name
 		}
+	}
+	return ""
+}
 
-		if val != "" {
-			selected = b
-			apiKey = val
-			if baseURL == "" {
-				baseURL = b.BaseURL
-			}
+// normalizeOllamaHost appends the OpenAI-compatible /v1 suffix to an
+// OLLAMA_HOST value.
+func normalizeOllamaHost(host string) string {
+	host = strings.TrimSuffix(strings.TrimSpace(host), "/")
+	if !strings.HasSuffix(host, "/v1") {
+		host += "/v1"
+	}
+	return host
+}
+
+// newBackendConverter builds a Converter for the explicitly named backend.
+func newBackendConverter(name, model string, contextWindow int) (Converter, error) {
+	var b *BackendConfig
+	for i := range supportedBackends {
+		if supportedBackends[i].Name == name {
+			b = &supportedBackends[i]
 			break
 		}
 	}
-
-	if selected == nil {
-		return nil, fmt.Errorf("%w for auto-detection (checked DEEPSEEK_API_KEY, OPENROUTER_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY, OLLAMA_API_KEY/OLLAMA_HOST) for model %s", ErrNoAPIKey, model)
+	if b == nil {
+		return nil, fmt.Errorf("unsupported backend %q for model %s", name, model)
 	}
 
-	actualModel := strings.TrimPrefix(model, backendOpenRouter+"/")
+	key := sanitizeAPIKey(os.Getenv(b.EnvKey))
+	if b.Name == backendOllama {
+		if key == "" && os.Getenv("OLLAMA_HOST") == "" {
+			return nil, fmt.Errorf("%w: %s or OLLAMA_HOST is required for model %s", ErrNoAPIKey, b.EnvKey, model)
+		}
+		if key == "" {
+			key = "dummy"
+		}
+	} else if key == "" {
+		return nil, fmt.Errorf("%w: %s is required for model %s", ErrNoAPIKey, b.EnvKey, model)
+	}
 
-	slog.Info("using LLM backend", "backend", selected.Name, "model", actualModel)
-	return newOpenAICompatConverter(baseURL, apiKey, actualModel, selected.Name, contextWindow, selected.Headers), nil
+	baseURL := b.BaseURL
+	if b.Name == backendOllama {
+		if host := os.Getenv("OLLAMA_HOST"); host != "" {
+			baseURL = normalizeOllamaHost(host)
+		}
+	}
+
+	// The backend prefix is a namespace, not part of the model id
+	// ("openrouter/tencent/hy3" -> "tencent/hy3"). Dash-prefixed model
+	// names ("deepseek-v4-flash") are real model ids and stay intact.
+	actualModel := strings.TrimPrefix(model, b.Name+"/")
+
+	slog.Info("using LLM backend", "backend", b.Name, "model", actualModel)
+	return newOpenAICompatConverter(baseURL, key, actualModel, b.Name, contextWindow, b.Headers), nil
+}
+
+// New creates a Converter for the given model name.
+func New(model string, contextWindow int) (Converter, error) {
+	if contextWindow < minContextWindow {
+		return nil, fmt.Errorf("context window %d is too small (needs at least %d tokens)", contextWindow, minContextWindow)
+	}
+
+	// An explicit backend prefix in the model wins over environment
+	// detection, e.g. --llm-model="ollama/llama3".
+	if hint := backendHintFromModel(model); hint != "" {
+		conv, err := newBackendConverter(hint, model, contextWindow)
+		if err == nil {
+			return conv, nil
+		}
+		if !errors.Is(err, ErrNoAPIKey) {
+			return nil, err
+		}
+		slog.Warn("backend named by model is not configured, falling back to environment detection",
+			"backend", hint, "model", model, "err", err)
+	}
+
+	// Auto-detect based on API key presence.
+	for i := range supportedBackends {
+		b := &supportedBackends[i]
+		key := sanitizeAPIKey(os.Getenv(b.EnvKey))
+		host := ""
+		if b.Name == backendOllama && key == "" {
+			if h := os.Getenv("OLLAMA_HOST"); h != "" {
+				key = "dummy"
+				host = h
+			}
+		}
+		if key == "" {
+			continue
+		}
+
+		// Honor OLLAMA_HOST even when OLLAMA_API_KEY is set.
+		baseURL := b.BaseURL
+		if b.Name == backendOllama {
+			if host != "" {
+				baseURL = normalizeOllamaHost(host)
+			} else if h := os.Getenv("OLLAMA_HOST"); h != "" {
+				baseURL = normalizeOllamaHost(h)
+			}
+		}
+
+		if hint := backendHintFromModel(model); hint != "" && hint != b.Name {
+			slog.Warn("backend auto-detected from environment does not match the model name",
+				"backend", b.Name, "model", model, "expected", hint)
+		}
+
+		actualModel := strings.TrimPrefix(model, backendOpenRouter+"/")
+		slog.Info("using LLM backend", "backend", b.Name, "model", actualModel)
+		return newOpenAICompatConverter(baseURL, key, actualModel, b.Name, contextWindow, b.Headers), nil
+	}
+
+	return nil, fmt.Errorf("%w for auto-detection (checked DEEPSEEK_API_KEY, OPENROUTER_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY, OLLAMA_API_KEY/OLLAMA_HOST) for model %s", ErrNoAPIKey, model)
 }
