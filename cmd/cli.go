@@ -10,6 +10,8 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/charmbracelet/x/term"
+	kongcompletion "github.com/jotaen/kong-completion"
+	"github.com/posener/complete"
 
 	"github.com/nmdra/notebrain-cli/v2/internal/configfile"
 )
@@ -48,24 +50,38 @@ type Globals struct {
 type CLI struct {
 	Globals
 
-	Ingest      IngestCmd      `cmd:"" help:"Ingest markdown files from a vault"`
-	Search      SearchCmd      `cmd:"" help:"Semantic search across indexed notes"`
-	Backlinks   BacklinksCmd   `cmd:"" help:"Find incoming links to a note"`
-	Connections ConnectionsCmd `cmd:"" help:"Find notes connected via wikilinks (graph traversal)"`
-	Hidden      HiddenCmd      `cmd:"" help:"Discover semantically related but unlinked notes"`
-	Tags        TagsCmd        `cmd:"" help:"Find notes sharing common tags"`
-	Boosted     BoostedCmd     `cmd:"" help:"Semantic search boosted by wikilink graph proximity"`
-	Stats       StatsCmd       `cmd:"" help:"Show collection statistics"`
-	Get         GetCmd         `cmd:"" help:"Retrieve the full text of an indexed note"`
-	Reset       ResetCmd       `cmd:"" help:"Delete all indexed data and reset the database"`
-	Doctor      DoctorCmd      `cmd:"" help:"Run diagnostics to check system dependencies and configurations"`
-	DoctorProbe DoctorProbeCmd `cmd:"" hidden:"" help:"internal: verify the database can be opened (used by doctor)"`
-	Init        InitCmd        `cmd:"" help:"Initialize NoteBrain configuration interactively"`
-	Version     VersionCmd     `cmd:"" help:"Show version information"`
+	Ingest      IngestCmd                 `cmd:"" help:"Ingest markdown files from a vault"`
+	Search      SearchCmd                 `cmd:"" help:"Semantic search across indexed notes"`
+	Backlinks   BacklinksCmd              `cmd:"" help:"Find incoming links to a note"`
+	Connections ConnectionsCmd            `cmd:"" help:"Find notes connected via wikilinks (graph traversal)"`
+	Hidden      HiddenCmd                 `cmd:"" help:"Discover semantically related but unlinked notes"`
+	Tags        TagsCmd                   `cmd:"" help:"Find notes sharing common tags"`
+	Boosted     BoostedCmd                `cmd:"" help:"Semantic search boosted by wikilink graph proximity"`
+	Stats       StatsCmd                  `cmd:"" help:"Show collection statistics"`
+	Get         GetCmd                    `cmd:"" help:"Retrieve the full text of an indexed note"`
+	Reset       ResetCmd                  `cmd:"" help:"Delete all indexed data and reset the database"`
+	Doctor      DoctorCmd                 `cmd:"" help:"Run diagnostics to check system dependencies and configurations"`
+	DoctorProbe DoctorProbeCmd            `cmd:"" hidden:"" help:"internal: verify the database can be opened (used by doctor)"`
+	Init        InitCmd                   `cmd:"" help:"Initialize NoteBrain configuration interactively"`
+	Version     VersionCmd                `cmd:"" help:"Show version information"`
+	Completion  kongcompletion.Completion `cmd:"" help:"Outputs shell code for initialising tab completions"`
+}
+
+// completionPredictors returns the named predictors used by shell completion.
+// They are shared between the real CLI and tests to prevent drift.
+func completionPredictors() []kongcompletion.Option {
+	return []kongcompletion.Option{
+		kongcompletion.WithPredictor("llm-model",
+			complete.PredictSet("openrouter/anthropic/claude-3.5-haiku", "deepseek-chat", "gemini-3.5-flash-lite", "ollama/<model>")),
+	}
 }
 
 // ParseAndRun parses CLI arguments and runs the selected subcommand.
 func ParseAndRun(ctx context.Context, version, commit, date string, defaultConfig []byte) error {
+	return parseAndRun(ctx, version, commit, date, defaultConfig, os.Args[1:])
+}
+
+func parseAndRun(ctx context.Context, version, commit, date string, defaultConfig []byte, args []string) error {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		home = "."
@@ -85,7 +101,7 @@ func ParseAndRun(ctx context.Context, version, commit, date string, defaultConfi
 		},
 	}
 
-	ctxParser := kong.Parse(&cli,
+	parser := kong.Must(&cli,
 		kong.Name("notebrain"),
 		kong.Description(`Index and search your Obsidian vault with semantic intelligence.
 
@@ -115,6 +131,14 @@ Examples:
 		kong.Configuration(configfile.IgnoreMissingFileLoader(configfile.TOMLResolver), defaultConfigPath),
 		kong.Vars{"version": versionStr},
 	)
+
+	// Intercept shell completion requests (COMP_LINE env) before parsing args.
+	kongcompletion.Register(parser, completionPredictors()...)
+
+	ctxParser, err := parser.Parse(args)
+	if err != nil {
+		parser.FatalIfErrorf(err)
+	}
 
 	setupLogger(cli.LogLevel, cli.Debug)
 

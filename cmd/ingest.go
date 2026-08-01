@@ -37,7 +37,7 @@ type IngestCmd struct {
 	ChunkOverlap     int    `name:"chunk-overlap" help:"overlap runes between sub-chunks" default:"100"`
 	RespectExclude   bool   `help:"respect Obsidian userIgnoreFilters and attachmentFolderPath settings during ingest" default:"false"`
 	EnablePDF        bool   `help:"enable indexing of PDF attachments" default:"false"`
-	LLMModel         string `name:"llm-model" help:"LLM model to use for PDF parsing (e.g. openrouter/anthropic/claude-sonnet, deepseek-chat). Requires API key in env." default:""`
+	LLMModel         string `name:"llm-model" help:"LLM model to use for PDF parsing (e.g. openrouter/anthropic/claude-sonnet, deepseek-chat). Requires API key in env." default:"" completion-predictor:"llm-model"`
 	LLMContextWindow int    `name:"llm-context-window" help:"total context window size of the LLM in tokens. Set this to match your specific model." default:"128000"`
 }
 
