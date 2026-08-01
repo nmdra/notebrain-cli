@@ -31,7 +31,9 @@ const (
 	// unchanged (e.g. the chunk-overlap duplication fix, has_code metadata).
 	// Version 4 covers the embedding-model hash salt: switching models must
 	// invalidate stored hashes to avoid dimension mismatches.
-	chunkSchemaVersion = 4
+	// Version 5 covers the attachment-embed marker rendering (chunk text
+	// changes from raw filenames to [image]/[image: alt] markers).
+	chunkSchemaVersion = 5
 )
 
 // Embedder abstracts vector embedding so the pipeline can be tested with mocks.

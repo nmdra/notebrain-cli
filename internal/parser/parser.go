@@ -94,3 +94,42 @@ func IsAttachmentLink(target string) bool {
 	_, isAttachment := attachmentExts[ext]
 	return isAttachment
 }
+
+// imageExts are the image file extensions used to label attachment embeds
+// in chunk text as "image"; any other known attachment is labeled "attachment".
+var imageExts = map[string]struct{}{
+	".png": {}, ".jpg": {}, ".jpeg": {}, ".gif": {}, ".svg": {}, ".webp": {},
+	".avif": {}, ".bmp": {}, ".tiff": {}, ".ico": {}, ".heic": {},
+}
+
+// attachmentKind returns "image" for image embeds and "attachment" for other
+// known attachments (e.g. canvas files, archives, media). The target must
+// already be a known attachment (see IsAttachmentLink).
+func attachmentKind(target string) string {
+	if idx := strings.Index(target, "#"); idx != -1 {
+		target = target[:idx]
+	}
+	ext := strings.ToLower(filepath.Ext(target))
+	if _, ok := imageExts[ext]; ok {
+		return "image"
+	}
+	return "attachment"
+}
+
+// isNumericSize reports whether label is an Obsidian embed size suffix such
+// as "200" or "200x150". Numeric sizes are layout, not content.
+func isNumericSize(label string) bool {
+	label = strings.TrimSpace(label)
+	if label == "" {
+		return false
+	}
+	digits := 0
+	for _, c := range label {
+		if c >= '0' && c <= '9' {
+			digits++
+		} else if c != 'x' && c != 'X' {
+			return false
+		}
+	}
+	return digits > 0
+}

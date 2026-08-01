@@ -206,17 +206,28 @@ func (r *chunkRenderer) renderInline(w io.Writer, n ast.Node, source []byte) boo
 		}
 
 		if r.rich {
-			_, _ = w.Write([]byte("[[" + target))
+			if node.Embed {
+				_, _ = w.Write([]byte("![[" + target))
+			} else {
+				_, _ = w.Write([]byte("[[" + target))
+			}
 			if label != "" && label != target {
 				_, _ = w.Write([]byte("|" + label))
 			}
 			_, _ = w.Write([]byte("]]"))
-		} else {
-			if label != "" {
-				_, _ = w.Write([]byte(label))
+		} else if node.Embed && IsAttachmentLink(target) {
+			// An embed of an attachment includes its content rather than
+			// referencing a note. Emit a marker instead of the filename so
+			// embeddings do not absorb image noise; keep a real alt label.
+			if label != "" && label != target && !isNumericSize(label) {
+				_, _ = w.Write([]byte("[" + attachmentKind(target) + ": " + label + "]"))
 			} else {
-				_, _ = w.Write([]byte(target))
+				_, _ = w.Write([]byte("[" + attachmentKind(target) + "]"))
 			}
+		} else if label != "" {
+			_, _ = w.Write([]byte(label))
+		} else {
+			_, _ = w.Write([]byte(target))
 		}
 	case *ast.Link:
 		if r.rich {

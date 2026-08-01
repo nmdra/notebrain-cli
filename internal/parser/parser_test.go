@@ -298,9 +298,133 @@ func TestParse_SkipAttachments(t *testing.T) {
 
 	resNoSkip := Parse(body, "test-note", 1000, 0, false)
 	sort.Strings(resNoSkip.Links)
-	expected := []string{"Apache Kafka", "doc.pdf", "redis-queue-1741846972555.webp"}
+	expected := []string{"Apache Kafka", "doc.pdf"}
 	if !reflect.DeepEqual(resNoSkip.Links, expected) {
-		t.Errorf("expected all links when skipAttachments=false, got %v, want %v", resNoSkip.Links, expected)
+		t.Errorf("expected embed of attachment excluded from links even with skipAttachments=false, got %v, want %v", resNoSkip.Links, expected)
+	}
+}
+
+func TestParse_AttachmentEmbedsNotLinks(t *testing.T) {
+	body := "See ![[diagram.png]] and ![[notes/other note]] and the gallery [[image.png]]."
+	tests := []struct {
+		skipAttachments bool
+		want            []string
+	}{
+		{skipAttachments: false, want: []string{"image.png", "notes/other note"}},
+		{skipAttachments: true, want: []string{"notes/other note"}},
+	}
+	for _, tt := range tests {
+		res := Parse(body, "test-note", 1000, 0, tt.skipAttachments)
+		sort.Strings(res.Links)
+		if !reflect.DeepEqual(res.Links, tt.want) {
+			t.Errorf("skipAttachments=%v: got links %v, want %v", tt.skipAttachments, res.Links, tt.want)
+		}
+	}
+}
+
+func TestParse_AttachmentEmbedRendering(t *testing.T) {
+	tests := []struct {
+		name       string
+		body       string
+		wantText   string
+		wantRich   string
+		wantHas    string
+		wantAbsent []string
+	}{
+		{
+			name:     "image embed without label",
+			body:     "![[diagram.png]]",
+			wantText: "[image]",
+			wantRich: "![[diagram.png]]",
+		},
+		{
+			name:       "image embed with size suffix",
+			body:       "![[diagram.png|200]]",
+			wantText:   "[image]",
+			wantRich:   "![[diagram.png|200]]",
+			wantAbsent: []string{"200"},
+		},
+		{
+			name:       "image embed with width x height",
+			body:       "![[diagram.png|200x150]]",
+			wantText:   "[image]",
+			wantRich:   "![[diagram.png|200x150]]",
+			wantAbsent: []string{"200", "150"},
+		},
+		{
+			name:     "image embed with alt label",
+			body:     "![[diagram.png|CNN architecture]]",
+			wantText: "[image: CNN architecture]",
+			wantRich: "![[diagram.png|CNN architecture]]",
+		},
+		{
+			name:     "non-image attachment embed",
+			body:     "![[archive.zip]]",
+			wantText: "[attachment]",
+			wantRich: "![[archive.zip]]",
+		},
+		{
+			name:     "non-embed attachment link keeps filename",
+			body:     "[[archive.zip]]",
+			wantText: "archive.zip",
+			wantRich: "[[archive.zip]]",
+		},
+		{
+			name:     "note embed keeps label",
+			body:     "![[notes/other note]]",
+			wantText: "notes/other note",
+			wantRich: "![[notes/other note]]",
+		},
+		{
+			name:     "markdown image keeps alt text",
+			body:     "![alt text](diagram.png)",
+			wantText: "alt text",
+			wantRich: "alt text",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res := Parse(tt.body, "test-note", 1000, 0, false)
+			if len(res.Chunks) == 0 {
+				t.Fatal("expected at least 1 chunk")
+			}
+			c := res.Chunks[0]
+			if c.Text != tt.wantText {
+				t.Errorf("Text = %q, want %q", c.Text, tt.wantText)
+			}
+			if c.RichText != tt.wantRich {
+				t.Errorf("RichText = %q, want %q", c.RichText, tt.wantRich)
+			}
+			if tt.wantAbsent != nil {
+				for _, s := range tt.wantAbsent {
+					if strings.Contains(c.Text, s) {
+						t.Errorf("Text should not contain %q: got %q", s, c.Text)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestIsNumericSize(t *testing.T) {
+	tests := []struct {
+		label string
+		want  bool
+	}{
+		{label: "200", want: true},
+		{label: "200x150", want: true},
+		{label: "300X150", want: true},
+		{label: "200x150x100", want: true},
+		{label: "CNN architecture", want: false},
+		{label: "200px", want: false},
+		{label: "", want: false},
+		{label: "x", want: false},
+	}
+	for _, tt := range tests {
+		if got := isNumericSize(tt.label); got != tt.want {
+			t.Errorf("isNumericSize(%q) = %v, want %v", tt.label, got, tt.want)
+		}
 	}
 }
 

@@ -102,7 +102,13 @@ func (t *metadataTransformer) Transform(node *ast.Document, _ text.Reader, pc pa
 			tagsSet[string(nTyped.Tag)] = struct{}{}
 		case *wikilink.Node:
 			target := string(nTyped.Target)
-			if !skipAttachments || !IsAttachmentLink(target) {
+			isAttachment := IsAttachmentLink(target)
+			// An embed of an attachment includes its content rather than
+			// referencing a note; it is never part of the graph.
+			if nTyped.Embed && isAttachment {
+				return ast.WalkContinue, nil
+			}
+			if !skipAttachments || !isAttachment {
 				linksSet[target] = struct{}{}
 			}
 		}
