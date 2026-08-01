@@ -49,7 +49,7 @@ The repository gives template files in [contrib/automation/systemd/](https://git
    systemctl --user enable --now notebrain-ingest.timer
    ```
 
-4. Check the status and the next execution times:
+4. See the status and the next execution times:
    ```bash
    systemctl --user list-timers --all | grep notebrain
    systemctl --user status notebrain-ingest.timer

@@ -1,6 +1,6 @@
 # Architecture and Design
 
-NoteBrain CLI processes the markdown vault of Obsidian. It makes a semantic knowledge engine that you can search. It puts the markdown notes into an embedded vector store (ChromaDB). This vector store makes possible semantic search, backlink traversal, graph connections, hidden connections, shared tags discovery, and graph-boosted hybrid search.
+NoteBrain CLI processes the markdown vault of Obsidian. It creates a semantic knowledge engine that you can search. It puts the markdown notes into an embedded vector store (ChromaDB). The store makes semantic search, graph traversal, and hybrid search possible.
 
 ---
 
@@ -69,7 +69,7 @@ graph TD
 
 ## 2. Local Vector Database (ChromaDB)
 
-NoteBrain embeds ChromaDB directly into the Go binary. It uses `chroma-go` v2. NoteBrain runs embedded in the local process (`CGO_ENABLED=1`). The tool compiles the bindings for SQLite and HNSW directly. The vector storage flushes synchronously to the disk at `~/.notebrain/chroma`.
+NoteBrain embeds ChromaDB directly into the Go binary. It uses `chroma-go` v2. NoteBrain runs embedded in the local process (`CGO_ENABLED=1`). The tool compiles the bindings for SQLite and HNSW directly. The vector storage writes to the disk synchronously at `~/.notebrain/chroma`.
 
 ---
 
@@ -79,7 +79,7 @@ ChromaDB separates the data into two primary collections. The `nb_chunks` collec
 
 ### `nb_chunks` Collection
 
-This collection stores chunks of note content. It also stores their vector embeddings and comprehensive structural metadata.
+This collection stores chunks of note content. It also stores their vector embeddings and structural metadata.
 
 | Property              | Value / Setting                                                | Description                                                                              |
 | :-------------------- | :------------------------------------------------------------- | :--------------------------------------------------------------------------------------- |
@@ -92,7 +92,7 @@ This collection stores chunks of note content. It also stores their vector embed
 
 #### Metadata Schema (`nb_chunks`)
 
-Array properties (such as tags) are flattened into numbered keys (`tag_0`, `tag_1`). This flattening maintains strict compatibility with the Go ChromaDB client.
+Array properties (such as tags) are flattened into numbered keys (`tag_0`, `tag_1`). This flattening keeps compatibility with the Go ChromaDB client.
 
 | Field Name            | Type     | Description                                                                |
 | :-------------------- | :------- | :------------------------------------------------------------------------- |
@@ -142,7 +142,7 @@ This collection stores directed edges. These edges represent wikilinks and Markd
 | Field Name | Type | Description |
 | :--- | :--- | :--- |
 | `source_slug` | `string` | The slugified identifier of the source note where the link starts. |
-| `target_slug` | `string` | The canonicalized slug identifier of the target note. This identifier strips `#anchor` headings and resolves exact vault paths via `buildLinkTargetResolver`. |
+| `target_slug` | `string` | The canonicalized slug identifier of the target note. This identifier removes `#anchor` headings and resolves exact vault paths with `buildLinkTargetResolver`. |
 | `target_path` | `string` | The raw link text or path from the Markdown source. |
 | `display_text` | `string` | The display alias or text of the link (for example, `[[Target|Alias]]` -> `Alias`). |
 
@@ -151,7 +151,7 @@ This collection stores directed edges. These edges represent wikilinks and Markd
 > 
 > ChromaDB is a vector database. It does not support standard relational tables or vectorless document collections. Every stored document requires a vector embedding. NoteBrain stores directed edges as metadata in the `nb_links` collection. This represents Wikilink graph edges without a second database technology.
 > 
-> *   **Prevention of HNSW Index Collapse:** The HNSW index degenerates if NoteBrain uses flat zero-vectors (for example, `[0, 0, ..., 0]`) for all links. Distance calculations collapse to zero for identical vectors. This causes C++ crashes or infinite loops.
+> *   **Prevention of HNSW Index Collapse:** If NoteBrain uses flat zero-vectors (for example, `[0, 0, ..., 0]`) for all links, the HNSW index degenerates. Distance calculations collapse to zero for identical vectors. This causes C++ crashes or infinite loops.
 > *   **Random Vectors in L2 Space:** NoteBrain generates a 16-dimensional random vector in L2 (Euclidean) space for each link. This configuration keeps the index mathematically stable. NoteBrain does not query these vectors. All graph traversals filter only on metadata fields in Go memory.
 
 ---
@@ -159,10 +159,10 @@ This collection stores directed edges. These edges represent wikilinks and Markd
 ## 4. Subsystems and Components
 
 - **CLI Layer (`cmd/`)**: Kong builds this layer for command-line parsing and flag resolution. The CLI layer supports a strict two-tier configuration hierarchy. CLI flags override the TOML configuration file (`~/.notebrain/config/config.toml`).
-- **Configuration (`internal/configfile` and `config/`)**: This subsystem manages the loading of TOML configuration via Kong resolvers. It supports normalized key lookups (`snake_case` and `kebab-case`). It resolves flags without `.env` files or application environment variables.
+- **Configuration (`internal/configfile` and `config/`)**: This subsystem manages the loading of TOML configuration with Kong resolvers. It supports normalized key lookups (`snake_case` and `kebab-case`). It resolves flags without `.env` files or application environment variables.
 - **Embedder (`internal/embedder`)**: This subsystem manages the local embedding models. It supports embedded ONNX MiniLM sentence embeddings or external Ollama service backends.
 - **Parser (`internal/parser`)**: This subsystem reads Markdown files from the Obsidian vault. It extracts YAML frontmatter and properties. It parses wikilinks and standard Markdown links. It identifies task checkboxes and tables. It splits note text into semantic chunks. It preserves structural Markdown syntax across chunks. This syntax includes tight lists (`1. `, `- `), task checkboxes (`[ ] `, `[x] `), blockquotes, callout headers (`> [!NOTE]`), and tables. Distinct structural blocks are cleanly separated by `\n\n`. Attachment embeds become `[image]` or `[attachment]` markers in the embedding text.
-- **PDF Extractor (`internal/pdfextract` and `internal/llmparse`)**: This subsystem extracts text from PDFs. It uses a WASM-compiled PDFium backend. The system sends the raw text to an LLM API via `llmparse`. This converts the text into structured markdown. This process guarantees that PDF chunks share the same layout as markdown notes.
+- **PDF Extractor (`internal/pdfextract` and `internal/llmparse`)**: This subsystem extracts text from PDFs. It uses a WASM-compiled PDFium backend. The system sends the raw text to an LLM API with `llmparse`. This converts the text into structured markdown. This process guarantees that PDF chunks share the same layout as markdown notes.
 - **Ingest (`internal/ingest`)**: This subsystem handles multi-worker concurrent directory walking. It reads `.md` and `.pdf` files. It calls the parser and extractor. It generates embeddings. It coordinates atomic note updates under a single store mutex lock.
 - **Store (`internal/store`)**: This is the ChromaDB wrapper. It abstracts collection creation, chunk upsertion, and link deduplication. It exposes all graph and semantic queries.
 - **Obsidian Client (`internal/obsidian`)**: This client interacts with the Obsidian CLI for vault operations and note inspection.
@@ -174,7 +174,7 @@ This collection stores directed edges. These edges represent wikilinks and Markd
 1. **Embedded Persistent Storage Only**: NoteBrain strictly embeds ChromaDB in persistent mode (`CGO_ENABLED=1`). This configuration removes the need for a separate Docker container or HTTP vector database server.
 2. **Atomic Ingestion Under Mutex**: The system executes all note updates under a write lock. The sequence is `DeleteNoteChunks` -> `UpsertChunks` -> `UpsertLinks`. This prevents concurrent HNSW graph modifications. Concurrent modifications can cause hnswlib assertion crashes.
 3. **In-Memory Graph Traversal**: The system executes graph algorithms (BFS for connections, backlinks, and hidden links) in Go memory. The data comes from `nb_links` metadata. NoteBrain does not use complex SQL queries or a dedicated graph database.
-4. **Flat Tag Encoding**: The system flattens array metadata (`tag_0`, `tag_1`). This encoding makes sure that ChromaDB has robust compatibility with the Go client binding.
+4. **Flat Tag Encoding**: The system flattens array metadata (`tag_0`, `tag_1`). This encoding makes sure that ChromaDB stays compatible with the Go client binding.
 5. **Dummy 16-Dimensional Vectors for Edges**: ChromaDB requires uniform dimensions and non-empty vectors. Because of this, `nb_links` uses 16-dimensional random float vectors in L2 space. The 16 distinct dimensions prevent HNSW failure or corruption on identical vector spaces.
 
 ---
@@ -210,6 +210,6 @@ Multiple separate search commands add overhead for AI agents when they research 
 
 - **How it operates**: Multiple positional query arguments instruct NoteBrain to embed all query terms simultaneously. NoteBrain uses `emb.EmbedBatch` for this operation. The system retrieves candidates independently for each query vector across ChromaDB. The system uses semantic vector similarity (cosine distance).
 - **Multi-Hit Boosting**: The system merges and sorts the results with a two-tier ranking strategy:
-  1. **Primary Sort (Hit Count)**: Chunks that match multiple query topics move to the top of the rankings. They are higher than single-topic matches. A single-topic match can have a higher similarity score, but the multiple query match still wins. This sorting surfaces concepts that bridge orthogonal domains.
+  1. **Primary Sort (Hit Count)**: Chunks that match multiple query topics move to the top of the rankings. They are higher than single-topic matches. A single-topic match can have a higher similarity score, but the multiple query match still wins. This sorting shows concepts that bridge orthogonal domains.
   2. **Secondary Sort (Score)**: Within each hit-count tier, the system orders the results by their maximum cosine similarity score descending.
 - **Hit Attribution**: In structured outputs (JSON or TSV), each item includes a `matched_queries` array. This array shows the query vectors that retrieved the item. In text mode, the system shows hit tags (for example, `[hits: "redis", "message broker"]`).

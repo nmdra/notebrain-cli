@@ -1,6 +1,6 @@
 # PDF Ingestion with LLMs
 
-NoteBrain indexes your PDF attachments with Large Language Models (LLMs). The LLMs parse text and structural metadata, enabling semantic searches on your documents, research papers, and ebooks.
+NoteBrain indexes your PDF attachments with Large Language Models (LLMs). The LLMs parse text and structural metadata. Semantic search then works on your documents, research papers, and ebooks.
 
 ## Requirements
 
@@ -31,7 +31,7 @@ notebrain ingest --enable-pdf --llm-model="tencent/hy3"
 You can set these values permanently with the CLI wizard:
 
 ```bash
-notebrain config init
+notebrain init
 ```
 
 Alternatively, put them in your `~/.notebrain/config.toml`:
@@ -41,7 +41,7 @@ enable_pdf = true
 llm_model = "tencent/hy3"
 ```
 
-## Graceful Fallbacks and Cost Control
+## Fallbacks and Cost Control
 
 If you run `notebrain ingest` with `--enable-pdf` but your API key is missing, NoteBrain has a fallback process:
 
@@ -50,7 +50,7 @@ If you run `notebrain ingest` with `--enable-pdf` but your API key is missing, N
 - NoteBrain keeps previously ingested PDFs in the ChromaDB index.
 - NoteBrain continues to ingest your standard Markdown (`.md`) files.
 
-Because of this, you can schedule regular ingestion runs in the background (for example, with `cron`). You do not lose PDF data if your environment variables are incorrect.
+Because of this, you can schedule regular ingestion runs in the background (for example, with `cron`). If your environment variables are incorrect, you do not lose PDF data.
 
 ## Search PDFs
 

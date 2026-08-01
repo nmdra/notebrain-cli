@@ -37,10 +37,11 @@ NoteBrain includes an [AI agent skill](wiki/Skill_Usage.md) and an [OpenCode Age
 - **Terminal Hyperlinks**: Use OSC 8 hyperlinks to open notes from supported terminals.
 - **Obsidian-Aware Indexing**: NoteBrain obeys your Obsidian configuration. It ignores excluded files and attachment folders.
 - **Optional PDF Support**: Get text from PDFs. NoteBrain uses an LLM API to read scanned documents.
+- **Shell Completion**: Tab completion for bash, zsh, and fish. It completes commands, flags, and note slugs from your index.
 
 ### Internals
 
-- **PDF Support**: NoteBrain extracts text from PDFs with **[PDFium-go](https://github.com/klippa-app/go-pdfium)**. It converts the raw text into structured Markdown with an LLM API (OpenRouter or DeepSeek). This makes high-quality chunks that match native markdown notes.
+- **PDF Support**: NoteBrain extracts text from PDFs with **[PDFium-go](https://github.com/klippa-app/go-pdfium)**. It converts the raw text into structured Markdown with an LLM API (OpenRouter or DeepSeek). This makes chunks that match native markdown notes.
 - **Goldmark AST-Aware Chunking**: NoteBrain splits markdown by header hierarchy. It preserves lists, GFM tables, blockquotes, callouts, and code blocks.
 - **Embedded ChromaDB**: NoteBrain writes vectors to the disk with [`chroma-go`](https://github.com/amikos-tech/chroma-go).
 - **Incremental Ingestion**: NoteBrain calculates SHA-256 content hashes. It ignores unmodified notes in milliseconds during subsequent runs.
@@ -181,7 +182,7 @@ NoteBrain stores persistent data in `~/.notebrain/`:
 | `~/.notebrain/chroma/`            | ChromaDB vector store (embeddings, metadata, link graph) |
 | `~/.notebrain/config/config.toml` | User configuration file                                  |
 
-To uninstall NoteBrain completely, remove the `notebrain` binary and delete the `~/.notebrain/` directory.
+To uninstall NoteBrain, remove the `notebrain` binary and delete the `~/.notebrain/` directory.
 
 ## Documentation
 
@@ -200,7 +201,7 @@ To uninstall NoteBrain completely, remove the `notebrain` binary and delete the 
 
 We welcome contributions. Open an issue or a pull request on [GitHub](https://github.com/nmdra/notebrain-cli).
 
-This project uses [Conventional Commits](https://www.conventionalcommits.org/), Go vendoring (`vendor/`), and pre-commit hooks via [Lefthook](https://github.com/evilmartians/lefthook).
+This project uses [Conventional Commits](https://www.conventionalcommits.org/), Go vendoring (`vendor/`), and pre-commit hooks with [Lefthook](https://github.com/evilmartians/lefthook).
 
 ## License
 

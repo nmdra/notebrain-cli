@@ -12,7 +12,7 @@ AI agents find and obey these instructions automatically when you ask about your
 
 ## Tiered Retrieval Workflow
 
-The `notebrain-assistant` skill mandates a tiered retrieval workflow. This workflow stops excessive token consumption and decreases latency.
+The `notebrain-assistant` skill mandates a tiered retrieval workflow. This workflow prevents token waste and decreases latency.
 
 1. **Lean Initial Search and Quiet Mode**:
    The agent starts with a focused semantic query:
@@ -22,7 +22,7 @@ The `notebrain-assistant` skill mandates a tiered retrieval workflow. This workf
    NoteBrain writes results to stdout and all diagnostics (progress, warnings) to stderr, so `--format json` output is always clean machine JSON. The `--context-window N` flag gets adjacent chunks but removes the matched chunk from the context. This decreases token consumption.
    
 2. **Similarity Score Check**:
-   The agent stops immediately if the top result has a similarity score of `score >= 0.75` (for example, `0.8520`) and gives enough context to answer you.
+   If the top result has a similarity score of `score >= 0.75` (for example, `0.8520`) and gives enough context to answer you, the agent stops.
 
 3. **Conditional Escalation**:
    The agent executes multi-step graph commands only when necessary:

@@ -26,7 +26,8 @@ Without a shell argument, `notebrain completion` detects your login shell automa
 | --- | --- |
 | Subcommands | `ingest`, `search`, `backlinks`, `connections`, `hidden`, `tags`, `boosted`, `stats`, `get`, `reset`, `doctor`, `init`, `version`, `completion` |
 | Global flags | `--vault-path`, `--chroma-path`, `--format`, `--log-level`, `--limit`, `--top-k`, `--seed`, `--hops`, ... |
-| Enum values | `--format` → `text`, `json`, `tsv`; `--log-level` → `debug`, `info`, `warn`, `error` |
+| Enum values (`--format`) | `text`, `json`, `tsv` |
+| Enum values (`--log-level`) | `debug`, `info`, `warn`, `error` |
 | `--llm-model` | Documented model values (`openrouter/anthropic/claude-3.5-haiku`, `deepseek-chat`, `gemini-3.5-flash-lite`, `ollama/<model>`) |
 | Note slugs (dynamic) | Positional `<note>` args of `get`, `backlinks`, `connections`, `hidden`, and `tags`, plus `--seed` of `boosted` |
 
@@ -34,7 +35,7 @@ Without a shell argument, `notebrain completion` detects your login shell automa
 
 Slug candidates come from your live ChromaDB index. When you press Tab after a `<note>` argument, NoteBrain lists the indexed note slugs.
 
-- Requires an indexed database. Run `notebrain ingest` first; an empty database completes nothing.
+- Requires an indexed database. Run `notebrain ingest` first. An empty database completes nothing.
 - Slugs are fetched by the hidden `suggest-notes` command (one process spawn per Tab press). It is a paginated metadata scan with no embeddings or LLM calls, so it is fast.
 
 ## Limitations
@@ -47,5 +48,5 @@ Slug candidates come from your live ChromaDB index. When you press Tab after a `
 ## Troubleshooting
 
 - **No completions after adding the line**: restart the shell or run `exec bash` / `exec zsh` so the init file is re-sourced.
-- **Slug completion is empty**: confirm the index is populated with `notebrain stats`.
+- **Slug completion is empty**: make sure that the index is populated with `notebrain stats`.
 - **Completions appear twice or are stale**: make sure only one activation line exists in your init file.

@@ -44,7 +44,7 @@ You can apply these flags to `notebrain` before a subcommand (for example, `note
 When you execute NoteBrain queries inside AI agent workflows, automated pipelines, or background scripts, you must control the token count. You must also hide interactive formatting.
 
 1. **Clean stdout in machine formats**:
-   NoteBrain writes query results to stdout and all diagnostics (progress, warnings) to stderr. When you use a non-interactive machine format (`--format=json`, `tsv`, or `--jsonpath`), stdout is already clean and correct for JSON parsers and AI agents.
+   NoteBrain writes query results to stdout and all diagnostics (progress, warnings) to stderr. When you use a non-interactive machine format (`--format=json`, `tsv`, or `--jsonpath`), stdout is clean and correct for JSON parsers and AI agents.
 2. **Compact JSON envelopes**:
    By default, the JSON output includes the necessary properties in a clean format. You can use `--show-file-path=false` to remove file paths. This decreases the token consumption for Large Language Models. The similarity scores (`score`) round to 4 decimal places (`0.8520`). The query headers (`query`) do not have terminal decorations.
 3. **Non-redundant context windows (`--context-window N`)**:
@@ -56,10 +56,10 @@ When you execute NoteBrain queries inside AI agent workflows, automated pipeline
 
 When a search or graph command returns zero results in standard terminal `text` format (`--format=text`), NoteBrain does not show generic `(no results)` text. Instead, it shows helpful tips in italicized amber (`hintStyle`) under the command header:
 
-- **`backlinks`**: Tells you to see if other notes link to the target, or to run `notebrain ingest` again.
+- **`backlinks`**: Tells you to run `notebrain ingest` again, or to make sure that other notes link to the target.
 - **`connections`**: Tells you to increase `--hops` or to make sure that the Wikilinks are correct.
 - **`hidden`**: Tells you to use `--include-linked` to include notes that can already have links. It also tells you to run the index again if the note is too unique.
-- **`tags`**: Tells you to check the note tags or to decrease `--min-shared`.
+- **`tags`**: Tells you to see the note tags or to decrease `--min-shared`.
 - **`search` / `boosted`**: Tells you to use broader search terms, to change `--boost`, or to run `notebrain ingest`.
 
 > Note: Contextual hints show only in standard `text` output. To maintain compatibility with automated scripts and AI agents, machine formats (`json`, `tsv`, `--jsonpath`) omit these hints.
@@ -189,7 +189,7 @@ When you supply multiple query positional arguments (`notebrain search "arg1" "a
 
 ### `get`
 
-This command builds and shows the complete markdown text of a note. It joins all the indexed chunks of the note. To make the text clear and easy to read, the tool automatically puts a dynamic markdown section heading before each chunk. It gets this heading from the `heading_path` metadata (`### Section Heading\n\n<text>`).
+This command builds and shows the complete markdown text of a note. It joins all the indexed chunks of the note. To make the text readable, the tool puts a dynamic markdown section heading before each chunk. It gets this heading from the `heading_path` metadata (`### Section Heading\n\n<text>`).
 
 #### Usage
 
@@ -379,7 +379,7 @@ Checks performed:
 - **ChromaDB Path** — the database directory is writable.
 - **ChromaDB sqlite** — `chroma.sqlite3` exists, has a valid SQLite header, and a sane file size.
 - **ChromaDB index** — each collection segment has all of its HNSW index files (missing or empty files mean an interrupted write).
-- **ChromaDB open test** — opens the database in a subprocess and forces the HNSW indexes to load. A corrupted native index aborts the subprocess; the doctor reports the signal and suggests `notebrain reset`.
+- **ChromaDB open test** — opens the database in a subprocess and forces the HNSW indexes to load. A corrupted native index aborts the subprocess. The doctor reports the signal and suggests `notebrain reset`.
 
 The command exits non-zero when database problems are found.
 
@@ -393,7 +393,7 @@ notebrain doctor [flags]
 
 ### `init`
 
-This command starts an interactive wizard to create or update your `config.toml` file. It automatically finds your vault path. It lets you enable or disable PDF support.
+This command starts an interactive wizard to create or update your `config.toml` file. It automatically finds your vault path. You can enable or disable PDF support.
 
 #### Usage
 
@@ -469,7 +469,7 @@ show-tags = false
 
 ## Machine-Readable Output and AI Chain Automation
 
-You can use output formats like JSON and extract fields with `--jsonpath`. This lets you easily pipe the output to shell tools and AI agents:
+You can use output formats like JSON and extract fields with `--jsonpath`. You can pipe the output to shell tools and AI agents:
 
 ```bash
 # Extract the slug of the top result
