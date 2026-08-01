@@ -105,11 +105,20 @@ github.com/go-viper/mapstructure/v2/internal/errors
 # github.com/google/uuid v1.6.0
 ## explicit
 github.com/google/uuid
+# github.com/hashicorp/errwrap v1.1.0
+## explicit
+github.com/hashicorp/errwrap
+# github.com/hashicorp/go-multierror v1.1.1
+## explicit; go 1.13
+github.com/hashicorp/go-multierror
 # github.com/jolestar/go-commons-pool/v2 v2.1.2
 ## explicit; go 1.13
 github.com/jolestar/go-commons-pool/v2
 github.com/jolestar/go-commons-pool/v2/collections
 github.com/jolestar/go-commons-pool/v2/concurrent
+# github.com/jotaen/kong-completion v0.0.14
+## explicit; go 1.25
+github.com/jotaen/kong-completion
 # github.com/klippa-app/go-pdfium v1.19.6
 ## explicit; go 1.25.0
 github.com/klippa-app/go-pdfium
@@ -148,9 +157,17 @@ github.com/pelletier/go-toml/v2/unstable
 # github.com/pkg/errors v0.9.1
 ## explicit
 github.com/pkg/errors
+# github.com/posener/complete v1.2.3
+## explicit; go 1.13
+github.com/posener/complete
+github.com/posener/complete/cmd
+github.com/posener/complete/cmd/install
 # github.com/rivo/uniseg v0.4.7
 ## explicit; go 1.18
 github.com/rivo/uniseg
+# github.com/riywo/loginshell v0.0.0-20200815045211-7d26008be1ab
+## explicit
+github.com/riywo/loginshell
 # github.com/shopspring/decimal v1.4.0
 ## explicit; go 1.10
 github.com/shopspring/decimal
