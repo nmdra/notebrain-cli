@@ -40,6 +40,7 @@ Slug candidates come from your live ChromaDB index. When you press Tab after a `
 ## Limitations
 
 - Completions only work for a binary named `notebrain` in your `$PATH`. `./notebrain` (relative invocation) is not completed.
+- Slug candidates come from the config or default chroma path (`~/.notebrain/chroma`). A `--chroma-path` flag typed on the command line is not reflected in completions.
 - The hidden `suggest-notes` command does not appear in completion lists or `notebrain --help`.
 - Vault subfolder paths and tag names are not completed dynamically.
 
