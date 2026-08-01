@@ -381,6 +381,9 @@ func paginatedGetMetadatas(ctx context.Context, col chroma.Collection, where chr
 		if err != nil {
 			return nil, err
 		}
+		if res == nil {
+			return nil, nil
+		}
 		metas := res.GetMetadatas()
 		if len(metas) == 0 {
 			break
@@ -407,6 +410,9 @@ func paginatedGetIDs(ctx context.Context, col chroma.Collection, where chroma.Wh
 		)
 		if err != nil {
 			return nil, err
+		}
+		if res == nil {
+			return nil, nil
 		}
 		ids := res.GetIDs()
 		if len(ids) == 0 {
