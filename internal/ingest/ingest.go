@@ -229,6 +229,16 @@ fileLoop:
 				<-sem
 				workerWg.Done()
 			}()
+			// Count every file (including failures) so progress can reach
+			// totalFiles even when some files error out.
+			defer func() {
+				n := completed.Add(1)
+				progressCh <- ProgressUpdate{
+					Done:    int(n),
+					Total:   totalFiles,
+					Current: filepath.Base(f),
+				}
+			}()
 
 			res, err := p.processFile(ctx, vaultPath, f, simpleHashes)
 			if err != nil {
@@ -242,13 +252,6 @@ fileLoop:
 				mu.Lock()
 				ingestResults = append(ingestResults, *res)
 				mu.Unlock()
-			}
-
-			n := completed.Add(1)
-			progressCh <- ProgressUpdate{
-				Done:    int(n),
-				Total:   totalFiles,
-				Current: filepath.Base(f),
 			}
 		}(file)
 	}
