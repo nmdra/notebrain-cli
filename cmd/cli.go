@@ -50,21 +50,22 @@ type Globals struct {
 type CLI struct {
 	Globals
 
-	Ingest      IngestCmd                 `cmd:"" help:"Ingest markdown files from a vault"`
-	Search      SearchCmd                 `cmd:"" help:"Semantic search across indexed notes"`
-	Backlinks   BacklinksCmd              `cmd:"" help:"Find incoming links to a note"`
-	Connections ConnectionsCmd            `cmd:"" help:"Find notes connected via wikilinks (graph traversal)"`
-	Hidden      HiddenCmd                 `cmd:"" help:"Discover semantically related but unlinked notes"`
-	Tags        TagsCmd                   `cmd:"" help:"Find notes sharing common tags"`
-	Boosted     BoostedCmd                `cmd:"" help:"Semantic search boosted by wikilink graph proximity"`
-	Stats       StatsCmd                  `cmd:"" help:"Show collection statistics"`
-	Get         GetCmd                    `cmd:"" help:"Retrieve the full text of an indexed note"`
-	Reset       ResetCmd                  `cmd:"" help:"Delete all indexed data and reset the database"`
-	Doctor      DoctorCmd                 `cmd:"" help:"Run diagnostics to check system dependencies and configurations"`
-	DoctorProbe DoctorProbeCmd            `cmd:"" hidden:"" help:"internal: verify the database can be opened (used by doctor)"`
-	Init        InitCmd                   `cmd:"" help:"Initialize NoteBrain configuration interactively"`
-	Version     VersionCmd                `cmd:"" help:"Show version information"`
-	Completion  kongcompletion.Completion `cmd:"" help:"Outputs shell code for initialising tab completions"`
+	Ingest       IngestCmd                 `cmd:"" help:"Ingest markdown files from a vault"`
+	Search       SearchCmd                 `cmd:"" help:"Semantic search across indexed notes"`
+	Backlinks    BacklinksCmd              `cmd:"" help:"Find incoming links to a note"`
+	Connections  ConnectionsCmd            `cmd:"" help:"Find notes connected via wikilinks (graph traversal)"`
+	Hidden       HiddenCmd                 `cmd:"" help:"Discover semantically related but unlinked notes"`
+	Tags         TagsCmd                   `cmd:"" help:"Find notes sharing common tags"`
+	Boosted      BoostedCmd                `cmd:"" help:"Semantic search boosted by wikilink graph proximity"`
+	Stats        StatsCmd                  `cmd:"" help:"Show collection statistics"`
+	Get          GetCmd                    `cmd:"" help:"Retrieve the full text of an indexed note"`
+	Reset        ResetCmd                  `cmd:"" help:"Delete all indexed data and reset the database"`
+	Doctor       DoctorCmd                 `cmd:"" help:"Run diagnostics to check system dependencies and configurations"`
+	DoctorProbe  DoctorProbeCmd            `cmd:"" hidden:"" help:"internal: verify the database can be opened (used by doctor)"`
+	SuggestNotes SuggestNotesCmd           `cmd:"" hidden:"" help:"internal: list indexed note slugs, one per line (used by shell completion)"`
+	Init         InitCmd                   `cmd:"" help:"Initialize NoteBrain configuration interactively"`
+	Version      VersionCmd                `cmd:"" help:"Show version information"`
+	Completion   kongcompletion.Completion `cmd:"" help:"Outputs shell code for initialising tab completions"`
 }
 
 // completionPredictors returns the named predictors used by shell completion.
