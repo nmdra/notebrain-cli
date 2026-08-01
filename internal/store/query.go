@@ -24,6 +24,20 @@ const ffiSafePageSize = 200
 // Query results include distances + metadata, so we cap lower than Get().
 const ffiSafeSemanticLimit = 100
 
+// clampSemanticLimit caps a user-requested result limit at the FFI-safe
+// ceiling and warns once when truncation will occur. Internal fetch
+// multipliers must be capped with min() instead and must not go through
+// this helper, otherwise every per-chunk query in --deep mode logs a
+// spurious warning.
+func clampSemanticLimit(limit int) int {
+	if limit > ffiSafeSemanticLimit {
+		slog.Warn("semantic search limit exceeds FFI-safe cap; results will be truncated",
+			"limit", limit, "cap", ffiSafeSemanticLimit)
+		return ffiSafeSemanticLimit
+	}
+	return limit
+}
+
 // Result is one row returned by any query.
 type Result struct {
 	NoteSlug       string   `json:"note_slug"`
@@ -58,6 +72,7 @@ type NoteContent struct {
 func (s *Store) SemanticSearch(ctx context.Context, queryVec []float32, limit int, topKPerNote int, whereFilter chroma.WhereFilter, includeText bool) ([]Result, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+	limit = clampSemanticLimit(limit)
 	return s.semanticSearch(ctx, queryVec, limit, topKPerNote, whereFilter, includeText)
 }
 
@@ -68,17 +83,16 @@ func (s *Store) semanticSearch(ctx context.Context, queryVec []float32, limit in
 	if topKPerNote < 1 {
 		topKPerNote = 1
 	}
-	// Fetch enough results to allow top-K deduplication across chunks
+	// Fetch enough results to allow top-K deduplication across chunks.
+	// Clamped silently: callers using user-facing limits already warned
+	// once via clampSemanticLimit; internal multipliers (limit*3, *5)
+	// are never worth a warning per query.
 	includes := []chroma.Include{chroma.IncludeMetadatas, chroma.IncludeDistances}
 	if includeText {
 		includes = append(includes, chroma.IncludeDocuments)
 	}
 
 	fetchCount := min(max(limit*3, limit*topKPerNote), ffiSafeSemanticLimit)
-	if limit > ffiSafeSemanticLimit {
-		slog.Warn("semantic search limit exceeds FFI-safe cap; results will be truncated",
-			"limit", limit, "cap", ffiSafeSemanticLimit)
-	}
 
 	opts := []chroma.QueryOption{
 		chroma.WithQueryEmbeddings(embeddings.NewEmbeddingFromFloat32(queryVec)),
@@ -105,6 +119,7 @@ func (s *Store) MultiSemanticSearch(ctx context.Context, queryVecs [][]float32, 
 	if len(queryVecs) == 0 {
 		return nil, nil
 	}
+	limit = clampSemanticLimit(limit)
 	if len(queryVecs) == 1 {
 		res, err := s.semanticSearch(ctx, queryVecs[0], limit, topKPerNote, whereFilter, includeText)
 		if err != nil {
@@ -125,7 +140,7 @@ func (s *Store) MultiSemanticSearch(ctx context.Context, queryVecs [][]float32, 
 		return res, nil
 	}
 
-	fetchLimit := max(limit*2, 20)
+	fetchLimit := min(max(limit*2, 20), ffiSafeSemanticLimit)
 	fetchTopK := max(topKPerNote*2, 6)
 
 	chunkMap := make(map[string]*mergedChunk)
@@ -686,6 +701,7 @@ func (s *Store) HiddenConnections(ctx context.Context, queryVec []float32, seedS
 
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+	limit = clampSemanticLimit(limit)
 	// 1. Collect all slugs already linked to/from seed
 	linked, err := s.linkedSlugs(ctx, seedSlug)
 	if err != nil {
@@ -693,8 +709,8 @@ func (s *Store) HiddenConnections(ctx context.Context, queryVec []float32, seedS
 	}
 	linked[seedSlug] = true
 
-	// 2. Wide semantic search
-	candidates, err := s.semanticSearch(ctx, queryVec, limit*5, 1, nil, includeText)
+	// 2. Wide semantic search (internal fetch headroom, capped silently)
+	candidates, err := s.semanticSearch(ctx, queryVec, min(limit*5, ffiSafeSemanticLimit), 1, nil, includeText)
 	if err != nil {
 		return nil, err
 	}
@@ -725,6 +741,7 @@ func (s *Store) HiddenConnectionsDeep(ctx context.Context, seedSlug string, limi
 			opt(&opts)
 		}
 	}
+	limit = clampSemanticLimit(limit)
 
 	resolved, err := s.ResolveNoteSlug(ctx, seedSlug)
 	if err != nil {
@@ -815,8 +832,10 @@ func (s *Store) HiddenConnectionsDeep(ctx context.Context, seedSlug string, limi
 		seedLabels[i] = info.label
 	}
 
-	// 3. Wide multi-query semantic search across all vault chunks
-	candidates, err := s.MultiSemanticSearch(ctx, queryVecs, seedLabels, max(limit*2, 15), topKPerNote, nil, includeText)
+	// 3. Wide multi-query semantic search across all vault chunks.
+	// The limit here is internal fetch headroom, already capped by
+	// clampSemanticLimit above, so MultiSemanticSearch stays quiet.
+	candidates, err := s.MultiSemanticSearch(ctx, queryVecs, seedLabels, min(max(limit*2, 15), ffiSafeSemanticLimit), topKPerNote, nil, includeText)
 	if err != nil {
 		return nil, nil, fmt.Errorf("hidden connections deep: %w", err)
 	}
@@ -1048,12 +1067,13 @@ func mergeDeduplicatedResults(existing, incoming []Result) []Result {
 func (s *Store) GraphBoostedSearch(ctx context.Context, queryVec []float32, seedSlug string, boost float64, limit int, whereFilter chroma.WhereFilter, includeText bool) ([]Result, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+	limit = clampSemanticLimit(limit)
 	linked, err := s.linkedSlugs(ctx, seedSlug)
 	if err != nil {
 		return nil, err
 	}
 
-	candidates, err := s.semanticSearch(ctx, queryVec, limit*3, 1, whereFilter, includeText)
+	candidates, err := s.semanticSearch(ctx, queryVec, min(limit*3, ffiSafeSemanticLimit), 1, whereFilter, includeText)
 	if err != nil {
 		return nil, err
 	}

@@ -1,8 +1,10 @@
 package store_test
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 	"sync"
 	"testing"
@@ -1243,5 +1245,78 @@ func TestTagSearch_HierarchicalDeduplication(t *testing.T) {
 	}
 	if res[0].NoteSlug != "note-llm" {
 		t.Errorf("Expected note-llm, got %s", res[0].NoteSlug)
+	}
+}
+
+// captureSlog redirects the default slog logger to an in-memory buffer and
+// restores it after the test.
+func captureSlog(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&buf, nil))
+	old := slog.Default()
+	slog.SetDefault(logger)
+	t.Cleanup(func() { slog.SetDefault(old) })
+	return &buf
+}
+
+func TestSemanticSearch_WarnsOnceWhenLimitExceedsCap(t *testing.T) {
+	ctx, st, qVec := setupStoreTest(t)
+	buf := captureSlog(t)
+
+	res, err := st.SemanticSearch(ctx, qVec, 150, 1, nil, false)
+	if err != nil {
+		t.Fatalf("SemanticSearch failed: %v", err)
+	}
+	if len(res) > 100 {
+		t.Errorf("expected results clamped to the FFI-safe cap, got %d", len(res))
+	}
+	if got := strings.Count(buf.String(), "FFI-safe cap"); got != 1 {
+		t.Errorf("expected exactly 1 truncation warning, got %d:\n%s", got, buf.String())
+	}
+}
+
+func TestHiddenConnectionsDeep_NoSpuriousWarnings(t *testing.T) {
+	ctx := context.Background()
+	st := newTestStore(t)
+
+	var chunks []store.ChunkRecord
+	for i := range 4 {
+		chunks = append(chunks, store.ChunkRecord{
+			ID:         fmt.Sprintf("note-seed:%d", i),
+			NoteSlug:   "note-seed",
+			Title:      "Seed",
+			FilePath:   "Seed.md",
+			ChunkIndex: i,
+			Text:       fmt.Sprintf("seed chunk %d", i),
+			Embedding:  []float32{float32(i+1) / 10, 0, 0},
+		})
+	}
+	for _, slug := range []string{"alpha", "beta", "gamma", "delta"} {
+		chunks = append(chunks, store.ChunkRecord{
+			ID:         slug + ":0",
+			NoteSlug:   slug,
+			Title:      slug,
+			FilePath:   slug + ".md",
+			ChunkIndex: 0,
+			Text:       "other content",
+			Embedding:  []float32{0.2, 0.3, 0.4},
+		})
+	}
+	seedChunks(t, ctx, st, chunks, nil)
+
+	buf := captureSlog(t)
+	results, labels, err := st.HiddenConnectionsDeep(ctx, "note-seed", 30, 3, false)
+	if err != nil {
+		t.Fatalf("HiddenConnectionsDeep failed: %v", err)
+	}
+	if len(labels) != 4 {
+		t.Errorf("expected 4 seed chunks analyzed, got %d", len(labels))
+	}
+	if len(results) == 0 {
+		t.Error("expected hidden connection results")
+	}
+	if got := strings.Count(buf.String(), "FFI-safe cap"); got != 0 {
+		t.Errorf("expected no truncation warnings for limit=30 deep search, got %d:\n%s", got, buf.String())
 	}
 }
