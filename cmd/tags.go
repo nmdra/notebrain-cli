@@ -29,7 +29,7 @@ import (
 )
 
 type TagsCmd struct {
-	Query     string `arg:"" help:"Tag name to search for (e.g. 'kubernetes'), or note slug/title if --shared is used."`
+	Query     string `arg:"" help:"Tag name to search for (e.g. 'kubernetes'), or note slug/title if --shared is used." completion-predictor:"note-slug"`
 	Shared    bool   `help:"Find notes sharing tags with the given note instead of searching by tag name." default:"false"`
 	Children  bool   `help:"Include child tags in the hierarchy (e.g. 'kubernetes' also matches 'kubernetes/cka')." default:"false"`
 	MinShared int    `help:"Minimum shared tags to include a result (only with --shared)." default:"1"`

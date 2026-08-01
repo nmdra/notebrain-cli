@@ -30,7 +30,7 @@ import (
 
 type HiddenCmd struct {
 	ChunkDisplayFlags
-	Note          string `arg:"" help:"note slug, title, or file path (auto-resolved)"`
+	Note          string `arg:"" help:"note slug, title, or file path (auto-resolved)" completion-predictor:"note-slug"`
 	Limit         int    `help:"maximum number of hidden connections to return" default:"10"`
 	Deep          bool   `help:"analyze each chunk individually for granular section-level matches"`
 	TopK          int    `name:"top-k" help:"chunks to evaluate per candidate note in --deep mode" default:"3"`

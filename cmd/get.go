@@ -10,7 +10,7 @@ import (
 )
 
 type GetCmd struct {
-	Slug string `arg:"" help:"note slug, title, or file path (auto-resolved)"`
+	Slug string `arg:"" help:"note slug, title, or file path (auto-resolved)" completion-predictor:"note-slug"`
 }
 
 func (c *GetCmd) Run(globals *Globals) error {

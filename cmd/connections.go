@@ -26,7 +26,7 @@ import (
 )
 
 type ConnectionsCmd struct {
-	Note string `arg:"" help:"note slug, title, or file path (auto-resolved)"`
+	Note string `arg:"" help:"note slug, title, or file path (auto-resolved)" completion-predictor:"note-slug"`
 	Hops int    `help:"graph traversal depth (keep 1-2 to avoid exponential blowup)" default:"2"`
 }
 

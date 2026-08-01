@@ -7,6 +7,7 @@ import (
 
 	"github.com/alecthomas/kong"
 	kongcompletion "github.com/jotaen/kong-completion"
+	"github.com/posener/complete"
 )
 
 // TestKongCompletionRegisterCompat verifies that kong-completion v0.0.14
@@ -99,6 +100,9 @@ func TestCompletionInterceptsShellRequests(t *testing.T) {
 				t.Errorf("completion output missing %q:\n%s", want, got)
 			}
 		}
+		if strings.Contains(got, "suggest-notes") {
+			t.Errorf("hidden command suggest-notes must not be completed:\n%s", got)
+		}
 	})
 }
 
@@ -121,5 +125,71 @@ func TestCompletionPredictorTags(t *testing.T) {
 	}
 	if _, ok := cmd.GlobalFlags["--log-level"]; !ok {
 		t.Error("--log-level (global enum flag) not completed at the root")
+	}
+}
+
+// TestNoteSlugPredictorWiring verifies the note-slug predictor is attached
+// to positional note args and --seed, and that the predictor is invoked
+// (spawning suggest-notes) rather than a static set.
+func TestNoteSlugPredictorWiring(t *testing.T) {
+	cli := CLI{}
+	parser := kong.Must(&cli, kong.Name("notebrain"))
+	kongcompletion.Register(parser, completionPredictors()...)
+
+	cmd, err := kongcompletion.Command(parser, completionPredictors()...)
+	if err != nil {
+		t.Fatalf("Command() failed: %v", err)
+	}
+
+	for _, sub := range []string{"get", "backlinks", "connections", "hidden", "tags"} {
+		args, ok := cmd.Sub[sub].Args.(*kongcompletion.PositionalPredictor)
+		if !ok {
+			t.Fatalf("%s: expected PositionalPredictor, got %T", sub, cmd.Sub[sub].Args)
+		}
+		if len(args.Predictors) == 0 {
+			t.Fatalf("%s: no positional predictor attached", sub)
+		}
+		if _, ok := args.Predictors[0].(complete.PredictFunc); !ok {
+			t.Errorf("%s: positional predictor is %T, want complete.PredictFunc", sub, args.Predictors[0])
+		}
+	}
+
+	seed, ok := cmd.Sub["boosted"].GlobalFlags["--seed"]
+	if !ok {
+		t.Fatal("--seed not completed for the boosted command")
+	}
+	if _, ok := seed.(complete.PredictFunc); !ok {
+		t.Errorf("--seed predictor is %T, want complete.PredictFunc", seed)
+	}
+}
+
+// TestStripCompletionEnv verifies COMP_LINE/COMP_POINT are removed from the
+// environment of the suggest-notes child process (posener/complete hijacks
+// on COMP_LINE alone), while other variables are preserved.
+func TestStripCompletionEnv(t *testing.T) {
+	t.Setenv("COMP_LINE", "notebrain get ")
+	t.Setenv("COMP_POINT", "15")
+	t.Setenv("KEEP_ME", "yes")
+
+	env := stripCompletionEnv()
+	var kept, sawLine, sawPoint bool
+	for _, kv := range env {
+		switch {
+		case strings.HasPrefix(kv, "COMP_LINE="):
+			sawLine = true
+		case strings.HasPrefix(kv, "COMP_POINT="):
+			sawPoint = true
+		case kv == "KEEP_ME=yes":
+			kept = true
+		}
+	}
+	if sawLine {
+		t.Error("COMP_LINE leaked into suggest-notes environment")
+	}
+	if sawPoint {
+		t.Error("COMP_POINT leaked into suggest-notes environment")
+	}
+	if !kept {
+		t.Error("unrelated environment variables were dropped")
 	}
 }

@@ -74,6 +74,7 @@ func completionPredictors() []kongcompletion.Option {
 	return []kongcompletion.Option{
 		kongcompletion.WithPredictor("llm-model",
 			complete.PredictSet("openrouter/anthropic/claude-3.5-haiku", "deepseek-chat", "gemini-3.5-flash-lite", "ollama/<model>")),
+		kongcompletion.WithPredictor("note-slug", complete.PredictFunc(predictNoteSlugs)),
 	}
 }
 
