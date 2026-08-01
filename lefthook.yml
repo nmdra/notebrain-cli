@@ -21,7 +21,7 @@ pre-commit:
     test-short:
       priority: 4
       glob: "*.go"
-      run: go test -short ./...
+      run: go test -race -short ./...
 
 commit-msg:
   commands:
