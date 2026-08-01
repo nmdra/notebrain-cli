@@ -7,6 +7,7 @@ require (
 	github.com/PaesslerAG/jsonpath v0.1.1
 	github.com/alecthomas/kong v1.16.0
 	github.com/amikos-tech/chroma-go v0.4.1
+	github.com/bmatcuk/doublestar/v4 v4.10.0
 	github.com/charmbracelet/x/ansi v0.11.7
 	github.com/charmbracelet/x/term v0.2.2
 	github.com/klippa-app/go-pdfium v1.19.6

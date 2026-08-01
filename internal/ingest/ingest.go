@@ -16,6 +16,8 @@ import (
 	"sync/atomic"
 	"unicode/utf8"
 
+	"github.com/bmatcuk/doublestar/v4"
+
 	"github.com/nmdra/notebrain-cli/v2/internal/llmparse"
 	"github.com/nmdra/notebrain-cli/v2/internal/parser"
 	"github.com/nmdra/notebrain-cli/v2/internal/pdfextract"
@@ -326,7 +328,10 @@ func (p *Pipeline) collectFiles(vaultPath, glob string, skipPDF bool) ([]string,
 		ext := strings.ToLower(filepath.Ext(path))
 		if ext == ".md" || (p.EnablePDF && !skipPDF && ext == ".pdf") {
 			if glob != "" {
-				matched, _ := filepath.Match(glob, rel)
+				matched, err := doublestar.Match(glob, rel)
+				if err != nil {
+					return fmt.Errorf("invalid glob %q: %w", glob, err)
+				}
 				if !matched {
 					return nil
 				}
