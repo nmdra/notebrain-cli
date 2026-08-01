@@ -18,18 +18,7 @@ type LocalEmbedder struct {
 }
 
 func NewLocalEmbedder() (*LocalEmbedder, error) {
-	var ef *ort.DefaultEmbeddingFunction
-	var destroy func() error
-	var err error
-
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		ef, destroy, err = ort.NewDefaultEmbeddingFunction()
-	}()
-
-	<-done
-
+	ef, destroy, err := ort.NewDefaultEmbeddingFunction()
 	if err != nil {
 		return nil, fmt.Errorf("init local embedder: %w", err)
 	}
