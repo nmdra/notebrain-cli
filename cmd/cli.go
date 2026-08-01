@@ -59,6 +59,7 @@ type CLI struct {
 	Get         GetCmd         `cmd:"" help:"Retrieve the full text of an indexed note"`
 	Reset       ResetCmd       `cmd:"" help:"Delete all indexed data and reset the database"`
 	Doctor      DoctorCmd      `cmd:"" help:"Run diagnostics to check system dependencies and configurations"`
+	DoctorProbe DoctorProbeCmd `cmd:"" hidden:"" help:"internal: verify the database can be opened (used by doctor)"`
 	Init        InitCmd        `cmd:"" help:"Initialize NoteBrain configuration interactively"`
 	Version     VersionCmd     `cmd:"" help:"Show version information"`
 }

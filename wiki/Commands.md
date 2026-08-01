@@ -362,6 +362,16 @@ notebrain boosted "caching strategies" --seed "Redis" --boost 2.0 --limit 5
 
 This command runs a diagnostic health check on your environment. It makes sure that NoteBrain has the correct configuration and can access the necessary dependencies.
 
+Checks performed:
+
+- **Vault Path** — the configured vault directory exists and is accessible.
+- **ChromaDB Path** — the database directory is writable.
+- **ChromaDB sqlite** — `chroma.sqlite3` exists, has a valid SQLite header, and a sane file size.
+- **ChromaDB index** — each collection segment has all of its HNSW index files (missing or empty files mean an interrupted write).
+- **ChromaDB open test** — opens the database in a subprocess and forces the HNSW indexes to load. A corrupted native index aborts the subprocess; the doctor reports the signal and suggests `notebrain reset`.
+
+The command exits non-zero when database problems are found.
+
 #### Usage
 
 ```bash
