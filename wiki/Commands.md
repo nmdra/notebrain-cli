@@ -37,6 +37,8 @@ You can apply these flags to `notebrain` before a subcommand (for example, `note
 
 > Note: Supported terminal emulators (for example, Ghostty, WezTerm, Kitty, and iTerm2) automatically enable clickable OSC 8 terminal links. You can set the `NO_HYPERLINKS=1` environment variable to disable hyperlinks for all commands.
 
+> Note: A command exits with a non-zero status when the JSONPath expression is invalid. Scripts can use the exit status to detect this error.
+
 ### Token Efficiency and Quiet Mode for AI Agents
 
 When you execute NoteBrain queries inside AI agent workflows, automated pipelines, or background scripts, you must control the token count. You must also hide interactive formatting.
@@ -105,7 +107,16 @@ notebrain ingest [<glob>] [flags]
 | `--llm-model`       | `string`  | `""`    | The LLM model to parse PDFs (for example, `openrouter/inclusionai/ling-3.0-flash:free`). |
 | `--llm-context-window` | `integer` | `128000` | The total context window size of the LLM in tokens.                                         |
 
-> Note: During the index procedure, the tool excludes attachment links from the graph edges.
+#### Attachment Embeds
+
+An attachment embed shows a file inside a note (for example, `![[diagram.webp]]`). The tool never adds an attachment embed to the graph edges. The embed includes the file content. It does not reference a note.
+
+The chunk text keeps two forms of the embed:
+
+- **Rich form**: The original wikilink (for example, `![[diagram.webp|200x150]]`). Commands such as `notebrain get` and `--include-text` show this form.
+- **Embedding form**: A marker without the filename. The vector model reads this form. Image embeds become `[image]`. Other attachments become `[attachment]`. A text label stays in the marker (for example, `[image: Architecture diagram]`). Numeric size suffixes (for example, `|200x150`) do not appear.
+
+> Note: The chunk schema version is `5`. After an upgrade, run `notebrain ingest` again. The index procedure rebuilds the chunks with the embedding form.
 
 #### Examples
 

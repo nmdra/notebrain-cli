@@ -114,6 +114,14 @@ Array properties (such as tags) are flattened into numbered keys (`tag_0`, `tag_
 | `tag_0`, `tag_1`, ... | `string` | The flat encoding of individual tags (for example, `tag_0: "golang"`, `tag_1: "ai"`). |
 | `file_type`           | `string` | The type of file, `md` for markdown or `pdf` for PDF.                           |
 
+#### Attachment Embeds in Chunk Text
+
+A chunk stores two forms of its text. The `Text` field stores the rich form. It keeps the original wikilinks (for example, `![[diagram.webp|200x150]]`). Commands such as `notebrain get` show this form.
+
+The embedding text is the plain form. The embedder reads this form. Image embeds become `[image]`. Other attachments become `[attachment]`. A text label stays in the marker (for example, `[image: Architecture diagram]`). Numeric size suffixes (for example, `|200x150`) do not appear.
+
+This keeps image noise out of the vector embeddings. Attachment embeds never appear in the `nb_links` collection.
+
 ---
 
 ### `nb_links` Collection
@@ -153,7 +161,7 @@ This collection stores directed edges. These edges represent wikilinks and Markd
 - **CLI Layer (`cmd/`)**: Kong builds this layer for command-line parsing and flag resolution. The CLI layer supports a strict two-tier configuration hierarchy. CLI flags override the TOML configuration file (`~/.notebrain/config/config.toml`).
 - **Configuration (`internal/configfile` and `config/`)**: This subsystem manages the loading of TOML configuration via Kong resolvers. It supports normalized key lookups (`snake_case` and `kebab-case`). It resolves flags without `.env` files or application environment variables.
 - **Embedder (`internal/embedder`)**: This subsystem manages the local embedding models. It supports embedded ONNX MiniLM sentence embeddings or external Ollama service backends.
-- **Parser (`internal/parser`)**: This subsystem reads Markdown files from the Obsidian vault. It extracts YAML frontmatter and properties. It parses wikilinks and standard Markdown links. It identifies task checkboxes and tables. It splits note text into semantic chunks. It preserves structural Markdown syntax across chunks. This syntax includes tight lists (`1. `, `- `), task checkboxes (`[ ] `, `[x] `), blockquotes, callout headers (`> [!NOTE]`), and tables. Distinct structural blocks are cleanly separated by `\n\n`.
+- **Parser (`internal/parser`)**: This subsystem reads Markdown files from the Obsidian vault. It extracts YAML frontmatter and properties. It parses wikilinks and standard Markdown links. It identifies task checkboxes and tables. It splits note text into semantic chunks. It preserves structural Markdown syntax across chunks. This syntax includes tight lists (`1. `, `- `), task checkboxes (`[ ] `, `[x] `), blockquotes, callout headers (`> [!NOTE]`), and tables. Distinct structural blocks are cleanly separated by `\n\n`. Attachment embeds become `[image]` or `[attachment]` markers in the embedding text.
 - **PDF Extractor (`internal/pdfextract` and `internal/llmparse`)**: This subsystem extracts text from PDFs. It uses a WASM-compiled PDFium backend. The system sends the raw text to an LLM API via `llmparse`. This converts the text into structured markdown. This process guarantees that PDF chunks share the same layout as markdown notes.
 - **Ingest (`internal/ingest`)**: This subsystem handles multi-worker concurrent directory walking. It reads `.md` and `.pdf` files. It calls the parser and extractor. It generates embeddings. It coordinates atomic note updates under a single store mutex lock.
 - **Store (`internal/store`)**: This is the ChromaDB wrapper. It abstracts collection creation, chunk upsertion, and link deduplication. It exposes all graph and semantic queries.
