@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"fmt"
+	"hash/fnv"
 	"math/rand"
 	"strconv"
 	"strings"
@@ -150,7 +151,11 @@ func (s *Store) upsertChunks(ctx context.Context, chunks []ChunkRecord) error {
 			texts[j] = c.Text
 			embs[j] = embeddings.NewEmbeddingFromFloat32(c.Embedding)
 			metaMap := buildChunkMeta(c)
-			metas[j], _ = chroma.NewDocumentMetadataFromMap(metaMap)
+			meta, err := chroma.NewDocumentMetadataFromMap(metaMap)
+			if err != nil {
+				return fmt.Errorf("encode metadata for chunk %s: %w", c.ID, err)
+			}
+			metas[j] = meta
 		}
 
 		err := s.chunks.Upsert(ctx,
@@ -244,7 +249,11 @@ func (s *Store) upsertLinks(ctx context.Context, noteSlug string, links []string
 			"target_path":  l,
 			"display_text": l,
 		}
-		metas[i], _ = chroma.NewDocumentMetadataFromMap(metaMap)
+		meta, err := chroma.NewDocumentMetadataFromMap(metaMap)
+		if err != nil {
+			return fmt.Errorf("encode metadata for link %s: %w", ids[i], err)
+		}
+		metas[i] = meta
 	}
 
 	// nb_links has no embedding function — pass zero-length embeddings or
@@ -253,12 +262,15 @@ func (s *Store) upsertLinks(ctx context.Context, noteSlug string, links []string
 	embs := make([]embeddings.Embedding, len(uniqueLinks))
 	// Add dummy 16-dimensional embeddings to bypass Chroma dimension checks (required).
 	// Using 16 distinct dimensions in L2 space avoids HNSW pathologically failing or corrupting
-	// on identical/degenerate vector spaces.
-	for i := range uniqueLinks {
+	// on identical/degenerate vector spaces. Vectors are seeded per link pair so
+	// re-ingesting an unchanged note reproduces the same vectors (no HNSW churn).
+	for i, l := range uniqueLinks {
 		vec := make([]float32, 16)
+		seed := fnv.New32a()
+		_, _ = seed.Write([]byte(noteSlug + "\x00" + targetSlugMap[l]))
+		rng := rand.New(rand.NewSource(int64(seed.Sum32()))) //nolint:gosec // dummy vectors, not security-sensitive
 		for j := range 16 {
-			//nolint:gosec // math/rand used intentionally for dummy 16-dim random vector generation
-			vec[j] = rand.Float32()
+			vec[j] = rng.Float32()
 		}
 		embs[i] = embeddings.NewEmbeddingFromFloat32(vec)
 	}
