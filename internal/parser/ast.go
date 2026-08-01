@@ -505,7 +505,7 @@ type splitPart struct {
 // preferring sentence boundaries (./!/?) or newlines as break points.
 // overlapRunes from the previous part are repeated at the start of each new
 // part's embedRaw only, so display output never duplicates content.
-// The overlap rewind never lands inside a \x00...\x00 placeholder token.
+// Boundaries never land inside a \x00...\x00 placeholder token.
 func splitAtBoundary(runes []rune, maxRunes, overlapRunes int) []splitPart {
 	spans := placeholderSpans(runes)
 	parts := make([]splitPart, 0, (len(runes)/maxRunes)+1)
@@ -532,6 +532,11 @@ func splitAtBoundary(runes []rune, maxRunes, overlapRunes int) []splitPart {
 				break
 			}
 		}
+		// Sentence breaks and newlines cannot land inside a placeholder token,
+		// so only the fallback boundary needs this: snap forward to the token
+		// end so formatChunkText can still resolve it (the token then lives in
+		// the next part).
+		breakAt = snapToPlaceholderEnd(spans, breakAt)
 		parts = append(parts, splitPart{
 			embedRaw:   strings.TrimSpace(string(runes[start:breakAt])),
 			displayRaw: strings.TrimSpace(string(runes[displayStart:breakAt])),
@@ -579,6 +584,18 @@ func snapToPlaceholderStart(spans [][2]int, pos int) int {
 	for _, sp := range spans {
 		if pos > sp[0] && pos < sp[1] {
 			return sp[0]
+		}
+	}
+	return pos
+}
+
+// snapToPlaceholderEnd returns the rune index just past the placeholder token
+// containing pos, or pos unchanged when pos is not inside any placeholder
+// token.
+func snapToPlaceholderEnd(spans [][2]int, pos int) int {
+	for _, sp := range spans {
+		if pos > sp[0] && pos < sp[1] {
+			return sp[1]
 		}
 	}
 	return pos

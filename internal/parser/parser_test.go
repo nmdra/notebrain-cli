@@ -928,6 +928,60 @@ func TestSnapToPlaceholderStart(t *testing.T) {
 	}
 }
 
+func TestSnapToPlaceholderEnd(t *testing.T) {
+	spans := [][2]int{{50, 65}, {200, 214}}
+	tests := []struct {
+		pos  int
+		want int
+	}{
+		{pos: 0, want: 0},
+		{pos: 30, want: 30},
+		{pos: 55, want: 65}, // inside first placeholder -> snap to its end
+		{pos: 64, want: 65},
+		{pos: 50, want: 50}, // exactly at token start: not inside
+		{pos: 65, want: 65}, // exactly at token end: not inside
+		{pos: 205, want: 214},
+		{pos: 100, want: 100},
+	}
+	for _, tt := range tests {
+		if got := snapToPlaceholderEnd(spans, tt.pos); got != tt.want {
+			t.Errorf("snapToPlaceholderEnd(%d) = %d, want %d", tt.pos, got, tt.want)
+		}
+	}
+}
+
+func TestSplitAtBoundary_FallbackNeverCutsPlaceholderToken(t *testing.T) {
+	// The fallback boundary (start+maxRunes) lands inside the placeholder
+	// token, and the scan window [start+maxRunes/2, end] contains no sentence
+	// punctuation or newlines. The boundary must snap past the token end
+	// instead of cutting it: a cut token would leave an unmatched \x00 in the
+	// part and formatChunkText could not resolve it.
+	for _, token := range []string{"\x00INLINE:0\x00", "\x00CODE:0:go\x00"} {
+		body := strings.Repeat("a", 95) + token + strings.Repeat("b", 120)
+		parts := splitAtBoundary([]rune(body), 100, 25)
+		if len(parts) < 2 {
+			t.Fatalf("token %q: expected multiple parts", token)
+		}
+		for i, p := range parts {
+			for name, text := range map[string]string{
+				"embedRaw":   p.embedRaw,
+				"displayRaw": p.displayRaw,
+			} {
+				if strings.Count(text, "\x00")%2 != 0 {
+					t.Errorf("token %q: part %d %s contains an unmatched \\x00: %q", token, i, name, text)
+				}
+			}
+		}
+		var concat strings.Builder
+		for _, p := range parts {
+			concat.WriteString(p.displayRaw)
+		}
+		if concat.String() != body {
+			t.Errorf("token %q: display concat does not equal source", token)
+		}
+	}
+}
+
 func TestParse_OverlapNeverLeaksPlaceholders(t *testing.T) {
 	for _, filler := range []int{10, 12, 14, 16, 18, 20} {
 		body := "prefix text to push the section. " +
