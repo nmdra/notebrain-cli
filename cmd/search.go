@@ -103,8 +103,7 @@ func (c *SearchCmd) runStatic(ctx context.Context, globals *Globals, st *store.S
 		if err := st.PopulateContext(ctx, results, c.ContextWindow); err != nil {
 			return fmt.Errorf("populate context: %w", err)
 		}
-		printResultsFormatted("search", fmt.Sprintf("Tag Search: %q", c.Tag), c.Tag, results, globals, &c.ChunkDisplayFlags)
-		return nil
+		return printResultsFormatted("search", fmt.Sprintf("Tag Search: %q", c.Tag), c.Tag, results, globals, &c.ChunkDisplayFlags)
 	}
 
 	if len(resolved) > 1 {
@@ -124,8 +123,7 @@ func (c *SearchCmd) runStatic(ctx context.Context, globals *Globals, st *store.S
 		if c.Tag != "" {
 			header += fmt.Sprintf(" (Tag: %s)", c.Tag)
 		}
-		printResultsFormatted("search", header, strings.Join(resolved, " | "), results, globals, &c.ChunkDisplayFlags)
-		return nil
+		return printResultsFormatted("search", header, strings.Join(resolved, " | "), results, globals, &c.ChunkDisplayFlags)
 	}
 
 	qVec, err := emb.Embed(ctx, resolved[0])
@@ -140,8 +138,7 @@ func (c *SearchCmd) runStatic(ctx context.Context, globals *Globals, st *store.S
 		return fmt.Errorf("populate context: %w", err)
 	}
 
-	printResultsFormatted("search", fmt.Sprintf("Semantic Search: %q", resolved[0]), resolved[0], results, globals, &c.ChunkDisplayFlags)
-	return nil
+	return printResultsFormatted("search", fmt.Sprintf("Semantic Search: %q", resolved[0]), resolved[0], results, globals, &c.ChunkDisplayFlags)
 }
 
 func (c *SearchCmd) buildWhereFilter(resolveTags bool) chroma.WhereFilter {

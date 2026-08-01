@@ -259,6 +259,26 @@ func TestPrintJSONPathResult(t *testing.T) {
 	}
 }
 
+// TestPrintResultsFormatted_JSONPathError ensures an invalid JSONPath is
+// returned as an error (so commands exit non-zero) instead of being printed
+// to stderr and swallowed like it was for stats only.
+func TestPrintResultsFormatted_JSONPathError(t *testing.T) {
+	var buf bytes.Buffer
+	results := []store.Result{{NoteSlug: "n", Title: "N", Score: 0.5}}
+	globals := &Globals{JSONPath: "invalid[syntax[["}
+
+	if err := printResultsFormattedToWriter(&buf, "search", "q", "q", results, globals, nil); err == nil {
+		t.Error("expected error for invalid jsonpath syntax, got nil")
+	}
+	globals.JSONPath = "$.nonexistent"
+	if err := printResultsFormattedToWriter(&buf, "search", "q", "q", results, globals, nil); err == nil {
+		t.Error("expected error for unknown key, got nil")
+	}
+	if buf.Len() != 0 {
+		t.Errorf("expected no stdout output on jsonpath error, got %q", buf.String())
+	}
+}
+
 func TestPrintResultsFormatted_Formats(t *testing.T) {
 	var buf bytes.Buffer
 	results := []store.Result{

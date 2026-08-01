@@ -47,12 +47,14 @@ type jsonEnvelope struct {
 	Results []store.Result `json:"results"`
 }
 
-// printResultsFormatted renders a list of results to stdout based on the requested format.
-func printResultsFormatted(commandName string, headerQuery string, rawQuery string, results []store.Result, globals *Globals, displayFlags *ChunkDisplayFlags) {
-	printResultsFormattedToWriter(os.Stdout, commandName, headerQuery, rawQuery, results, globals, displayFlags)
+// printResultsFormatted renders a list of results to stdout based on the
+// requested format. It returns an error (e.g. an invalid JSONPath) so
+// commands can exit non-zero; stats/get already fail on JSONPath errors.
+func printResultsFormatted(commandName string, headerQuery string, rawQuery string, results []store.Result, globals *Globals, displayFlags *ChunkDisplayFlags) error {
+	return printResultsFormattedToWriter(os.Stdout, commandName, headerQuery, rawQuery, results, globals, displayFlags)
 }
 
-func printResultsFormattedToWriter(w io.Writer, commandName string, headerQuery string, rawQuery string, results []store.Result, globals *Globals, displayFlags *ChunkDisplayFlags) {
+func printResultsFormattedToWriter(w io.Writer, commandName string, headerQuery string, rawQuery string, results []store.Result, globals *Globals, displayFlags *ChunkDisplayFlags) error {
 	initStyles()
 	filtered := filterResults(results, globals, displayFlags)
 
@@ -73,10 +75,7 @@ func printResultsFormattedToWriter(w io.Writer, commandName string, headerQuery 
 			Total:   len(filtered),
 			Results: filtered,
 		}
-		if err := printJSONPathResultToWriter(w, env, globals.JSONPath); err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		}
-		return
+		return printJSONPathResultToWriter(w, env, globals.JSONPath)
 	}
 
 	switch globals.Format {
@@ -87,6 +86,7 @@ func printResultsFormattedToWriter(w io.Writer, commandName string, headerQuery 
 	default: // "text"
 		printTextResults(w, commandName, headerQuery, filtered, globals)
 	}
+	return nil
 }
 
 func filterResults(results []store.Result, globals *Globals, displayFlags *ChunkDisplayFlags) []store.Result {

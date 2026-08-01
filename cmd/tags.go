@@ -56,8 +56,7 @@ func (c *TagsCmd) Run(globals *Globals) error {
 			return err
 		}
 
-		printResultsFormatted("tags --shared", fmt.Sprintf("Notes sharing tags with: %q (slug: %s) [Min Shared: %d]", c.Query, targetSlug, c.MinShared), targetSlug, nodes, globals, nil)
-		return nil
+		return printResultsFormatted("tags --shared", fmt.Sprintf("Notes sharing tags with: %q (slug: %s) [Min Shared: %d]", c.Query, targetSlug, c.MinShared), targetSlug, nodes, globals, nil)
 	}
 
 	// Direct tag search (default)
@@ -74,8 +73,7 @@ func (c *TagsCmd) Run(globals *Globals) error {
 		title = fmt.Sprintf("Notes containing tag: %q (and children tags)", c.Query)
 	}
 
-	printResultsFormatted(commandName, title, "", nodes, globals, nil)
-	return nil
+	return printResultsFormatted(commandName, title, "", nodes, globals, nil)
 }
 
 func normalizeTagInput(input string) string {
