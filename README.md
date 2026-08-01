@@ -191,6 +191,7 @@ To uninstall NoteBrain completely, remove the `notebrain` binary and delete the 
 | [Commands Reference](wiki/Commands.md)                     | Full CLI command and flag information                                    |
 | [Architecture](wiki/Architecture.md)                       | Internal functions: chunking pipeline, embeddings, and ChromaDB schema   |
 | [Scheduled Ingestion](wiki/Scheduled_Ingestion.md)         | Instructions for cron and systemd timers to index data in the background |
+| [Shell Completion](wiki/Shell_Completion.md)               | Tab completion setup for bash, zsh, and fish                             |
 | [AI Agent Skill Usage](wiki/Skill_Usage.md)                | Instructions for the built-in AI agent skill                             |
 | [OpenCode Agent Integration](wiki/OpenCode_Integration.md) | Configuration for NoteBrain as an OpenCode AI coding assistant           |
 | [DeepWiki](https://deepwiki.com/nmdra/notebrain-cli)       | AI-generated codebase documentation                                      |
