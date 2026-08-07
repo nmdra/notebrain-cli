@@ -101,7 +101,7 @@ func filterResults(results []store.Result, globals *Globals, displayFlags *Chunk
 	}
 
 	for _, r := range results {
-		if r.Score < minScore {
+		if r.Score < minScore && !r.Lexical {
 			continue
 		}
 		if globals.SkipPhantom && r.IsPhantom {
@@ -119,7 +119,44 @@ func filterResults(results []store.Result, globals *Globals, displayFlags *Chunk
 		r.Score = math.Round(r.Score*10000) / 10000
 		filtered = append(filtered, r)
 	}
+	if displayFlags != nil && displayFlags.GroupByNote {
+		filtered = groupByNote(filtered)
+	}
 	return filtered
+}
+
+// groupByNote collapses chunk rows of the same note into its best-scoring
+// row. When a note matched in more than one chunk, the kept row carries an
+// "N matching chunks" extra so the coverage is still visible.
+func groupByNote(results []store.Result) []store.Result {
+	type agg struct {
+		best  store.Result
+		count int
+	}
+	bySlug := make(map[string]*agg, len(results))
+	var order []string
+	for _, r := range results {
+		a, ok := bySlug[r.NoteSlug]
+		if !ok {
+			bySlug[r.NoteSlug] = &agg{best: r, count: 1}
+			order = append(order, r.NoteSlug)
+			continue
+		}
+		a.count++
+		if r.Score > a.best.Score {
+			a.best = r
+		}
+	}
+	out := make([]store.Result, 0, len(order))
+	for _, slug := range order {
+		a := bySlug[slug]
+		r := a.best
+		if a.count > 1 {
+			r.Extra = fmt.Sprintf("%d matching chunks", a.count)
+		}
+		out = append(out, r)
+	}
+	return out
 }
 
 func printJSONResults(w io.Writer, commandName, query string, queries []string, filtered []store.Result) {
@@ -393,4 +430,52 @@ func printSingleJSONPathValue(w io.Writer, val any) {
 		enc := json.NewEncoder(w)
 		_ = enc.Encode(v)
 	}
+}
+
+// tagListEnvelope is the machine-readable shape of "tags --list" output.
+type tagListEnvelope struct {
+	Command string           `json:"command,omitempty"`
+	Total   int              `json:"total"`
+	Tags    []store.TagCount `json:"tags"`
+}
+
+// printTagsFormatted renders a tag listing to stdout based on the requested
+// format. JSONPath extraction applies to the tag envelope when requested.
+func printTagsFormatted(commandName string, tags []store.TagCount, globals *Globals) error {
+	return printTagsFormattedToWriter(os.Stdout, commandName, tags, globals)
+}
+
+func printTagsFormattedToWriter(w io.Writer, commandName string, tags []store.TagCount, globals *Globals) error {
+	initStyles()
+	env := tagListEnvelope{Command: commandName, Total: len(tags), Tags: tags}
+
+	if globals.JSONPath != "" {
+		return printJSONPathResultToWriter(w, env, globals.JSONPath)
+	}
+
+	switch globals.Format {
+	case formatJSON:
+		enc := json.NewEncoder(w)
+		enc.SetIndent("", "  ")
+		return enc.Encode(env)
+	case formatTSV:
+		_, _ = fmt.Fprintln(w, "tag\tcount")
+		for _, t := range tags {
+			_, _ = fmt.Fprintf(w, "%s\t%d\n", tsvEscape(t.Tag), t.Count)
+		}
+		return nil
+	default: // "text"
+		for _, t := range tags {
+			_, _ = fmt.Fprintf(w, "#%s\t(%d %s)\n", t.Tag, t.Count, pluralizeNote(t.Count))
+		}
+		return nil
+	}
+}
+
+// pluralizeNote returns "note" or "notes" for a count.
+func pluralizeNote(n int) string {
+	if n == 1 {
+		return "note"
+	}
+	return "notes"
 }

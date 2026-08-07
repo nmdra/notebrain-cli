@@ -61,6 +61,16 @@ func (searchTestEmbedder) Embed(_ context.Context, _ string) ([]float32, error) 
 	return make([]float32, 384), nil
 }
 
+func (searchTestEmbedder) EmbedBatch(_ context.Context, texts []string) ([][]float32, error) {
+	out := make([][]float32, len(texts))
+	for i := range out {
+		out[i] = make([]float32, 384)
+	}
+	return out, nil
+}
+
+func (searchTestEmbedder) Close() error { return nil }
+
 func (searchTestEmbedder) Model() string { return "search-test" }
 
 // newSearchTestStore ingests three notes into a temp store and returns the

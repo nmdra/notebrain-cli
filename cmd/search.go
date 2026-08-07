@@ -166,6 +166,32 @@ func (c *SearchCmd) resolveExcludes(ctx context.Context, st storeAPI) ([]string,
 	return out, nil
 }
 
+// lexicalFallback runs the keyword fallback for a query that produced no
+// semantic matches (or none above --min-score). It returns nil when the
+// fallback also finds nothing.
+func (c *SearchCmd) lexicalFallback(ctx context.Context, st storeAPI, query string, limit int, whereFilter store.WhereFilter) ([]store.Result, error) {
+	results, err := st.LexicalSearch(ctx, query, limit, whereFilter)
+	if err != nil {
+		return nil, err
+	}
+	return results, nil
+}
+
+// allBelowMinScore reports whether every row would be dropped by the
+// --min-score filter (used to decide whether the lexical fallback should
+// run even when the store returned rows).
+func allBelowMinScore(results []store.Result, minScore float64) bool {
+	if minScore <= 0 {
+		return false
+	}
+	for _, r := range results {
+		if r.Score >= minScore || r.Lexical {
+			return false
+		}
+	}
+	return true
+}
+
 func (c *SearchCmd) runStatic(ctx context.Context, globals *Globals, st storeAPI, emb embedderAPI, resolved, displayQueries, excluded []string) error {
 	whereFilter := (&store.SearchFilter{
 		Section:     c.Section,
@@ -202,11 +228,19 @@ func (c *SearchCmd) runStatic(ctx context.Context, globals *Globals, st storeAPI
 		if err != nil {
 			return err
 		}
-		if err := populateContext(ctx, st, results, c.ContextWindow); err != nil {
+		header := fmt.Sprintf("Multi-Hit Semantic Search: %q", strings.Join(resolved, ", "))
+		if len(results) == 0 || allBelowMinScore(results, c.MinScore) {
+			results, err = c.lexicalFallback(ctx, st, strings.Join(resolved, " "), c.Limit, whereFilter)
+			if err != nil {
+				return err
+			}
+			if len(results) > 0 {
+				header = fmt.Sprintf("Lexical Search (no semantic matches): %q", strings.Join(resolved, ", "))
+			}
+		} else if err := populateContext(ctx, st, results, c.ContextWindow); err != nil {
 			return err
 		}
 
-		header := fmt.Sprintf("Multi-Hit Semantic Search: %q", strings.Join(resolved, ", "))
 		if c.Tag != "" {
 			header += fmt.Sprintf(" (Tag: %s)", c.Tag)
 		}
@@ -222,9 +256,18 @@ func (c *SearchCmd) runStatic(ctx context.Context, globals *Globals, st storeAPI
 	if err != nil {
 		return err
 	}
-	if err := populateContext(ctx, st, results, c.ContextWindow); err != nil {
+	header := fmt.Sprintf("Semantic Search: %q%s", resolved[0], excludeSuffix)
+	if len(results) == 0 || allBelowMinScore(results, c.MinScore) {
+		results, err = c.lexicalFallback(ctx, st, resolved[0], c.Limit, whereFilter)
+		if err != nil {
+			return err
+		}
+		if len(results) > 0 {
+			header = fmt.Sprintf("Lexical Search (no semantic matches): %q%s", resolved[0], excludeSuffix)
+		}
+	} else if err := populateContext(ctx, st, results, c.ContextWindow); err != nil {
 		return err
 	}
 
-	return printResultsFormatted("search", fmt.Sprintf("Semantic Search: %q%s", resolved[0], excludeSuffix), resolved[0], displayQueries, results, globals, &c.ChunkDisplayFlags)
+	return printResultsFormatted("search", header, resolved[0], displayQueries, results, globals, &c.ChunkDisplayFlags)
 }

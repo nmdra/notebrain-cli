@@ -24,6 +24,7 @@ type ChunkDisplayFlags struct {
 	IncludeText   bool    `group:"display" help:"include the matched markdown text in each result"`
 	ContextWindow int     `group:"display" name:"context-window" help:"fetch ±N surrounding chunks around each match (0=off)" default:"0"`
 	MinScore      float64 `group:"display" help:"minimum similarity score to include in results (0.0–1.0)" default:"0"`
+	GroupByNote   bool    `group:"display" name:"group-by-note" help:"collapse multiple chunk matches from the same note into one row (keeps the best score; adds a 'N matching chunks' extra)" default:"false"`
 }
 
 // Flag group keys. The order here determines the order of the titled
@@ -129,6 +130,15 @@ type UsageError struct{ Err error }
 func (e *UsageError) Error() string { return e.Err.Error() }
 func (e *UsageError) Unwrap() error { return e.Err }
 
+// JSONEnvelopeError marks an error that has already been emitted as a
+// machine-readable {"error": "..."} object on stdout. runMain skips the
+// human-readable stderr line for these, so --format json scripts get exactly
+// one error representation.
+type JSONEnvelopeError struct{ Err error }
+
+func (e *JSONEnvelopeError) Error() string { return e.Err.Error() }
+func (e *JSONEnvelopeError) Unwrap() error { return e.Err }
+
 // usageFailure prints the parse error the way kong's FatalIfErrorf would
 // (usage to stdout, error to stderr) and returns a UsageError. In JSON mode
 // the error is emitted as a machine-readable object instead of usage text.
@@ -138,10 +148,11 @@ func usageFailure(parser *kong.Kong, err error, args []string) error {
 		_ = parseErr.Context.PrintUsage(false)
 		fmt.Fprintln(parser.Stdout)
 	}
-	parser.Errorf("%s", err.Error())
 	if argsWantJSON(args) {
 		_, _ = fmt.Fprintf(parser.Stdout, "{\"error\": %q}\n", err.Error())
+		return &JSONEnvelopeError{Err: &UsageError{Err: err}}
 	}
+	parser.Errorf("%s", err.Error())
 	return &UsageError{Err: err}
 }
 
@@ -275,8 +286,10 @@ Examples:
 	err = ctxParser.Run(&cli.Globals)
 	if err != nil {
 		if cli.Format == formatJSON {
-			// Print error as JSON to stdout for agents
+			// Print error as JSON to stdout for agents; main skips the
+			// human-readable stderr line for JSONEnvelopeError.
 			_, _ = fmt.Fprintf(os.Stdout, "{\"error\": %q}\n", err.Error())
+			return &JSONEnvelopeError{Err: err}
 		}
 		return err
 	}

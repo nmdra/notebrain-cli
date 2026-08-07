@@ -11,6 +11,8 @@ import (
 
 type GetCmd struct {
 	Slug string `arg:"" help:"note slug, title, or file path (auto-resolved)" completion-predictor:"note-slug"`
+	Meta bool   `group:"get" help:"show only the note header (title, path, tags, chunk count) without any text" default:"false"`
+	Head int    `group:"get" help:"show only the first N chunks of text (0 = full note)" default:"0"`
 }
 
 func (c *GetCmd) Run(globals *Globals) error {
@@ -21,7 +23,15 @@ func (c *GetCmd) Run(globals *Globals) error {
 	}
 	defer func() { _ = st.Close() }()
 
-	note, err := st.GetNote(ctx, c.Slug)
+	var note *store.NoteContent
+	switch {
+	case c.Meta:
+		note, err = st.GetNoteMeta(ctx, c.Slug)
+	case c.Head > 0:
+		note, err = st.GetNoteHead(ctx, c.Slug, c.Head)
+	default:
+		note, err = st.GetNote(ctx, c.Slug)
+	}
 	if err != nil {
 		return err
 	}
@@ -62,7 +72,11 @@ func (c *GetCmd) Run(globals *Globals) error {
 			fmt.Println(metaStyle.Render("Tags:   " + strings.Join(formatTagChips(note.Tags), " ")))
 		}
 		fmt.Println(metaStyle.Render(fmt.Sprintf("Chunks: %d", note.Chunks)))
-		fmt.Println("\n" + note.Text + "\n")
+		if note.Text != "" {
+			fmt.Println("\n" + note.Text + "\n")
+		} else {
+			fmt.Println()
+		}
 		return nil
 	}
 }

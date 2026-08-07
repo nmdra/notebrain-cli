@@ -79,6 +79,12 @@ func runMain(args []string) (code int) {
 		return exitUsage
 	}
 
+	// The error was already emitted as {"error": ...} on stdout; the stderr
+	// line would be redundant.
+	if _, ok := errors.AsType[*cmd.JSONEnvelopeError](err); ok {
+		return exitError
+	}
+
 	printFatalError(err)
 	return exitError
 }

@@ -111,6 +111,7 @@ type Result struct {
 	Context        []string `json:"context,omitempty"` // adjacent chunks when windowing is enabled
 	MatchedQueries []string `json:"matched_queries,omitempty"`
 	FileType       string   `json:"file_type,omitempty"`
+	Lexical        bool     `json:"lexical,omitempty"` // keyword-fallback match, not semantic similarity
 }
 
 // NoteContent represents the complete reconstructed text and metadata of a note.
@@ -875,7 +876,7 @@ func (s *Store) HiddenConnectionsDeep(ctx context.Context, seedSlug string, limi
 	s.mu.RUnlock()
 
 	if len(embs) == 0 || len(metas) == 0 {
-		return nil, nil, fmt.Errorf("note %q has no indexed chunks (required for --deep chunk analysis); run 'notebrain ingest' first", seedSlug)
+		return nil, nil, fmt.Errorf("note %q has no indexed chunks (required for --deep chunk analysis); if the note was renamed or recently added, run 'notebrain ingest' to refresh the index", seedSlug)
 	}
 
 	type seedChunkInfo struct {
@@ -1469,18 +1470,19 @@ func decodeTags(m chroma.DocumentMetadata) []string {
 }
 
 // ResolveNoteSlug resolves a user-provided input (exact slug, title, filename, or partial path)
-// to its exact indexed note_slug in ChromaDB.
+// to its exact indexed note_slug in ChromaDB. Resolution is deterministic:
+// title/path/suffix matching happens in one metadata scan (never against a
+// slugified guess), so the same input resolves the same way in every
+// subcommand. A missing note is an error, not a silently guessed slug.
 func (s *Store) ResolveNoteSlug(ctx context.Context, input string) (string, error) {
 	cleanInput := strings.TrimSpace(input)
 	if cleanInput == "" {
 		return "", nil
 	}
 
-	slug := parser.Slugify(cleanInput)
 	s.mu.RLock()
 	res, err := s.chunks.Get(ctx,
 		chroma.WithWhere(chroma.Or(
-			chroma.EqString("note_slug", slug),
 			chroma.EqString("note_slug", cleanInput),
 			chroma.EqString("file_path", cleanInput),
 		)),
@@ -1500,7 +1502,14 @@ func (s *Store) ResolveNoteSlug(ctx context.Context, input string) (string, erro
 		// instead of falling back to a slugified guess.
 		return "", fmt.Errorf("resolve note %q: %w", cleanInput, wrapChromaErr(scanErr))
 	}
-	return resolveFromMetas(metas, cleanInput)
+	resolved, found, err := resolveFromMetas(metas, cleanInput)
+	if err != nil {
+		return "", err
+	}
+	if !found {
+		return "", fmt.Errorf("note not found: %q — check the exact slug or title, or run 'notebrain ingest' if the note was recently added", cleanInput)
+	}
+	return resolved, nil
 }
 
 // ResolveNoteSlugs resolves multiple user inputs (exact slug, title,
@@ -1530,7 +1539,7 @@ func (s *Store) ResolveNoteSlugs(ctx context.Context, inputs []string) (resolved
 	resolved = make(map[string]string, len(clean))
 	indexed = make(map[string]struct{}, len(metas))
 	for _, in := range clean {
-		r, rerr := resolveFromMetas(metas, in)
+		r, _, rerr := resolveFromMetas(metas, in)
 		if rerr != nil {
 			return nil, nil, rerr
 		}
@@ -1545,21 +1554,23 @@ func (s *Store) ResolveNoteSlugs(ctx context.Context, inputs []string) (resolved
 }
 
 // resolveFromMetas resolves cleanInput against a set of zero-index metadata
-// records (note_slug, title, file_path). It returns the slugified input when
-// nothing matches.
-func resolveFromMetas(metas []chroma.DocumentMetadata, cleanInput string) (string, error) {
+// records (note_slug, title, file_path). The third return value reports
+// whether a real match was found; when nothing matches it returns the
+// slugified input with found=false so callers can decide between falling
+// back (ResolveNoteSlugs) and erroring (ResolveNoteSlug).
+func resolveFromMetas(metas []chroma.DocumentMetadata, cleanInput string) (string, bool, error) {
 	slug := parser.Slugify(cleanInput)
 
 	pathMatches, titleMatches, suffixMatches := findSlugMatches(metas, cleanInput, slug)
 
 	if len(pathMatches) == 1 {
-		return pathMatches[0], nil
+		return pathMatches[0], true, nil
 	}
 	if len(titleMatches) == 1 {
-		return titleMatches[0], nil
+		return titleMatches[0], true, nil
 	}
 	if len(suffixMatches) == 1 {
-		return suffixMatches[0], nil
+		return suffixMatches[0], true, nil
 	}
 
 	allMatches := make(map[string]struct{})
@@ -1574,7 +1585,7 @@ func resolveFromMetas(metas []chroma.DocumentMetadata, cleanInput string) (strin
 	}
 	if len(allMatches) == 1 {
 		for s := range allMatches {
-			return s, nil
+			return s, true, nil
 		}
 	} else if len(allMatches) > 1 {
 		matchesList := make([]string, 0, len(allMatches))
@@ -1582,10 +1593,10 @@ func resolveFromMetas(metas []chroma.DocumentMetadata, cleanInput string) (strin
 			matchesList = append(matchesList, s)
 		}
 		sort.Strings(matchesList)
-		return "", fmt.Errorf("note %q matches multiple indexed notes: %s (please specify the exact note slug or path)", cleanInput, strings.Join(matchesList, ", "))
+		return "", false, fmt.Errorf("note %q matches multiple indexed notes: %s (please specify the exact note slug or path)", cleanInput, strings.Join(matchesList, ", "))
 	}
 
-	return slug, nil
+	return slug, false, nil
 }
 
 // GetNote retrieves all chunks of a note and reconstructs its complete content.
@@ -1596,19 +1607,76 @@ func (s *Store) GetNote(ctx context.Context, slugOrPath string) (*NoteContent, e
 	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	whereFilter := chroma.Or(
-		chroma.EqString("note_slug", resolved),
-		chroma.EqString("file_path", slugOrPath),
-	)
-	metas, texts, err := paginatedGetMetadatasWithDocs(ctx, s.chunks, whereFilter)
+	metas, texts, err := paginatedGetMetadatasWithDocs(ctx, s.chunks, chroma.EqString("note_slug", resolved))
 	if err != nil {
 		return nil, fmt.Errorf("get note: %w", wrapChromaErr(err))
 	}
 
 	if len(metas) == 0 {
-		return nil, fmt.Errorf("note not found: %s — if the note was added recently, run 'notebrain ingest' to update the index", slugOrPath)
+		return nil, noteNotFoundError(slugOrPath)
 	}
+	return buildNoteContent(metas, texts, len(metas)), nil
+}
 
+// GetNoteMeta retrieves a note's header (slug, title, path, tags) and chunk
+// count without fetching any chunk text — the cheap alternative to GetNote
+// when only identification is needed.
+func (s *Store) GetNoteMeta(ctx context.Context, slugOrPath string) (*NoteContent, error) {
+	resolved, err := s.ResolveNoteSlug(ctx, slugOrPath)
+	if err != nil {
+		return nil, err
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	metas, err := paginatedGetMetadatas(ctx, s.chunks, chroma.EqString("note_slug", resolved))
+	if err != nil {
+		return nil, fmt.Errorf("get note meta: %w", wrapChromaErr(err))
+	}
+	if len(metas) == 0 {
+		return nil, noteNotFoundError(slugOrPath)
+	}
+	m := metas[0]
+	return &NoteContent{
+		NoteSlug: resolved,
+		Title:    metaString(m, "title"),
+		FilePath: metaString(m, "file_path"),
+		Tags:     decodeTags(m),
+		Chunks:   len(metas),
+	}, nil
+}
+
+// GetNoteHead retrieves only the first maxChunks chunks of a note's text.
+// Chunks reports the note's total chunk count regardless of the cap.
+func (s *Store) GetNoteHead(ctx context.Context, slugOrPath string, maxChunks int) (*NoteContent, error) {
+	resolved, err := s.ResolveNoteSlug(ctx, slugOrPath)
+	if err != nil {
+		return nil, err
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	metas, texts, err := paginatedGetMetadatasWithDocs(ctx, s.chunks, chroma.EqString("note_slug", resolved))
+	if err != nil {
+		return nil, fmt.Errorf("get note head: %w", wrapChromaErr(err))
+	}
+	if len(metas) == 0 {
+		return nil, noteNotFoundError(slugOrPath)
+	}
+	total := len(metas)
+	if maxChunks > 0 && maxChunks < total {
+		metas = metas[:maxChunks]
+		texts = texts[:maxChunks]
+	}
+	return buildNoteContent(metas, texts, total), nil
+}
+
+func noteNotFoundError(slugOrPath string) error {
+	return fmt.Errorf("note not found: %s — if the note was added recently, run 'notebrain ingest' to update the index", slugOrPath)
+}
+
+// buildNoteContent reconstructs a note's header and full text from its
+// ordered chunk metadata and documents. totalChunks is the note's total
+// chunk count (used by --head, which may carry a partial slice).
+func buildNoteContent(metas []chroma.DocumentMetadata, texts chroma.Documents, totalChunks int) *NoteContent {
 	type chunkInfo struct {
 		index int
 		text  string
@@ -1669,8 +1737,8 @@ func (s *Store) GetNote(ctx context.Context, slugOrPath string) (*NoteContent, e
 		FilePath: filePath,
 		Tags:     tags,
 		Text:     fullText,
-		Chunks:   len(chunks),
-	}, nil
+		Chunks:   totalChunks,
+	}
 }
 
 // PopulateContext fetches adjacent chunks for each result when windowSize > 0.

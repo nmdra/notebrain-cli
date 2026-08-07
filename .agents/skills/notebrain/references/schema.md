@@ -6,9 +6,9 @@ This reference documents the structure of NoteBrain's output in each format. Rea
 
 | Format   | When to Use                                                                                             |
 | -------- | ------------------------------------------------------------------------------------------------------- |
-| `json`   | Default for agents. Structured envelope with `results` array. |
+| `json`   | Default for agents. Structured envelope with `results` array.                                           |
 | `tsv`    | Token-optimized for scan-only steps — no repeating key names. Good for backlinks, connections, tags.    |
-| `text`   | Standard text output for human reading. Not recommended for agents — use structured formats instead.                |
+| `text`   | Standard text output for human reading. Not recommended for agents — use structured formats instead.    |
 
 ## JSON Envelope Structure
 
@@ -23,31 +23,32 @@ When `--format=json` is used, the response has this top-level shape:
 }
 ```
 
-
 ### Result Fields
 
 Each item in the `results` array may contain:
 
-| Field             | Present When                    | Description                                                                                               |
-| ----------------- | ------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `note_slug`       | Always                          | URL-safe unique identifier derived from the file path. Used as input for graph/get commands.              |
-| `title`           | Always                          | Note title extracted from frontmatter or filename.                                                        |
-| `file_path`       | Always (unless `--show-file-path=false`) | Relative file path within the vault. Included by default; hide with `--show-file-path=false` to save tokens. |
-| `score`           | Always                          | Similarity score (0–1) for semantic search; hop count for graph connections. Rounded to 4 decimal places. |
-| `chunk_index`     | search, hidden, boosted         | Which chunk of the note matched the query (0-indexed).                                                    |
-| `tags`            | When note has tags              | Array of tag strings (e.g., `["#Architecture", "#Go"]`).                                                  |
-| `heading_path`    | When chunk is under a heading   | Breadcrumb path hierarchy (e.g., `"Section > Subsection"`).                                               |
-| `text`            | When `--include-text` is passed | The matched chunk's full markdown text, preserving code blocks and formatting.                            |
-| `context`         | When `--context-window N` > 0   | Array of ±N adjacent chunk texts around the match (excluding the matched chunk itself).                   |
-| `extra`           | connections, tags, boosted      | Command-specific metadata (e.g., `"2 hop(s)"`, `"graph-boosted"`).                                        |
-| `is_phantom`      | When `--skip-phantom=false`     | `true` if the note is an uncreated phantom link without a `.md` file on disk.                             |
-| `matched_queries` | hidden `--deep`, multi-query    | Array of queries or section headings (`§ <HeadingPath>`) that matched this candidate.                     |
+| Field             | Present When                                       | Description                                                                                                           |
+| ----------------- | -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `note_slug`       | Always                                             | URL-safe unique identifier derived from the file path. Used as input for graph/get commands.                          |
+| `title`           | Always                                             | Note title extracted from frontmatter or filename.                                                                    |
+| `file_path`       | Always (unless `--show-file-path=false`)           | Relative file path within the vault. Included by default; hide with `--show-file-path=false` to save tokens.          |
+| `file_type`       | Always                                             | Source format: `"md"` for markdown notes, `"pdf"` for PDF extractions (returned only with `--with-pdf`). Not affected by `--show-file-path=false`. |
+| `score`           | Always                                             | Similarity score (0–1) for semantic search; hop count for graph connections. JSON rounds to 4 decimals; TSV prints 6. |
+| `chunk_index`     | search, hidden, boosted — **unless 0**             | Which chunk of the note matched the query (0-indexed). Omitted when the match landed on chunk 0 (Go `omitempty`), so absence is normal. |
+| `tags`            | When `--show-tags` is passed and the note has tags | Array of tag strings, bare and lowercase (e.g., `["y4s2/ead"]` — no `#` prefix). Omitted entirely for untagged notes. |
+| `heading_path`    | When chunk is under a heading                      | Breadcrumb path hierarchy (e.g., `"Section > Subsection"`).                                                           |
+| `text`            | When `--include-text` is passed (or enabled via config) | The matched chunk's full markdown text, preserving code blocks and formatting.                                  |
+| `context`         | When `--context-window N` > 0 (or enabled via config) | Array of ±N adjacent chunk texts around the match (excluding the matched chunk itself).                           |
+| `extra`           | backlinks, connections, boosted, search (`--group-by-note`) | Command-specific metadata: backlinks → link display text; connections → `"N hop(s)"`; boosted → `"graph-boosted"` (only on graph-linked results); search with `--group-by-note` → `"N matching chunks"` when the note matched multiple chunks. Absent for `tags`, `hidden`, and non-boosted `boosted` rows. |
+| `lexical`         | search lexical fallback only                                | `true` when the row came from the token-based lexical fallback (no semantic match cleared the bar). Such rows carry `"score": 0`, no `chunk_index`, no `text`, and rank below any semantic rows. Absent on semantic rows. |
+| `is_phantom`      | Only when the note **is** a phantom                | `true` if the note is an uncreated phantom link without a `.md` file on disk. Absent for real notes — do not treat absence as a broken flag. Visible with `--skip-phantom=false`. |
+| `matched_queries` | hidden `--deep`, multi-query                       | Array of queries or section headings (`§ <HeadingPath>`) that matched this candidate.                                 |
 
 ## Example Outputs
 
 ### Semantic Search (with text and context)
 
-`notebrain search "event driven architecture" --format=json --include-text --context-window 1`
+`notebrain search "event driven architecture" --format=json --include-text --context-window 1 --show-tags`
 
 ```json
 {
@@ -58,7 +59,7 @@ Each item in the `results` array may contain:
       "title": "Event Driven Systems",
       "score": 0.852,
       "chunk_index": 2,
-      "tags": ["#Architecture", "#DistributedSystems"],
+      "tags": ["architecture", "distributedsystems"],
       "heading_path": "Overview > Message Brokers",
       "text": "Message brokers decouple producers from consumers...",
       "context": [
@@ -73,7 +74,7 @@ Each item in the `results` array may contain:
 
 ### Graph & Structure Mapping
 
-`notebrain connections "architecture/event-driven-systems" --hops 1 --format=json`
+`notebrain connections "architecture/event-driven-systems" --hops 1 --format=json --show-tags`
 
 ```json
 {
@@ -83,7 +84,7 @@ Each item in the `results` array may contain:
       "note_slug": "database/redis-streams",
       "title": "Redis Streams",
       "score": 1.0,
-      "tags": ["#Database", "#Redis"],
+      "tags": ["database", "redis"],
       "extra": "1 hop(s)"
     }
   ]
@@ -92,7 +93,7 @@ Each item in the `results` array may contain:
 
 ### Direct Tag Search
 
-`notebrain tags "#Architecture" --children --format=json`
+`notebrain tags "architecture" --children --format=json --show-tags`
 
 ```json
 {
@@ -102,29 +103,65 @@ Each item in the `results` array may contain:
       "note_slug": "architecture/event-driven-systems",
       "title": "Event Driven Systems",
       "score": 1.0,
-      "tags": ["#Architecture", "#DistributedSystems"]
+      "tags": ["architecture", "distributedsystems"]
     },
     {
       "note_slug": "architecture/microservices/intro",
       "title": "Microservices Introduction",
       "score": 1.0,
-      "tags": ["#Architecture/Microservices", "#Go"]
+      "tags": ["architecture/microservices", "go"]
     }
   ]
 }
 ```
 
+Tag input is normalized: the `#` prefix is optional and matching is case-insensitive, so `notebrain tags "Architecture"` is equivalent to `notebrain tags "#architecture"`. Without `--children`, the match is exact — `tags "arch"` does not match the tag `architecture`.
+
+### Full Note Retrieval (`get`)
+
+`get` does **not** use the `results` envelope — it returns a `note` object wrapping the full reconstructed note:
+
+`notebrain get "architecture/event-driven-systems" --format=json`
+
+```json
+{
+  "command": "get",
+  "query": "architecture/event-driven-systems",
+  "note": {
+    "note_slug": "architecture/event-driven-systems",
+    "title": "Event Driven Systems",
+    "file_path": "Architecture/Event Driven Systems.md",
+    "tags": ["architecture", "distributedsystems"],
+    "text": "## Overview\n\nMessage brokers decouple producers...",
+    "chunks": 12
+  }
+}
+```
+
+| Field       | Description                                              |
+| ----------- | -------------------------------------------------------- |
+| `note_slug` | URL-safe unique identifier.                              |
+| `title`     | Note title.                                              |
+| `file_path` | Relative path within the vault.                          |
+| `tags`      | Bare lowercase tags (`#`-optional; see Tag Matching Rules). |
+| `text`      | Full reconstructed note, section headers (`##`) prepended by the CLI. |
+| `chunks`    | Total indexed chunk count for the note.                  |
+
+The `note` object is always returned in full — there is no `--meta`/`--head` mode, so for metadata-only lookups prefer `search --limit 1 --jsonpath` or `get --format text` (which prints a compact `Tags:` header line).
+
 ### TSV Format
 
 `notebrain backlinks "architecture/event-driven-systems" --format=tsv`
 
+<!-- markdownlint-disable MD010 -->
+```text
+slug	title	file_path	score	tags	extra	heading_path	text
+database/redis-streams	Redis Streams	Database/Redis Streams.md	1.000000	database, redis			
+messaging/kafka-intro	Kafka Introduction	Messaging/Kafka Introduction.md	1.000000	messaging			
 ```
-note_slug	title	file_path	score	tags
-database/redis-streams	Redis Streams	Database/Redis Streams.md	1.0000	#Database, #Redis
-messaging/kafka-intro	Kafka Introduction	Messaging/Kafka Introduction.md	1.0000	#Messaging
-```
+<!-- markdownlint-enable MD010 -->
 
-First line is the header row. Columns are tab-separated. Tags are comma-joined into a single cell.
+First line is the header row (always emitted). Columns are tab-separated. Tags are comma-joined into a single cell, bare and lowercase (no `#`). Cells for absent fields (`extra`, `heading_path`, `text`) are empty tabs. Note: scores print with **6** decimals in TSV (`1.000000`), vs 4 in JSON (`1.0000`).
 
 ### Stats
 
@@ -132,6 +169,7 @@ First line is the header row. Columns are tab-separated. Tags are comma-joined i
 
 ```json
 {
+  "command": "stats",
   "chunks": 8993,
   "links": 1255,
   "notes": 783
@@ -142,7 +180,7 @@ Use this for pre-flight checks — if `chunks` is `0`, the vault hasn't been ind
 
 ## Extracting Fields via `--jsonpath`
 
-Use `--jsonpath` to extract exactly the fields you need without loading the full JSON envelope into context:
+Use `--jsonpath` to extract exactly the fields you need without loading the full JSON envelope into context. The dialect supports dotted paths, array wildcards (`[*]`), and numeric indices (`[0]`) — **not** jq-style pipe expressions, filters, or object construction (e.g. `$.results[*] | {slug: .note_slug}` fails). For multi-field extraction, use `--format tsv` or run two `--jsonpath` queries.
 
 ```bash
 # Note slugs only (newline-separated)

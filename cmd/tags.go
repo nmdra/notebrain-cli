@@ -22,19 +22,22 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"errors"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/nmdra/notebrain-cli/v2/internal/store"
 )
 
 type TagsCmd struct {
-	Query     string `arg:"" help:"Tag name to search for (e.g. 'kubernetes'), or note slug/title if --shared or --for-note is used." completion-predictor:"note-slug"`
+	Query     string `arg:"" optional:"" help:"Tag name to search for (e.g. 'kubernetes'), or note slug/title if --shared or --for-note is used." completion-predictor:"note-slug"`
+	List      bool   `group:"tags" help:"List all indexed tags with note counts instead of searching (query is ignored)." default:"false"`
 	Shared    bool   `group:"tags" help:"Find notes sharing tags with the given note instead of searching by tag name." default:"false"`
 	ForNote   bool   `group:"tags" name:"for-note" help:"Alias for --shared."`
 	Children  bool   `group:"tags" help:"Include child tags in the hierarchy (e.g. 'kubernetes' also matches 'kubernetes/cka')." default:"false"`
 	MinShared int    `group:"tags" help:"Minimum shared tags to include a result (only with --shared/--for-note)." default:"1"`
-	Limit     int    `group:"tags" help:"maximum number of results" default:"50"`
+	Limit     int    `group:"tags" help:"maximum number of results (0 = no limit for --list; searches default to 50)" default:"0"`
 	ChunkDisplayFlags
 }
 
@@ -45,6 +48,26 @@ func (c *TagsCmd) Run(globals *Globals) error {
 		return err
 	}
 	defer func() { _ = st.Close() }()
+
+	if c.List {
+		tags, listErr := st.ListTags(ctx, c.Limit)
+		if listErr != nil {
+			return listErr
+		}
+		if printErr := printTagsFormatted("tags --list", tags, globals); printErr != nil {
+			return printErr
+		}
+		return nil
+	}
+
+	if strings.TrimSpace(c.Query) == "" {
+		return &UsageError{Err: errors.New("tags requires a tag name to search for, or use --list to enumerate all tags")}
+	}
+
+	limit := c.Limit
+	if limit <= 0 {
+		limit = 50
+	}
 
 	if c.Shared || c.ForNote {
 		var targetSlug string
@@ -58,8 +81,8 @@ func (c *TagsCmd) Run(globals *Globals) error {
 		if err != nil {
 			return err
 		}
-		if c.Limit > 0 && len(nodes) > c.Limit {
-			nodes = nodes[:c.Limit]
+		if len(nodes) > limit {
+			nodes = nodes[:limit]
 		}
 		if err = populateContext(ctx, st, nodes, c.ContextWindow); err != nil {
 			return err
@@ -70,7 +93,7 @@ func (c *TagsCmd) Run(globals *Globals) error {
 
 	// Direct tag search (default)
 	normalizedTag := normalizeTagInput(c.Query)
-	nodes, err := st.TagSearch(ctx, normalizedTag, c.Limit, c.Children, nil, c.IncludeText)
+	nodes, err := st.TagSearch(ctx, normalizedTag, limit, c.Children, nil, c.IncludeText)
 	if err != nil {
 		return err
 	}
@@ -85,7 +108,24 @@ func (c *TagsCmd) Run(globals *Globals) error {
 		title = fmt.Sprintf("Notes containing tag: %q (and children tags)", c.Query)
 	}
 
-	return printResultsFormatted(commandName, title, "", nil, nodes, globals, &c.ChunkDisplayFlags)
+	if err := printResultsFormatted(commandName, title, "", nil, nodes, globals, &c.ChunkDisplayFlags); err != nil {
+		return err
+	}
+
+	// "Did you mean" suggestions for misspelled tags, text output only so
+	// machine formats stay clean (AGENTS.md).
+	if len(nodes) == 0 && !c.Children && globals.Format == formatText {
+		suggestions, serr := st.SuggestTags(ctx, normalizedTag, 3)
+		if serr == nil && len(suggestions) > 0 {
+			chips := make([]string, len(suggestions))
+			for i, s := range suggestions {
+				chips[i] = "#" + s
+			}
+			_, _ = fmt.Fprintln(os.Stdout, hintStyle.Render("  Did you mean: "+strings.Join(chips, ", ")+"?"))
+		}
+	}
+
+	return nil
 }
 
 func normalizeTagInput(input string) string {
