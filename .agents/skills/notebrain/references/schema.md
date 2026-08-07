@@ -115,7 +115,7 @@ Each item in the `results` array may contain:
 }
 ```
 
-Tag input is normalized: the `#` prefix is optional and matching is case-insensitive, so `notebrain tags "Architecture"` is equivalent to `notebrain tags "#architecture"`. Without `--children`, the match is exact — `tags "arch"` does not match the tag `architecture`.
+Tag matching and normalization semantics: see `tags` in [flags.md](flags.md).
 
 ### Full Note Retrieval (`get`)
 
@@ -147,7 +147,7 @@ Tag input is normalized: the `#` prefix is optional and matching is case-insensi
 | `text`      | Full reconstructed note, section headers (`##`) prepended by the CLI. |
 | `chunks`    | Total indexed chunk count for the note.                  |
 
-The `note` object is always returned in full — there is no `--meta`/`--head` mode, so for metadata-only lookups prefer `search --limit 1 --jsonpath` or `get --format text` (which prints a compact `Tags:` header line).
+The `note` object shape is the same for the `get` modes: default returns the full text, `--meta` returns the header with `text` empty (and `chunks` still the total), and `--head N` returns the first N chunks while `chunks` still reports the full total. For metadata-only lookups prefer `get "<slug>" --meta` (or `get --format text` for the compact `Tags:` header line) over a full fetch.
 
 ### TSV Format
 
@@ -180,7 +180,7 @@ Use this for pre-flight checks — if `chunks` is `0`, the vault hasn't been ind
 
 ## Extracting Fields via `--jsonpath`
 
-Use `--jsonpath` to extract exactly the fields you need without loading the full JSON envelope into context. The dialect supports dotted paths, array wildcards (`[*]`), and numeric indices (`[0]`) — **not** jq-style pipe expressions, filters, or object construction (e.g. `$.results[*] | {slug: .note_slug}` fails). For multi-field extraction, use `--format tsv` or run two `--jsonpath` queries.
+Use `--jsonpath` to extract exactly the fields you need without loading the full JSON envelope. Dialect rules (dotted paths, `[*]`, `[0]`; no filters/pipes/bracket keys) and shorthand normalization live in [flags.md](flags.md) — read those before writing expressions.
 
 ```bash
 # Note slugs only (newline-separated)

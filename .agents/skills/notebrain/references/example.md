@@ -16,7 +16,7 @@ Quick reference: the major scenarios with the proven command sequence. Pair with
 | 6   | Semantic search          | `search "<q>" --format=json --include-text --limit 3`; escalate: `--top-k 2 --context-window 1`; stop when top score ≥ 0.75                |
 | 7   | Multi-topic comparison   | `notebrain search "redis pubsub" "kafka brokers" --limit 5 --top-k 2 --format json`                                                        |
 | 8   | Filtered search          | add `--tag "y4s2/ead"`, `--section "Lecture 1"`, `--has-tasks`, `--has-code`, `--exclude-note "<slug>"`, `--min-score 0.3`                 |
-| 9   | Zero-result handling     | short common words return 0 (semantic-only retrieval) → longer phrase or `tags` query; never grep the vault                                |
+| 9   | Zero-result handling     | short common words now fall back to a lexical token scan (`"lexical": true`, `score: 0`); if still nothing → longer descriptive phrase or `tags` query; never grep the vault          |
 | 10  | Backlinks                | `notebrain backlinks "<slug>" --format json --limit 10`                                                                                    |
 | 11  | Connections              | `notebrain connections "<slug>" --hops 2 --format tsv`                                                                                     |
 | 12  | Hidden connections       | `notebrain hidden "<slug>" --limit 5 --format json`; section-level: `--deep`                                                               |
@@ -25,19 +25,22 @@ Quick reference: the major scenarios with the proven command sequence. Pair with
 | 15  | Context vs full `get`    | context: `--context-window 1 --include-text`; full note only on explicit demand: `get "<slug>"`                                            |
 | 16  | Stale-index recovery     | a slug that 404s mid-conversation → re-resolve: `search "<title>" --limit 3 --jsonpath="$.results[*].note_slug"`                           |
 
-## Semantics & Pitfalls (verified)
+## Semantics (verified)
 
 - **Tag matching**: exact match, case-insensitive, `#`-optional — `tags "Y4S2/EAD"` ≡ `tags "#y4s2/ead"`. Substrings do **not** match (`tags "ead"` finds nothing for `y4s2/ead`). `--children` = hierarchical prefix (`y4s2` also matches `y4s2/ead`).
-- **Tag discovery**: never guess tag spelling — discover via scenario 3 (vault tags drift: you remember `Y2S4/EAD`, the vault stores `y4s2/ead`).
 - **Tags in JSON**: present only with `--show-tags`; bare and lowercase (`["y4s2/ead"]`); omitted for untagged notes. Text output renders them as `#`-chips.
-- **Slug discipline**: always pass the exact `note_slug` (never bare titles) to `get`/`backlinks`/`connections`/`hidden`/`boosted`. Near-duplicate titles can silently resolve to a phantom slug; `hidden --deep` then fails with `note "<slug>" has no indexed chunks ... run 'notebrain ingest' first` (misleading hint — re-resolve via `search`).
+- **`--section` is exact-match**: it compares against the stored `heading_path` string verbatim. Partial or parent paths return 0 results silently — copy the full `heading_path` from a search result.
 - **`--jsonpath`**: dotted paths, `[*]`, and `[0]` only — no jq-style pipe expressions, filters, or object construction. Multi-field extraction → `--format tsv` or two `--jsonpath` calls.
+- **Config overrides defaults**: `~/.notebrain/config/config.toml` can enable `include-text`/`context-window` (and set `min-score`/`limit`/`top-k`) — output then carries `text`/`context` even without flags. Pass `--include-text=false`/`--context-window=0` explicitly for lean output.
+
+## Pitfalls (verified)
+
+- **Tag discovery**: never guess tag spelling — discover via scenario 3 (vault tags drift: you remember `Y2S4/EAD`, the vault stores `y4s2/ead`).
+- **Slug discipline**: always pass the exact `note_slug` (never bare titles) to `get`/`backlinks`/`connections`/`hidden`/`boosted`. Near-duplicate titles can silently resolve to a phantom slug; `hidden --deep` then fails with `note "<slug>" has no indexed chunks ... run 'notebrain ingest' first` (misleading hint — re-resolve via `search`).
 - **Duplicate rows**: one note can span multiple chunk rows — normal. For distinct notes use `--top-k 1`, or dedupe: `--jsonpath="$.results[*].note_slug" | sort -u` (piping `notebrain` stdout is fine).
 - **Weak matches**: add `--min-score 0.3` (or `0.5` for precision); results below ~0.30 are noise. Note: config may already set a `min-score` floor, so low-score results can be absent by design.
-- **`--section` is exact-match**: it compares against the stored `heading_path` string verbatim. Partial or parent paths return 0 results silently — copy the full `heading_path` from a search result.
-- **`get`**: no `--meta`/`--head` mode — always the full note. For metadata only, use scenarios 3/14.
+- **`get`**: `--meta` (header only: title, path, tags, chunk count) or `--head N` (first N chunks, `Chunks` still shows the total) cover most needs for cheap reads — reach for the full note only on demand. For metadata see also scenarios 3/14.
 - **Stale index**: scheduled re-ingest can invalidate cached slugs mid-conversation; re-verify via `search` before `--deep`/`backlinks` after any 404.
-- **Config overrides defaults**: `~/.notebrain/config/config.toml` can enable `include-text`/`context-window` (and set `min-score`/`limit`/`top-k`) — output then carries `text`/`context` even without flags. Pass `--include-text=false`/`--context-window=0` explicitly for lean output.
 
 ## Phrase → Scenario Map
 
