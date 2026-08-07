@@ -35,7 +35,7 @@ Each item in the `results` array may contain:
 | `file_type`       | Always                                             | Source format: `"md"` for markdown notes, `"pdf"` for PDF extractions (returned only with `--with-pdf`). Not affected by `--show-file-path=false`. |
 | `score`           | Always                                             | Similarity score (0–1) for semantic search; hop count for graph connections. JSON rounds to 4 decimals; TSV prints 6. |
 | `chunk_index`     | search, hidden, boosted — **unless 0**             | Which chunk of the note matched the query (0-indexed). Omitted when the match landed on chunk 0 (Go `omitempty`), so absence is normal. |
-| `tags`            | When `--show-tags` is passed and the note has tags | Array of tag strings, bare and lowercase (e.g., `["y4s2/ead"]` — no `#` prefix). Omitted entirely for untagged notes. |
+| `tags`            | When `--show-tags` is passed and the note has tags | Array of tag strings, bare and lowercase (e.g., `["kubernetes"]` — no `#` prefix). Omitted entirely for untagged notes. |
 | `heading_path`    | When chunk is under a heading                      | Breadcrumb path hierarchy (e.g., `"Section > Subsection"`).                                                           |
 | `text`            | When `--include-text` is passed (or enabled via config) | The matched chunk's full markdown text, preserving code blocks and formatting.                                  |
 | `context`         | When `--context-window N` > 0 (or enabled via config) | Array of ±N adjacent chunk texts around the match (excluding the matched chunk itself).                           |

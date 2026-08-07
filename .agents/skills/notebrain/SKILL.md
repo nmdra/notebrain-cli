@@ -79,14 +79,14 @@ Slugs are the handle; titles are not. For graph and `get` commands, pass the exa
 
 ## Tag discovery
 
-Never guess a tag spelling — vault tags drift ("Y2S4/EAD" remembered vs `y4s2/ead` stored). Four rungs, stop where the answer arrives:
+Never guess a tag spelling — vault tags drift (`K8S` remembered vs `kubernetes` stored). Four rungs, stop where the answer arrives:
 
 1. Enumerate cheaply: `tags --list --format tsv` (every tag + count). `--limit 0` = all; a config `limit` may cap — pass it explicitly.
 2. From content: `search "<topic>" --limit 1 --show-tags --jsonpath="$.results[0].tags"`.
 3. From the header: `get "<slug>" --format text`, read the `Tags:` line.
 4. Then query: `tags "<tag>"` with `--children` for the whole family.
 
-Tag semantics: `#` optional, case-insensitive, exact unless `--children` (then hierarchical prefix `y4s2` ⊃ `y4s2/ead`). JSON emits tags only with `--show-tags`, bare and lowercase — so in answer text render them as written.
+Tag semantics: `#` optional, case-insensitive, exact unless `--children` (then hierarchical prefix `kubernetes` ⊃ `kubernetes/cka`). JSON emits tags only with `--show-tags`, bare and lowercase — so in answer text render them as written.
 
 ## Response format
 
@@ -94,5 +94,5 @@ Lead with the answer; attach the sources; only embellish with threads the vault 
 
 - **Direct question** — answer first, then list supporting notes as bullet titles under `**From the vault**`. Add 1–2 real follow-ups only if the vault covers them; skip padding when the answer is self-contained.
 - **No result above `score 0.30`** — say so plainly. Offer 1–2 reformulations (synonyms, narrower/broader). Never pad weak matches; never go to the filesystem.
-- **Weak/off-topic top hits** — demand precision: `--min-score 0.5` or add a distinguishing term. Short shorthands (`Y2S4 EAD`) are the usual cause; spell out the subject before declaring the vault lacks it.
+- **Weak/off-topic top hits** — demand precision: `--min-score 0.5` or add a distinguishing term. Short shorthands (`k8s`) are the usual cause; spell out the subject (`kubernetes`) before declaring the vault lacks it.
 - **Traceability** — every fact claims a retrieved `note_slug`/`text`/`context`; never invent titles, paths, or quoted text. Label retrieved fact vs your own implication ("Your notes suggest…" vs "This looks like…"). Cite every note you lean on.

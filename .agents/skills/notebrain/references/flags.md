@@ -52,7 +52,7 @@ These flags are available only on the commands listed.
 | `--min-shared N` | Minimum number of shared tags required to include a result (only applies when --shared is active).        | `1`     |
 | `--limit N`      | Maximum number of results (0 = no limit for `--list`; searches default to 50). A `limit` key in config overrides this default — pass `--limit 0` explicitly for a full `--list` enumeration. | `0`     |
 
-> Tag input is normalized: the `#` prefix is optional and matching is case-insensitive, so `tags "Y4S2/EAD"` and `tags "#y4s2/ead"` are equivalent. Without `--children` the match is **exact** — `tags "ead"` does not match the tag `y4s2/ead`. `--children` enables hierarchical prefix matching (`y4s2` also matches `y4s2/ead`). Tags are stored bare and lowercase; the JSON `tags` field is only emitted with `--show-tags`.
+> Tag input is normalized: the `#` prefix is optional and matching is case-insensitive, so `tags "Kubernetes"` and `tags "#kubernetes"` are equivalent. Without `--children` the match is **exact** — `tags "k8s"` does not match the tag `kubernetes`. `--children` enables hierarchical prefix matching (`kubernetes` also matches `kubernetes/cka`). Tags are stored bare and lowercase; the JSON `tags` field is only emitted with `--show-tags`.
 >
 > When a tag search finds nothing, the CLI prints a "Did you mean: #go, #golang?" hint (Levenshtein-based, text output only — machine formats stay clean). Tag counts from `--list` are per-note (a note counts once even with many chunks).
 >
@@ -97,7 +97,7 @@ These flags work on `search`, `backlinks`, `connections`, `hidden`, `tags`, `boo
 | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
 | `--context-window N` | Fetch ±N adjacent chunks around each match into the `context` field. Use for lightweight surrounding context across results.                                                                                                                                   | `0`     |
 | `--min-score F`      | Suppress results below this similarity score (0.0–1.0).                                                                                                                                                                                                        | `0`     |
-| `--show-tags`        | Include tag names in output. In JSON they are bare and lowercase (e.g., `"y4s2/ead"`, no `#`); in CLI text they render as `#`-chips (`#y4s2/ead`). The field/line is omitted entirely for notes without tags, so its absence does not mean the flag is broken. | `false` |
+| `--show-tags`        | Include tag names in output. In JSON they are bare and lowercase (e.g., `"kubernetes"`, no `#`); in CLI text they render as `#`-chips (`#kubernetes`). The field/line is omitted entirely for notes without tags, so its absence does not mean the flag is broken. | `false` |
 | `--skip-phantom`     | Exclude uncreated notes (phantom wikilinks without a `.md` file on disk) from results.                                                                                                                                                                         | `true`  |
 
 ### Environment & Diagnostics
