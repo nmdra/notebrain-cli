@@ -260,7 +260,7 @@ func printTextResults(w io.Writer, commandName, query string, queries []string, 
 		rank := rankStyle.Render(fmt.Sprintf("%d.", i+1))
 
 		displayTitle := r.Title
-		if r.FileType == "pdf" {
+		if r.FileType == kindPDF {
 			displayTitle = pdfTagStyle.Render("[PDF] ") + displayTitle
 		}
 
