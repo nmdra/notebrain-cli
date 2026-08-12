@@ -279,6 +279,80 @@ notebrain get "kubernetes-native-applications" --format json
 
 ---
 
+### `refs`
+
+This command lists the direct references of a note: local attachment files (images, PDFs, archives, …) and external website links. It parses the note file fresh from the vault, so it sees everything, including embedded images that the index intentionally skips. References are listed in first-occurrence order, deduplicated by resolved path (or exact URL).
+
+The command resolves the note exactly like the other note commands (slug, title, filename, or partial path), then prints absolute file paths and URLs, filterable by kind.
+
+Reference resolution follows Obsidian semantics:
+
+- **Wiki links** (`[[file.png]]`): targets containing a folder path start at the vault root; `./` targets resolve relative to the note's folder; bare names search the note's folder, then the vault root, then the configured `attachmentFolderPath` from `.obsidian/app.json`.
+- **Markdown links** (`[doc](file.pdf)`, `![alt](img.png)`): resolve relative to the note's folder, with percent-decoding (`Router%20Modes.webp` → `Router Modes.webp`) and traversal protection (`..` escapes are rejected).
+
+Broken links are hidden by default; pass `--include-missing` to list them marked `missing: true`. External links are never verified (the tool is offline by design), so URL rows always report `missing: false`.
+
+#### Usage
+
+```bash
+notebrain refs <note> [flags]
+```
+
+#### Arguments
+
+- `<note>` (required): The note slug, title, or file path (auto-resolved).
+
+#### Command-Specific Flags
+
+| Flag | Description |
+| --- | --- |
+| `--images` | Include image attachments only |
+| `--pdf` | Include PDF attachments only |
+| `--other` | Include other attachments (video, audio, archives, office docs) |
+| `--external-links` | Include external website links (URLs) only |
+| `--include-missing` | Include references whose file is missing from the vault (marked `missing: true`) |
+
+Filters combine with OR semantics; with no filter flags every kind is listed.
+
+#### Examples
+
+```bash
+# List every reference of a note
+notebrain refs "kubernetes-notes"
+
+# List image attachments as machine-readable JSON
+notebrain refs "kubernetes-notes" --images --format=json
+
+# List PDF attachments as TSV
+notebrain refs "kubernetes-notes" --pdf --format=tsv
+
+# List external website links
+notebrain refs "kubernetes-notes" --external-links --format=json
+
+# Feed attachment paths straight into a script
+notebrain refs "$SLUG" --images --jsonpath='$.refs[*].path'
+```
+
+#### JSON shape
+
+```json
+{
+  "command": "refs",
+  "note_slug": "kubernetes-notes",
+  "title": "Kubernetes Notes",
+  "total": 3,
+  "refs": [
+    {"path": "/vault/assets/arch.png", "relative_path": "assets/arch.png", "kind": "image", "missing": false},
+    {"path": "/vault/99.Storage-Shed/Attachments/guide.pdf", "relative_path": "99.Storage-Shed/Attachments/guide.pdf", "kind": "pdf", "missing": false},
+    {"path": "https://example.com/docs", "kind": "external-links", "missing": false}
+  ]
+}
+```
+
+External rows omit `relative_path`. TSV output uses the header `path\tkind\tmissing\trelative_path`; external rows leave `missing` and `relative_path` empty.
+
+---
+
 ### `backlinks`
 
 This command finds all the notes that link to the target note. It uses the local Wikilink graph. The link target resolution is fully canonicalized. This means that the tool removes `#anchor` headings and resolves subfolders against canonical paths. This makes sure that the tool finds connections across deeply nested vault hierarchies.

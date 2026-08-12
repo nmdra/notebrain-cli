@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Reference Listing**: `notebrain refs <note>` lists a note's local attachments (images, PDFs, archives, …) and external website links, filterable with `--images`, `--pdf`, `--other`, and `--external-links`. Broken links are hidden by default and surfaced with `--include-missing` (`feat(cmd)`).
+
 ## [v2.12.0] - 2026-08-02
 
 ### Added
