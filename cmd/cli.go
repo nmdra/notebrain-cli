@@ -40,6 +40,7 @@ const (
 	groupTags    = "tags"
 	groupReset   = "reset"
 	groupGet     = "get"
+	groupRefs    = "refs"
 )
 
 // helpGroups returns the titled flag groups shown in --help output. Flags in
@@ -57,6 +58,7 @@ func helpGroups() []kong.Group {
 		{Key: groupTags, Title: "Tags Flags"},
 		{Key: groupReset, Title: "Reset Flags"},
 		{Key: groupGet, Title: "Get Flags"},
+		{Key: groupRefs, Title: "Refs Flags"},
 	}
 }
 
@@ -98,6 +100,7 @@ type CLI struct {
 	Boosted      BoostedCmd                `cmd:"" help:"Semantic search boosted by wikilink graph proximity"`
 	Stats        StatsCmd                  `cmd:"" help:"Show collection statistics"`
 	Get          GetCmd                    `cmd:"" help:"Retrieve the full text of an indexed note"`
+	Refs         RefsCmd                   `cmd:"" help:"List a note's attachments and external links"`
 	Reset        ResetCmd                  `cmd:"" help:"Delete all indexed data and reset the database"`
 	Doctor       DoctorCmd                 `cmd:"" help:"Run diagnostics to check system dependencies and configurations"`
 	DoctorProbe  DoctorProbeCmd            `cmd:"" hidden:"" help:"internal: verify the database can be opened (used by doctor)"`

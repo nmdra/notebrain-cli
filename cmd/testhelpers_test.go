@@ -13,17 +13,18 @@ import (
 // mutation calls and returns zero values for queries; tests can extend it
 // with the behavior they need.
 type fakeStore struct {
-	mu         sync.Mutex
-	resetCalls int
-	resetErr   error
-	tags       []store.TagCount
-	suggest    []string
-	semantic   []store.Result
-	lexical    []store.Result
-	metaCalls  int
-	headCalls  int
-	noteMeta   *store.NoteContent
-	noteHead   *store.NoteContent
+	mu          sync.Mutex
+	resetCalls  int
+	resetErr    error
+	tags        []store.TagCount
+	suggest     []string
+	semantic    []store.Result
+	lexical     []store.Result
+	metaCalls   int
+	headCalls   int
+	noteMeta    *store.NoteContent
+	noteMetaErr error
+	noteHead    *store.NoteContent
 }
 
 func (f *fakeStore) Close() error { return nil }
@@ -103,6 +104,9 @@ func (f *fakeStore) GetNoteMeta(context.Context, string) (*store.NoteContent, er
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.metaCalls++
+	if f.noteMetaErr != nil {
+		return nil, f.noteMetaErr
+	}
 	return f.noteMeta, nil
 }
 
