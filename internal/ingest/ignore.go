@@ -18,16 +18,8 @@ type ObsidianAppConfig struct {
 // LoadExcludedPaths reads the userIgnoreFilters and attachmentFolderPath from .obsidian/app.json.
 // Returns nil if the file is absent or unreadable.
 func LoadExcludedPaths(vaultPath string) []string {
-	data, err := os.ReadFile(filepath.Join(vaultPath, ".obsidian", "app.json"))
+	config, err := readObsidianAppConfig(vaultPath)
 	if err != nil {
-		if !errors.Is(err, os.ErrNotExist) {
-			slog.Warn("failed to read .obsidian/app.json", "vault_path", vaultPath, "err", err)
-		}
-		return nil
-	}
-	var config ObsidianAppConfig
-	if err := json.Unmarshal(data, &config); err != nil {
-		slog.Warn("failed to parse .obsidian/app.json", "vault_path", vaultPath, "err", err)
 		return nil
 	}
 	filters := config.UserIgnoreFilters
@@ -35,6 +27,35 @@ func LoadExcludedPaths(vaultPath string) []string {
 		filters = append(filters, config.AttachmentFolderPath)
 	}
 	return filters
+}
+
+// LoadAttachmentFolderPath returns the Obsidian attachment folder configured
+// in .obsidian/app.json, or "" when the file is absent, unreadable, or the
+// setting is unset.
+func LoadAttachmentFolderPath(vaultPath string) string {
+	config, err := readObsidianAppConfig(vaultPath)
+	if err != nil {
+		return ""
+	}
+	return config.AttachmentFolderPath
+}
+
+// readObsidianAppConfig reads and parses .obsidian/app.json. The caller
+// decides what to return when the file is absent or malformed.
+func readObsidianAppConfig(vaultPath string) (*ObsidianAppConfig, error) {
+	data, err := os.ReadFile(filepath.Join(vaultPath, ".obsidian", "app.json"))
+	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			slog.Warn("failed to read .obsidian/app.json", "vault_path", vaultPath, "err", err)
+		}
+		return nil, err
+	}
+	var config ObsidianAppConfig
+	if err := json.Unmarshal(data, &config); err != nil {
+		slog.Warn("failed to parse .obsidian/app.json", "vault_path", vaultPath, "err", err)
+		return nil, err
+	}
+	return &config, nil
 }
 
 // IsExcluded checks if the relative path matches any ignore filters.

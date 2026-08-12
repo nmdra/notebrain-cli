@@ -45,6 +45,50 @@ func TestLoadExcludedPaths_MissingFile(t *testing.T) {
 	}
 }
 
+func TestLoadAttachmentFolderPath(t *testing.T) {
+	vaultDir := t.TempDir()
+	obsidianDir := filepath.Join(vaultDir, ".obsidian")
+	if err := os.MkdirAll(obsidianDir, 0755); err != nil {
+		t.Fatalf("failed to create .obsidian dir: %v", err)
+	}
+
+	appJSONPath := filepath.Join(obsidianDir, "app.json")
+	content := []byte(`{
+		"userIgnoreFilters": ["Archive"],
+		"attachmentFolderPath": "99.Storage-Shed/Attachments"
+	}`)
+	if err := os.WriteFile(appJSONPath, content, 0644); err != nil {
+		t.Fatalf("failed to write app.json: %v", err)
+	}
+
+	if got := ingest.LoadAttachmentFolderPath(vaultDir); got != "99.Storage-Shed/Attachments" {
+		t.Errorf("LoadAttachmentFolderPath = %q, want %q", got, "99.Storage-Shed/Attachments")
+	}
+}
+
+func TestLoadAttachmentFolderPath_MissingFile(t *testing.T) {
+	vaultDir := t.TempDir()
+	if got := ingest.LoadAttachmentFolderPath(vaultDir); got != "" {
+		t.Errorf("expected empty attachment folder for missing app.json, got %q", got)
+	}
+}
+
+func TestLoadAttachmentFolderPath_EmptyValue(t *testing.T) {
+	vaultDir := t.TempDir()
+	obsidianDir := filepath.Join(vaultDir, ".obsidian")
+	if err := os.MkdirAll(obsidianDir, 0755); err != nil {
+		t.Fatalf("failed to create .obsidian dir: %v", err)
+	}
+	content := []byte(`{"userIgnoreFilters": ["Archive"]}`)
+	if err := os.WriteFile(filepath.Join(obsidianDir, "app.json"), content, 0644); err != nil {
+		t.Fatalf("failed to write app.json: %v", err)
+	}
+
+	if got := ingest.LoadAttachmentFolderPath(vaultDir); got != "" {
+		t.Errorf("expected empty attachment folder when unset, got %q", got)
+	}
+}
+
 func TestIsExcluded(t *testing.T) {
 	filters := []string{
 		"Archive",
