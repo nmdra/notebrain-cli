@@ -179,14 +179,14 @@ func TestRefsMissingHiddenUnlessFlagged(t *testing.T) {
 // brokenPNG names the reference that does not exist on disk in the fixture.
 const brokenPNG = "broken.png"
 
-func TestRefsMarkdownTraversalEscapeIsMissing(t *testing.T) {
+func TestRefsTraversalEscapeDropped(t *testing.T) {
 	vaultDir := t.TempDir()
 	noteDir := filepath.Join(vaultDir, "Notes")
 	if err := os.MkdirAll(noteDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(noteDir, "escape.md"),
-		[]byte("[x](../../secret.pdf)"), 0o644); err != nil {
+		[]byte("[x](../../secret.pdf)\n\n[[../../secret.png]]"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	fs := &fakeStore{noteMeta: &store.NoteContent{NoteSlug: "escape", Title: "Escape", FilePath: "Notes/escape.md"}}
@@ -197,8 +197,53 @@ func TestRefsMarkdownTraversalEscapeIsMissing(t *testing.T) {
 			t.Errorf("Run: %v", err)
 		}
 	})
-	if !strings.Contains(out, "(missing)") {
-		t.Errorf("traversal escape should be rejected and marked missing:\n%s", out)
+	for _, forbidden := range []string{"secret.pdf", "secret.png", "(missing)"} {
+		if strings.Contains(out, forbidden) {
+			t.Errorf("traversal escape must be dropped entirely, got %q:\n%s", forbidden, out)
+		}
+	}
+}
+
+func TestRefsCrossKindOrder(t *testing.T) {
+	vaultDir := t.TempDir()
+	noteDir := filepath.Join(vaultDir, "Notes")
+	if err := os.MkdirAll(noteDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(noteDir, "order.md"),
+		[]byte("[ext](https://example.com/docs)\n\n![[cover.png]]\n\n[more](https://links.example.com)\n\n![[second.png]]"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range []string{"cover.png", "second.png"} {
+		if err := os.WriteFile(filepath.Join(noteDir, f), []byte("png"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	fs := &fakeStore{noteMeta: &store.NoteContent{NoteSlug: "order", Title: "Order", FilePath: "Notes/order.md"}}
+	withFakeStore(t, fs)
+
+	out := captureStdout(t, func() {
+		if err := (&RefsCmd{Note: "order"}).Run(refsTestGlobals(vaultDir)); err != nil {
+			t.Errorf("Run: %v", err)
+		}
+	})
+	wantLines := []string{
+		"[external-links] https://example.com/docs",
+		"[image] " + filepath.Join(vaultDir, "Notes", "cover.png"),
+		"[external-links] https://links.example.com",
+		"[image] " + filepath.Join(vaultDir, "Notes", "second.png"),
+	}
+	idxs := make([]int, len(wantLines))
+	for i, want := range wantLines {
+		idxs[i] = strings.Index(out, want)
+		if idxs[i] == -1 {
+			t.Fatalf("output missing %q:\n%s", want, out)
+		}
+	}
+	for i := 1; i < len(idxs); i++ {
+		if idxs[i] < idxs[i-1] {
+			t.Errorf("output not in first-occurrence order: %q before %q:\n%s", wantLines[i-1], wantLines[i], out)
+		}
 	}
 }
 

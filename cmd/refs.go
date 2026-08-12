@@ -133,11 +133,14 @@ func (c *RefsCmd) resolveRefs(vaultPath, noteFilePath string, extracted parser.E
 		entries = append(entries, e)
 	}
 
-	for _, ref := range extracted.Attachments {
-		add(c.resolveAttachment(vaultPath, noteDir, attachmentFolder, ref))
-	}
-	for _, link := range extracted.External {
-		add(refEntry{Path: link, Kind: kindExternal})
+	for _, ref := range extracted.Refs {
+		if ref.Kind == parser.KindExternalLinks {
+			add(refEntry{Path: ref.Target, Kind: kindExternal})
+			continue
+		}
+		if entry, ok := c.resolveAttachment(vaultPath, noteDir, attachmentFolder, ref); ok {
+			add(entry)
+		}
 	}
 	return entries
 }
@@ -145,9 +148,10 @@ func (c *RefsCmd) resolveRefs(vaultPath, noteFilePath string, extracted parser.E
 // resolveAttachment finds the on-disk path of one attachment reference. Wiki
 // refs follow Obsidian's search order (note folder, vault root, attachment
 // folder); markdown refs resolve note-folder-relative with percent-decoding.
-// A reference that escapes the vault or matches no existing file resolves to
-// its first candidate marked missing.
-func (c *RefsCmd) resolveAttachment(vaultPath, noteDir, attachmentFolder string, ref parser.AttachmentRef) refEntry {
+// A reference that escapes the vault is rejected outright (dropped, never
+// even listed as missing); one that matches no existing file resolves to its
+// first candidate marked missing.
+func (c *RefsCmd) resolveAttachment(vaultPath, noteDir, attachmentFolder string, ref parser.Ref) (refEntry, bool) {
 	var candidates []string
 	switch ref.Source {
 	case parser.SrcMarkdown:
@@ -156,15 +160,18 @@ func (c *RefsCmd) resolveAttachment(vaultPath, noteDir, attachmentFolder string,
 		candidates = wikiCandidates(vaultPath, noteDir, attachmentFolder, ref.Target)
 	}
 	first := candidates[0]
+	if !insideVault(vaultPath, first) {
+		return refEntry{}, false
+	}
 	for _, cand := range candidates {
 		if !insideVault(vaultPath, cand) {
 			continue
 		}
 		if _, err := os.Stat(cand); err == nil {
-			return refEntry{Path: cand, RelativePath: vaultRelativePath(vaultPath, cand), Kind: string(ref.Kind)}
+			return refEntry{Path: cand, RelativePath: vaultRelativePath(vaultPath, cand), Kind: string(ref.Kind)}, true
 		}
 	}
-	return refEntry{Path: first, RelativePath: vaultRelativePath(vaultPath, first), Kind: string(ref.Kind), Missing: true}
+	return refEntry{Path: first, RelativePath: vaultRelativePath(vaultPath, first), Kind: string(ref.Kind), Missing: true}, true
 }
 
 // wikiCandidates returns candidate paths for a wiki target in Obsidian

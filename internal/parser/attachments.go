@@ -32,47 +32,42 @@ const (
 	SrcMarkdown AttachmentSource = "markdown"
 )
 
-// AttachmentRef is one attachment reference extracted from a note body.
-// Target is cleaned for wiki refs (alias/anchor stripped) and the raw
-// destination for markdown refs; resolution happens in the caller.
-type AttachmentRef struct {
+// Ref is one reference extracted from a note body. Target holds the cleaned
+// wiki target, the raw markdown destination, or the full URL for external
+// links; Kind classifies it; Source records which markdown syntax produced it
+// so resolution can apply Obsidian semantics (wiki vs note-folder-relative).
+// External links carry no Source: they are never resolved against the vault.
+type Ref struct {
 	Target string
 	Kind   AttachmentKind
 	Source AttachmentSource
 }
 
-// ExtractedRefs holds the references collected from a note body.
+// ExtractedRefs holds the references collected from a note body, deduped (by
+// cleaned target or exact URL) in first-occurrence document order across all
+// kinds.
 type ExtractedRefs struct {
-	Attachments []AttachmentRef
-	External    []string
+	Refs []Ref
 }
 
 // ExtractReferences walks a note body's AST and collects direct references:
 // local attachments (wiki and markdown syntax) and external http(s) website
 // links. URLs and content inside code fences never match. Results are deduped
-// (attachments by cleaned target, external by exact URL) in first-occurrence
-// document order.
+// by target (or exact URL) in first-occurrence document order, so an external
+// link that appears before an image is reported before it.
 func ExtractReferences(body string) ExtractedRefs {
 	src := []byte(body)
 	doc := mdParser.Parser().Parse(text.NewReader(src))
 
 	var refs ExtractedRefs
-	seenAttachments := make(map[string]struct{})
-	seenExternal := make(map[string]struct{})
+	seen := make(map[string]struct{})
 
-	addAttachment := func(ref AttachmentRef) {
-		if _, ok := seenAttachments[ref.Target]; ok {
+	add := func(ref Ref) {
+		if _, ok := seen[ref.Target]; ok {
 			return
 		}
-		seenAttachments[ref.Target] = struct{}{}
-		refs.Attachments = append(refs.Attachments, ref)
-	}
-	addExternal := func(url string) {
-		if _, ok := seenExternal[url]; ok {
-			return
-		}
-		seenExternal[url] = struct{}{}
-		refs.External = append(refs.External, url)
+		seen[ref.Target] = struct{}{}
+		refs.Refs = append(refs.Refs, ref)
 	}
 
 	_ = ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
@@ -86,17 +81,17 @@ func ExtractReferences(body string) ExtractedRefs {
 				break
 			}
 			if isHTTPScheme(target) {
-				addExternal(target)
+				add(Ref{Target: target, Kind: KindExternalLinks})
 				break
 			}
 			cleaned := cleanWikiTarget(target)
 			if kind, ok := classifyAttachmentKind(cleaned); ok {
-				addAttachment(AttachmentRef{Target: cleaned, Kind: kind, Source: SrcWiki})
+				add(Ref{Target: cleaned, Kind: kind, Source: SrcWiki})
 			}
 		case *ast.Link:
-			handleMarkdownReference(string(nTyped.Destination), addAttachment, addExternal)
+			handleMarkdownReference(string(nTyped.Destination), add)
 		case *ast.Image:
-			handleMarkdownReference(string(nTyped.Destination), addAttachment, addExternal)
+			handleMarkdownReference(string(nTyped.Destination), add)
 		case *ast.AutoLink:
 			if nTyped.AutoLinkType != ast.AutoLinkURL {
 				break
@@ -104,7 +99,7 @@ func ExtractReferences(body string) ExtractedRefs {
 			// URL() assembles the scheme for <...> autolinks; linkify nodes
 			// already carry it in the value. Either way only http(s) counts.
 			if url := string(nTyped.URL(src)); isHTTPScheme(url) {
-				addExternal(url)
+				add(Ref{Target: url, Kind: KindExternalLinks})
 			}
 		}
 		return ast.WalkContinue, nil
@@ -115,13 +110,13 @@ func ExtractReferences(body string) ExtractedRefs {
 
 // handleMarkdownReference classifies a markdown link/image destination as
 // either an external http(s) URL or a local attachment.
-func handleMarkdownReference(destination string, addAttachment func(AttachmentRef), addExternal func(string)) {
+func handleMarkdownReference(destination string, add func(Ref)) {
 	if isHTTPScheme(destination) {
-		addExternal(destination)
+		add(Ref{Target: destination, Kind: KindExternalLinks})
 		return
 	}
 	if kind, ok := classifyAttachmentKind(destination); ok {
-		addAttachment(AttachmentRef{Target: destination, Kind: kind, Source: SrcMarkdown})
+		add(Ref{Target: destination, Kind: kind, Source: SrcMarkdown})
 	}
 }
 
