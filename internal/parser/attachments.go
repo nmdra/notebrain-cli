@@ -23,12 +23,22 @@ const (
 	KindExternalLinks AttachmentKind = "external-links"
 )
 
+// AttachmentSource records which markdown syntax produced a reference, so
+// resolution can apply Obsidian semantics (wiki vs note-folder-relative).
+type AttachmentSource string
+
+const (
+	SrcWiki     AttachmentSource = "wiki"
+	SrcMarkdown AttachmentSource = "markdown"
+)
+
 // AttachmentRef is one attachment reference extracted from a note body.
 // Target is cleaned for wiki refs (alias/anchor stripped) and the raw
 // destination for markdown refs; resolution happens in the caller.
 type AttachmentRef struct {
 	Target string
 	Kind   AttachmentKind
+	Source AttachmentSource
 }
 
 // ExtractedRefs holds the references collected from a note body.
@@ -81,7 +91,7 @@ func ExtractReferences(body string) ExtractedRefs {
 			}
 			cleaned := cleanWikiTarget(target)
 			if kind, ok := classifyAttachmentKind(cleaned); ok {
-				addAttachment(AttachmentRef{Target: cleaned, Kind: kind})
+				addAttachment(AttachmentRef{Target: cleaned, Kind: kind, Source: SrcWiki})
 			}
 		case *ast.Link:
 			handleMarkdownReference(string(nTyped.Destination), addAttachment, addExternal)
@@ -111,7 +121,7 @@ func handleMarkdownReference(destination string, addAttachment func(AttachmentRe
 		return
 	}
 	if kind, ok := classifyAttachmentKind(destination); ok {
-		addAttachment(AttachmentRef{Target: destination, Kind: kind})
+		addAttachment(AttachmentRef{Target: destination, Kind: kind, Source: SrcMarkdown})
 	}
 }
 

@@ -15,19 +15,19 @@ func TestExtractReferences_WikiAttachments(t *testing.T) {
 		body string
 		want []AttachmentRef
 	}{
-		{name: "image embed with size", body: "![[img.png|200]]", want: []AttachmentRef{{Target: "img.png", Kind: KindImage}}},
-		{name: "pdf plain link", body: "[[doc.pdf]]", want: []AttachmentRef{{Target: "doc.pdf", Kind: KindPDF}}},
-		{name: "image embed with alias", body: "![[img.png|alt text]]", want: []AttachmentRef{{Target: "img.png", Kind: KindImage}}},
-		{name: "image with heading anchor", body: "[[img.png#anchor]]", want: []AttachmentRef{{Target: "img.png", Kind: KindImage}}},
-		{name: "subfolder image embed", body: "![[sub/img.png]]", want: []AttachmentRef{{Target: "sub/img.png", Kind: KindImage}}},
-		{name: "relative dot prefix", body: "[[./local.png]]", want: []AttachmentRef{{Target: "./local.png", Kind: KindImage}}},
-		{name: "archive attachment", body: "[[bundle.zip]]", want: []AttachmentRef{{Target: "bundle.zip", Kind: KindOther}}},
-		{name: "canvas attachment", body: "[[diagram.canvas]]", want: []AttachmentRef{{Target: "diagram.canvas", Kind: KindOther}}},
+		{name: "image embed with size", body: "![[img.png|200]]", want: []AttachmentRef{{Target: "img.png", Kind: KindImage, Source: SrcWiki}}},
+		{name: "pdf plain link", body: "[[doc.pdf]]", want: []AttachmentRef{{Target: "doc.pdf", Kind: KindPDF, Source: SrcWiki}}},
+		{name: "image embed with alias", body: "![[img.png|alt text]]", want: []AttachmentRef{{Target: "img.png", Kind: KindImage, Source: SrcWiki}}},
+		{name: "image with heading anchor", body: "[[img.png#anchor]]", want: []AttachmentRef{{Target: "img.png", Kind: KindImage, Source: SrcWiki}}},
+		{name: "subfolder image embed", body: "![[sub/img.png]]", want: []AttachmentRef{{Target: "sub/img.png", Kind: KindImage, Source: SrcWiki}}},
+		{name: "relative dot prefix", body: "[[./local.png]]", want: []AttachmentRef{{Target: "./local.png", Kind: KindImage, Source: SrcWiki}}},
+		{name: "archive attachment", body: "[[bundle.zip]]", want: []AttachmentRef{{Target: "bundle.zip", Kind: KindOther, Source: SrcWiki}}},
+		{name: "canvas attachment", body: "[[diagram.canvas]]", want: []AttachmentRef{{Target: "diagram.canvas", Kind: KindOther, Source: SrcWiki}}},
 		{name: "unknown extension is not an attachment", body: "[[archive.xyz]]", want: nil},
 		{name: "dotted note name is not an attachment", body: "[[Note 1.2.3]]", want: nil},
 		{name: "plain note link is not an attachment", body: "[[Other Note]]", want: nil},
-		{name: "uppercase extension is case-insensitive", body: "![[PHOTO.PNG]]", want: []AttachmentRef{{Target: "PHOTO.PNG", Kind: KindImage}}},
-		{name: "duplicate embeds dedupe", body: "![[img.png]]\n\n![[img.png|200]]", want: []AttachmentRef{{Target: "img.png", Kind: KindImage}}},
+		{name: "uppercase extension is case-insensitive", body: "![[PHOTO.PNG]]", want: []AttachmentRef{{Target: "PHOTO.PNG", Kind: KindImage, Source: SrcWiki}}},
+		{name: "duplicate embeds dedupe", body: "![[img.png]]\n\n![[img.png|200]]", want: []AttachmentRef{{Target: "img.png", Kind: KindImage, Source: SrcWiki}}},
 		{name: "code fence contents ignored", body: "```\n![[x.png]]\n[[secret.pdf]]\n```", want: nil},
 		{name: "inline code ignored", body: "`![[x.png]]`", want: nil},
 		{name: "empty target ignored", body: "[[#heading]]", want: nil},
@@ -51,16 +51,16 @@ func TestExtractReferences_MarkdownAttachments(t *testing.T) {
 		body string
 		want []AttachmentRef
 	}{
-		{name: "image", body: "![alt](img.png)", want: []AttachmentRef{{Target: "img.png", Kind: KindImage}}},
-		{name: "pdf in subfolder", body: "[doc](sub/file.pdf)", want: []AttachmentRef{{Target: "sub/file.pdf", Kind: KindPDF}}},
-		{name: "percent-encoded destination kept raw", body: "![alt](Router%20Modes.webp)", want: []AttachmentRef{{Target: "Router%20Modes.webp", Kind: KindImage}}},
-		{name: "parent traversal kept raw", body: "[x](../up.pdf)", want: []AttachmentRef{{Target: "../up.pdf", Kind: KindPDF}}},
-		{name: "pdf with page fragment", body: "[x](STP.pdf#page=5)", want: []AttachmentRef{{Target: "STP.pdf#page=5", Kind: KindPDF}}},
+		{name: "image", body: "![alt](img.png)", want: []AttachmentRef{{Target: "img.png", Kind: KindImage, Source: SrcMarkdown}}},
+		{name: "pdf in subfolder", body: "[doc](sub/file.pdf)", want: []AttachmentRef{{Target: "sub/file.pdf", Kind: KindPDF, Source: SrcMarkdown}}},
+		{name: "percent-encoded destination kept raw", body: "![alt](Router%20Modes.webp)", want: []AttachmentRef{{Target: "Router%20Modes.webp", Kind: KindImage, Source: SrcMarkdown}}},
+		{name: "parent traversal kept raw", body: "[x](../up.pdf)", want: []AttachmentRef{{Target: "../up.pdf", Kind: KindPDF, Source: SrcMarkdown}}},
+		{name: "pdf with page fragment", body: "[x](STP.pdf#page=5)", want: []AttachmentRef{{Target: "STP.pdf#page=5", Kind: KindPDF, Source: SrcMarkdown}}},
 		{name: "external link is not an attachment", body: "[text](https://example.com)", want: nil},
 		{name: "relative note link without extension", body: "[rel](../other-note)", want: nil},
 		{name: "anchor-only link", body: "[x](#anchor)", want: nil},
 		{name: "code fence contents ignored", body: "```\n![x](img.png)\n```", want: nil},
-		{name: "duplicate destinations dedupe", body: "![a](img.png) and ![b](img.png)", want: []AttachmentRef{{Target: "img.png", Kind: KindImage}}},
+		{name: "duplicate destinations dedupe", body: "![a](img.png) and ![b](img.png)", want: []AttachmentRef{{Target: "img.png", Kind: KindImage, Source: SrcMarkdown}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -106,8 +106,8 @@ func TestExtractReferences_Mixed(t *testing.T) {
 	body := "![[cover.png]] and [doc](manual.pdf) and https://example.com and [[https://links.example.com]]"
 	got := ExtractReferences(body)
 	wantAttach := []AttachmentRef{
-		{Target: "cover.png", Kind: KindImage},
-		{Target: "manual.pdf", Kind: KindPDF},
+		{Target: "cover.png", Kind: KindImage, Source: SrcWiki},
+		{Target: "manual.pdf", Kind: KindPDF, Source: SrcMarkdown},
 	}
 	if !reflect.DeepEqual(got.Attachments, wantAttach) {
 		t.Errorf("Attachments = %v, want %v", got.Attachments, wantAttach)
