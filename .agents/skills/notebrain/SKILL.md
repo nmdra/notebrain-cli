@@ -1,6 +1,6 @@
 ---
 name: notebrain-assistant
-description: Search and explore an Obsidian vault through the NoteBrain CLI (semantic search, tags, backlinks, connections, hidden links, boosted retrieval). Use it whenever the user mentions their notes, knowledge base, Obsidian vault, semantic search, finding connections or unlinked notes, or asks exploratory questions like "what do I know about X", "find notes related to Y", "what connects to Z", or "summarize my notes on W" — even when they never say NoteBrain, vector search, or ChromaDB.
+description: Search and explore an Obsidian vault through the NoteBrain CLI (semantic search, tags, backlinks, connections, hidden links, boosted retrieval). Use it whenever the user mentions their notes, knowledge base, Obsidian vault, semantic search, finding connections or unlinked notes, or asks exploratory questions like "what do I know about X", "find notes related to Y", "what connects to Z", "summarize my notes on W", "what does this note reference or embed", or "are any links broken" — even when they never say NoteBrain, vector search, or ChromaDB.
 license: MIT
 compatibility: Requires the `notebrain` binary on PATH.
 allowed-tools: Bash(notebrain:*), Bash(./notebrain:*)
@@ -11,7 +11,7 @@ allowed-tools: Bash(notebrain:*), Bash(./notebrain:*)
 NoteBrain indexes an Obsidian vault into local ChromaDB and answers read-only questions about it: semantic search, tag queries, graph structure, and note retrieval. It never mutates the vault — for writes, use standard file tools or obsidian-cli and keep NoteBrain for the discovery step.
 
 References, read on demand:
-- [references/example.md](references/example.md) — 16 worked scenarios, exact commands, verified pitfalls.
+- [references/example.md](references/example.md) — 18 worked scenarios, exact commands, verified pitfalls.
 - [references/flags.md](references/flags.md) — every flag, default, and config override.
 - [references/schema.md](references/schema.md) — JSON/TSV output shape, `--jsonpath` use.
 
@@ -60,6 +60,7 @@ Only when the task needs **graph structure** or **related-but-unlinked** notes, 
 | ------ | ------- | ------------- |
 | Reading / metadata only | `get` | `--meta` (header, no body) or `--head N` (first N chunks) — full `get` only on direct demand |
 | What links to a note | `backlinks` | exactly the slug |
+| What a note references / embeds | `refs` | kind filters; `--include-missing` for broken links |
 | What's graph-neighbour | `connections` | `--hops 1–2` (exponential blow-up beyond) |
 | Meaning-related but NOT linked | `hidden` | `--deep` for section-level matches |
 | Related **including** linked | `hidden` | `--include-linked` |
@@ -73,9 +74,13 @@ Only when the task needs **graph structure** or **related-but-unlinked** notes, 
 
 Semantic search returns zero results or nothing above `--min-score`, so `search` automatically falls back to a token scan over titles/paths/tags/text. Rows arrive `"lexical": true`, `score: 0`; the header prints `Lexical Search (no semantic matches)`. So a short word like `Lecture` can still hit. When even that returns nothing, lengthen the query into a descriptive phrase or switch to a `tags` query if the word is a heading/tag keyword. No fallback for `boosted` or `hidden`.
 
+### Refs: what a note references
+
+`refs` lists the note's attachments (images, PDFs, other) and external http(s) links, in first-occurrence order, read fresh from the note file on disk — no index staleness. It does NOT list links to other notes (that is `backlinks`/`connections`). Broken references are hidden by default; `--include-missing` surfaces them as `"missing": true`. External links are never missing and never touched over the network. No kind flags = every kind; the filters are pure kind selectors, no scores.
+
 ## Slug discipline
 
-Slugs are the handle; titles are not. For graph and `get` commands, pass the exact `note_slug` returned by a prior `search`/`tags` — never a bare title, titles are ambiguous. Since the deterministic-resolution fix, a missing note is an **error** (`note not found: "<input>" ...`), not a silently guessed phantom slug. A "no indexed chunks" / "note not found" failure is normally a breadth-resolution problem, not a missing note. Slugs also go stale mid-conversation on schedule (cron re-ingest): if a slug that worked earlier now 404s, re-resolve via `search` before retrying.
+Slugs are the handle; titles are not. For graph, `get`, and `refs` commands, pass the exact `note_slug` returned by a prior `search`/`tags` — never a bare title, titles are ambiguous. Since the deterministic-resolution fix, a missing note is an **error** (`note not found: "<input>" ...`), not a silently guessed phantom slug. A "no indexed chunks" / "note not found" failure is normally a breadth-resolution problem, not a missing note. Slugs also go stale mid-conversation on schedule (cron re-ingest): if a slug that worked earlier now 404s, re-resolve via `search` before retrying.
 
 ## Tag discovery
 

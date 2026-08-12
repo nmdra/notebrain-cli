@@ -76,9 +76,21 @@ These flags are available only on the commands listed.
 
 Takes a single positional argument: `<slug>` (note slug, title, or file path — auto-resolved). Without flags, `get` returns the full reconstructed note; in text format, the header block prints a `Tags:` line (rendered as `#`-chips) — a lightweight way to read a note's tags without JSON. `--meta`/`--head` are mutually independent modes; `--head 0` means full note.
 
+### `refs`
+
+| Flag                | Purpose                                                                                                                     | Default |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------- | ------- |
+| `--images`          | Include image attachments (png, jpg, gif, svg, webp, …).                                                                    | `false` |
+| `--pdf`             | Include PDF attachments.                                                                                                    | `false` |
+| `--other`           | Include other attachments (video, audio, archives, office docs).                                                            | `false` |
+| `--external-links`  | Include external http(s) website links.                                                                                     | `false` |
+| `--include-missing` | Include references whose file is missing from the vault (broken links). Hidden by default.                                  | `false` |
+
+Takes a single positional argument: `<note>` (note slug, title, or file path — auto-resolved, markdown notes only; PDF extractions error out). No kind flags = every kind. `refs` reads the note file fresh from disk, so results never go stale — but they cover only what the current file contains. External links are never `missing` and are never contacted over the network. Note: `refs` lists attachments and external links only — links to other notes are not included (use `backlinks`/`connections`).
+
 ## Global Flags (Available on Subcommands)
 
-These flags work on `search`, `backlinks`, `connections`, `hidden`, `tags`, `boosted`, `get`, and `stats`.
+These flags work on `search`, `backlinks`, `connections`, `hidden`, `tags`, `boosted`, `get`, `refs`, and `stats`.
 
 ### Output Format & Extraction
 

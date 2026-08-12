@@ -149,6 +149,59 @@ Tag matching and normalization semantics: see `tags` in [flags.md](flags.md).
 
 The `note` object shape is the same for the `get` modes: default returns the full text, `--meta` returns the header with `text` empty (and `chunks` still the total), and `--head N` returns the first N chunks while `chunks` still reports the full total. For metadata-only lookups prefer `get "<slug>" --meta` (or `get --format text` for the compact `Tags:` header line) over a full fetch.
 
+### `refs`
+
+`refs` uses its own envelope — a `refs` array (not `results`):
+
+`notebrain refs "architecture/event-driven-systems" --format=json`
+
+```json
+{
+  "command": "refs",
+  "note_slug": "architecture/event-driven-systems",
+  "title": "Event Driven Systems",
+  "total": 3,
+  "refs": [
+    {
+      "path": "/home/user/vault/Attachments/eda-diagram.png",
+      "relative_path": "Attachments/eda-diagram.png",
+      "kind": "image",
+      "missing": false
+    },
+    {
+      "path": "https://martinfowler.com/articles/eda.html",
+      "kind": "external-links",
+      "missing": false
+    }
+  ]
+}
+```
+
+| Field           | Description                                                                                                              |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `note_slug`     | URL-safe unique identifier of the note queried.                                                                          |
+| `title`         | Note title.                                                                                                              |
+| `total`         | Number of rows in `refs`.                                                                                                |
+| `refs[].path`   | Absolute vault path for attachments; the full URL for external links.                                                    |
+| `refs[].relative_path` | Vault-relative path (`/`-separated). Omitted for external links.                                                  |
+| `refs[].kind`   | `image`, `pdf`, `other`, or `external-links`.                                                                            |
+| `refs[].missing`| `true` when the file is not on disk (only visible with `--include-missing`). External links always carry `false` — they are never missing and never contacted over the network. |
+
+Rows are deduped by resolved path (or exact URL) in first-occurrence order. No kind flags = every kind.
+
+TSV shape — header `path<TAB>kind<TAB>missing<TAB>relative_path`; the `missing` cell is empty for external links:
+
+<!-- markdownlint-disable MD010 -->
+```text
+path	kind	missing	relative_path
+/home/user/vault/Attachments/eda-diagram.png	image	false	Attachments/eda-diagram.png
+/home/user/vault/broken.png	image	true	broken.png
+https://martinfowler.com/articles/eda.html	external-links		
+```
+<!-- markdownlint-enable MD010 -->
+
+Text format prints one row per reference: `[kind] path (missing)` — e.g. `[image] /home/user/vault/broken.png (missing)`. Empty result prints `No references found`.
+
 ### TSV Format
 
 `notebrain backlinks "architecture/event-driven-systems" --format=tsv`
