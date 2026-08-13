@@ -155,3 +155,121 @@ Out of scope: frontmatter references (wiki/markdown syntax only), audio/video su
 
 - None — the design tree is fully settled (grilling rounds 1-2 complete).
 - Non-blocking follow-ups (not part of v1): `--audio`/`--video` sub-filters (trivial enum extension), frontmatter reference scanning (needs per-field mapping rules), PDF page-anchor passthrough (`"anchor": "page=3"` in JSON), vault-only resolution without an index, and skill description trigger optimization via `scripts/run_loop.py` (skill-creator's Description Optimization step — 20 trigger queries; only if the user wants the description tuned beyond the manual wording update in Task 6).
+
+---
+
+# Plan: Cross-command flag & output consistency pass
+
+All changes land on `feat/refs-command` (extending PR #37), after Task 7. Scope decision: **A + B + C all in this PR** (user decision — one review pass over a larger, but cohesive, diff).
+
+## Goal
+
+Eliminate flag/help-text confusion and output-format drift found by a full-codebase audit (3 exploration passes over `cmd/`, `internal/`, `internal/parser`, `internal/ingest`, `internal/store`). The `refs` feature introduced the worst offender — kind-filter flags advertised as additive ("include …") that actually restrict — and surfaced pre-existing inconsistencies across commands.
+
+## Current State (audit findings, with file refs)
+
+**Flag semantics — `refs` kind filters are restrictive but help says "include":**
+- `cmd/refs.go:49-52` help: "include image attachments" (additive reading); `filterRefKinds` (`refs.go:243-265`): all-false → show everything; any-true → drop unselected kinds. Same command's `--include-missing` (`refs.go:53`) is truly additive → two semantic models in one command.
+- `--images` (plural) vs kind value `"image"` (singular) and vs `--pdf`/`--other`/`--external-links` — plurality mismatch (`refs.go:49` vs kind table `refs.go:40-45`).
+
+**Same concept, multiple flag names (PDF):**
+- `ingest --enable-pdf` (`cmd/ingest.go:40`), `search --with-pdf` (`cmd/search.go:44`), `boosted --with-pdf` (`cmd/boosted.go:37`), `refs --pdf` (`cmd/refs.go:50`).
+
+**Duplicate/alias flags:**
+- `hidden --top-k` (deprecated) + `--candidate-chunks`; `--candidate-chunks 0` inexpressible (`hidden.go:45-48`). `--top-k` also means "chunks per note" in `search` (collision).
+- `tags --for-note` alias of `--shared` (`tags.go:37`); global `--debug` alias of `--log-level=debug`; `--version` flag + `version` subcommand duplicate.
+- `search --exclude-note` singular name for plural field `ExcludeNotes` (`search.go:45`).
+- `get` positional `<SLUG>` vs `<NOTE>` everywhere else (`get.go:13` vs backlinks/connections/hidden/refs).
+
+**Output drift:**
+- `refs` TSV: external rows emit blank `missing` column while JSON emits `false` (`refs.go:287-289`).
+- Search TSV header `slug` vs `get` TSV `note_slug` (`print.go:187` vs `get.go:59`).
+- `get` TSV unescaped (raw tabs/newlines) vs escaped everywhere else (`get.go:59-62`).
+- Score: JSON 4dp rounded; TSV `%f` 6dp (`print.go:119` vs `:190`).
+- JSONPath: `get`/`stats` extract from bare structs — `$.command` fails; search/refs/tags extract from envelopes (`get.go:40`, `stats.go:49`).
+- `--jsonpath`/`--format json` silently ignored by ingest/reset/doctor/init/version/completion.
+- `command` envelope values decorated (`"connections --hops 2"`, `"hidden --deep --include-linked"`) — consumers must whitelist; `emptyResultHint` relies on `HasPrefix`.
+- `tags --list` text mode prints `#tag\t(2 notes)` — tab in human output (`print.go:469`).
+
+**Stringly-typed enum coupling (breakage risk):**
+- `"pdf"` × 4 sites, 2 semantics: refs kind (`parser/attachments.go:21`, `cmd/refs.go:42`) vs `file_type` (`ingest/ingest.go:29`); kept apart only because refs refuses PDF notes (`refs.go:94-96`).
+- `cmd/print.go:263` compares `r.FileType == kindPDF` (refs constant!) — works by coincidence.
+- `"md"` literal at `store/query.go:1082` bypasses `fileTypeMD` (`ingest/ingest.go:28`).
+- Vault-path UsageError duplicated verbatim (`ingest.go:49` == `refs.go:78`).
+- Parser block-kind literals partially unconstantine (`ast.go:427` compares `"paragraph"` literally).
+- Parser renderer labels non-image attachments `"attachment"` in chunk text vs `"other"` in refs — BUT stored chunk text change forces re-ingest; defer value change.
+
+**Authored decision (user):** flag renames happen with working deprecated aliases (hidden from `--help`, still parse); TSV `missing` emits `false`.
+
+## Decisions
+
+1. **`refs` kind filters rename to `--only-*`** — `--only-images`, `--only-pdf`, `--only-other`, `--only-external-links`; help text states "limit to … (no filter = all kinds; combine to union)". Old flags (`--images`/`--pdf`/`--other`/`--external-links`) become hidden deprecated aliases, still functional. Satisfies both the semantics lie and the plurality mismatch.
+2. **PDF family unifies on `--with-pdf`** for ingest (search/boosted already use it) via rename + hidden deprecated alias `--enable-pdf`; config key `enable-pdf` keeps working (alias field), `with-pdf` added to config.example.toml.
+3. **`hidden --top-k` removed; `--candidate-chunks` becomes the single flag** (gets `default:"3"`). Eliminates the cross-command `--top-k` collision with search. Breaking — flagged in CHANGELOG.
+4. **`get` positional → `<NOTE>`** (field rename `Slug` → `Note`); help text already matches siblings.
+5. **`search --exclude-note` → `--exclude-notes`** with hidden deprecated alias field merged in Run.
+6. **TSV `missing` = `false` for external rows** — delete the blanking special case (`refs.go:287-289`); matches JSON.
+7. **TSV column parity:** search TSV header `slug` → `note_slug`; `get` TSV fields routed through `tsvEscape`; score printed at 4dp in TSV (same value as JSON).
+8. **JSONPath envelope parity:** `get` and `stats` apply JSONPath to their full envelope (so `$.command` works). Breaking for existing paths like `$.note_slug` on get → `$.note.note_slug`; documented in CHANGELOG.
+9. **Ignored `--jsonpath`/`--format` on text-only commands:** stderr warning, no output change.
+10. **Enum hygiene:** `FileTypeMD`/`FileTypePDF` constants live in `internal/store` (or ingest-exported; decided at implementation — whichever avoids import cycles; store imports nothing from ingest, so constants in store and referenced from ingest + query.go + print.go); `print.go:263` drops the accidental `kindPDF` reuse; parser block-kind consts applied; vault-path UsageError shared constant. Parser renderer `"attachment"` label: **comment + const only, value unchanged** (would force re-ingest of every vault).
+11. **`--has-tasks`/`--has-code` AND semantics:** documented in help text + wiki, no behavior change.
+12. **`command` envelope decorated values + `tags --list` tab:** documented in wiki/Commands.md JSON schema section; no code change (human-facing text; stable-enough contract).
+
+## Scope
+
+In scope: refs flag renames + aliases + help text, TSV `missing` fix, ingest `--with-pdf` rename + config key, hidden `--top-k` removal, get `<NOTE>`, search `--exclude-notes`, TSV/JSONPath parity (`get`, `stats`, search family), ignored-flag warnings, enum constant hygiene, tests for every change, docs (README, wiki, AGENTS.md, CHANGELOG, skill ×4, config.example.toml).
+
+Out of scope: `--debug`/`--for-note`/`--version` alias removals (harmless, users rely on them), parser renderer `"attachment"` value change, `command` envelope value normalization, tags text-mode tab, `--min-score` lexical-bypass bug (pre-existing behavior, separate fix), `--limit` default unification (tags 0 is intentional), `--skip-phantom` inverted default.
+
+## Tasks
+
+- [x] **Task A: `refs` kind filters → `--only-*` + TSV `missing` fix.**
+  `cmd/refs.go`: rename fields to `OnlyImages/OnlyPDF/OnlyOther/OnlyExternal` with `name:"only-…"`; add hidden deprecated alias fields (`Images/PDF/Other/ExternalLinks`, `hidden:""`, help "deprecated: use --only-…"); `filterRefKinds` reads new|old; reword main help ("limit to …; no filter = all kinds; combine filters to union"). Delete the external-blank special case in TSV (`refs.go:287-289`). Verify kong `hidden:""` on flags still parses (fallback: keep visible with "(deprecated)").
+  (**Files:** `cmd/refs.go`, `cmd/refs_test.go`; **Verify:** legacy flags still filter; hidden from `--help`; external TSV row shows `false`; `go test -count=1 ./cmd/`.)
+
+- [x] **Task B: cross-command renames (PDF, hidden, get, search, ingest).**
+  - `cmd/ingest.go`: `EnablePDF` → `WithPDF` (`name:"with-pdf"`); alias field `EnablePDF` hidden/deprecated still wiring `pipeline.EnablePDF`. `config.example.toml`: add `with-pdf`, keep `enable-pdf` with deprecation comment. `init.go` wizard wording check.
+  - `cmd/hidden.go`: delete `TopK` + override merge; `CandidateChunks` gets `default:"3"`.
+  - `cmd/get.go`: field `Slug` → `Note`.
+  - `cmd/search.go`: `ExcludeNotes` gets `name:"exclude-notes"`; alias field `ExcludeNote` (name `exclude-note`) merged in Run.
+  (**Files:** the four cmd files + their tests, `config.example.toml`; **Verify:** flags parse under new names; aliases work; hidden `--top-k` rejected with clear kong error; `go test -count=1 ./cmd/ ./internal/configfile/`.)
+
+- [x] **Task C: output parity (TSV, JSONPath, ignored-flag warnings).**
+  - `cmd/print.go:187`: `slug` → `note_slug`; score `%f` → 4dp rounded value (match JSON).
+  - `cmd/get.go:59-62`: `tsvEscape` on text/tags/title columns.
+  - `cmd/get.go:39-41` + `cmd/stats.go:48-50`: JSONPath against the envelope struct, not the bare NoteContent/Stats.
+  - Also check refs TSV `kind` column: unescaped today (`refs.go:291` prints raw kind) — escape for parity or leave (enum-driven, safe); decide at implementation.
+  - New warning: in `runMain` or per text-only command, if `globals.Format != formatText || globals.JSONPath != ""` → stderr warning that the command ignores them (ingest/reset/doctor/init/version/completion).
+  (**Files:** `cmd/print.go`, `cmd/get.go`, `cmd/stats.go`, `cmd/cli.go` (+tests); **Verify:** TSV headers/escaping/score assertions updated; `$.command` works on get/stats JSONPath; warning appears on reset/doctor/ingest only once, stderr only.)
+
+- [x] **Task D: enum hygiene + docs sync.**
+  - Constants: `FileTypeMD`/`FileTypePDF` (home decided by import graph — likely `internal/store`); replace `"md"` at `store/query.go:1082`, `kindPDF` misuse at `cmd/print.go:263`, `.pdf`/`.md` suffix literals where a constant improves safety without churn.
+  - Parser block-kind consts: `ast.go:339,357,370,427,439,442`.
+  - Vault-path UsageError: shared constant (`ingest.go:49` + `refs.go:78`).
+  - Parser renderer label `"attachment"`: const + comment only (no value change — re-ingest risk).
+  - Docs: README.md:35,142, wiki/Commands.md:309-333, AGENTS.md flag-standards paragraph, CHANGELOG (`### Changed` renames table + `### Deprecated` aliases + breaking notes for `--top-k`, `--exclude-notes`, get JSONPath), skill files (SKILL.md:63,79, flags.md:83-87, example.md:27-28, schema.md:187-199 + TSV example row), `config.example.toml`.
+  (**Files:** listed above; **Verify:** `grep` shows no stale flag names in docs; `golangci-lint run ./...` clean (goconst); `go test -count=1 ./...`.)
+
+- [x] **Task E: full verification + review.**
+  `make test`, `make lint`, rebuild binary (`make build` + `cp notebrain ~/.local/bin/`), manual probes: new flags, alias flags, hidden `--top-k` rejection, `--exclude-notes`, get `<NOTE>`, `--with-pdf` flag+config key, get/stats `$.command` JSONPath, TSV headers (search `note_slug`, refs external `false`, get escaped). Then `/code-review` over `master...HEAD` (standards + spec axes), apply fixes, route the final commit batch through the `git-commiter` skill in groups (feat/fix × code files, docs, config).
+  (**Verify:** `git log master..HEAD` shows only feature+consistency commits; review findings resolved before merge; merge to master remains the user's call.)
+
+## Verification
+
+- `go test -count=1 ./...` green; `golangci-lint run ./...` 0 issues.
+- `notebrain refs --help` shows `--only-*` with "limit to" wording, no `--images`/`--pdf`/`--other`/`--external-links`; legacy flags still parse and filter correctly (checked via CLI probe, not just unit test).
+- `notebrain refs … --format tsv` external row: `false` in the `missing` column.
+- `notebrain ingest --with-pdf` and config key `with-pdf` both work; `enable-pdf` config key still honored (deprecated).
+- `notebrain hidden … --top-k 5` → kong error (flag removed); `--candidate-chunks` works.
+- `notebrain search … --exclude-notes x` works; `--exclude-note` still accepted (deprecated).
+- `notebrain get <note> --jsonpath='$.command'` → `get`; `--jsonpath='$.note.note_slug'` works.
+- TSV: search header `note_slug`; get TSV survives multiline/tab text (single parseable row); scores at 4dp.
+- `notebrain reset --format json` warns on stderr; stdout unchanged.
+- Docs: zero stale references to old flag names (`rg -- '--images|--enable-pdf|--top-k|--exclude-note|SLUG'` across README/wiki/AGENTS.md/skill/CHANGELOG/config.example.toml, allowing explicit "deprecated:" notes).
+- Skill evals 17/18 (refs scenarios) use `--only-*` names only if the fixture asserts flag names — regenerate fixture-based assertions if needed, rerun affected gradings; iteration-4 benchmark stays green.
+
+## Open Questions (non-blocking)
+
+- Long flag `--only-external-links` — accepted as-is (matches the kind value `external-links`; no shortcut alias in v1).
+- Parser renderer `"attachment"` label — value change deferred forever unless a future `chunkSchemaVersion` bump justifies re-ingest; documented via const + comment. (This decision matches the earlier draft; no change unless user insists.)
