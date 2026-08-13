@@ -363,7 +363,7 @@ func TestPipeline_PDFFallbackPreservesPDFs(t *testing.T) {
 					FilePath:    "PDF Document.pdf",
 					ChunkIndex:  0,
 					ContentHash: "abcdef",
-					FileType:    fileTypePDF,
+					FileType:    store.FileTypePDF,
 					Embedding:   []float32{1.0, 0.0, 0.0},
 				},
 			},

@@ -1079,7 +1079,7 @@ func (f *SearchFilter) Build() chroma.WhereFilter {
 		filters = append(filters, chroma.EqBool("has_code", true))
 	}
 	if !f.IncludePDF {
-		filters = append(filters, chroma.EqString("file_type", "md"))
+		filters = append(filters, chroma.EqString("file_type", FileTypeMD))
 	}
 	if f.ResolveTags && f.Tag != "" {
 		filters = append(filters, TagWhereClause(f.Tag))

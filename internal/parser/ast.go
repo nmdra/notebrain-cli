@@ -79,9 +79,12 @@ var (
 )
 
 const (
-	blockKindCode      = "code"
-	blockKindParagraph = "paragraph"
-	blockKindTaskList  = "task_list"
+	blockKindCode       = "code"
+	blockKindParagraph  = "paragraph"
+	blockKindTaskList   = "task_list"
+	blockKindList       = "list"
+	blockKindTable      = "table"
+	blockKindBlockquote = "blockquote"
 )
 
 type metadataTransformer struct{}
@@ -336,7 +339,7 @@ func (e *sectionExtractor) processList(node *ast.List) (ast.WalkStatus, error) {
 	if t == "" {
 		return ast.WalkSkipChildren, nil
 	}
-	kind := "list"
+	kind := blockKindList
 	if isTask {
 		kind = blockKindTaskList
 	}
@@ -354,7 +357,7 @@ func (e *sectionExtractor) processTable(node *extast.Table) (ast.WalkStatus, err
 		return ast.WalkSkipChildren, nil
 	}
 	e.current.blocks = append(e.current.blocks, block{
-		kind: "table",
+		kind: blockKindTable,
 		text: t,
 	})
 	return ast.WalkSkipChildren, nil
@@ -367,7 +370,7 @@ func (e *sectionExtractor) processBlockquote(node *ast.Blockquote) (ast.WalkStat
 		return ast.WalkSkipChildren, nil
 	}
 	e.current.blocks = append(e.current.blocks, block{
-		kind: "blockquote",
+		kind: blockKindBlockquote,
 		text: t,
 	})
 	return ast.WalkSkipChildren, nil
@@ -424,7 +427,7 @@ func buildChunks(sections []section, noteSlug string, maxRunes, overlapRunes int
 		var codeInfos []codeBlockInfo
 		for idx, b := range sec.blocks {
 			if idx > 0 {
-				if b.kind == "paragraph" && sec.blocks[idx-1].kind == "paragraph" {
+				if b.kind == blockKindParagraph && sec.blocks[idx-1].kind == blockKindParagraph {
 					prose.WriteByte(' ')
 				} else {
 					prose.WriteString("\n\n")
@@ -436,10 +439,10 @@ func buildChunks(sections []section, noteSlug string, maxRunes, overlapRunes int
 				codeIdx := len(codeInfos)
 				codeInfos = append(codeInfos, codeBlockInfo{lang: b.language, code: b.codeText})
 				_, _ = fmt.Fprintf(&prose, "\x00CODE:%d:%s\x00", codeIdx, b.language)
-			case "table":
+			case blockKindTable:
 				hasTable = true
 				prose.WriteString(b.text)
-			case blockKindTaskList, "list":
+			case blockKindTaskList, blockKindList:
 				if b.kind == blockKindTaskList {
 					hasTask = true
 				}

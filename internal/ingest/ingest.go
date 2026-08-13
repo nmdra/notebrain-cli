@@ -25,9 +25,6 @@ import (
 )
 
 const (
-	fileTypeMD  = "md"
-	fileTypePDF = "pdf"
-
 	// chunkSchemaVersion is bumped whenever chunk content semantics change so
 	// that already-ingested files are re-ingested even if their bytes are
 	// unchanged (e.g. the chunk-overlap duplication fix, has_code metadata).
@@ -123,7 +120,7 @@ func (p *Pipeline) Run(ctx context.Context, vaultPath string, glob string) error
 	skipPDF := false
 	if p.EnablePDF {
 		if p.LLMModel == "" {
-			slog.Warn("PDF ingestion requested via --enable-pdf, but no --llm-model was provided. Skipping PDF ingestion (previously ingested PDFs will be preserved). (hint: use --llm-model)")
+			slog.Warn("PDF ingestion requested via --with-pdf, but no --llm-model was provided. Skipping PDF ingestion (previously ingested PDFs will be preserved). (hint: use --llm-model)")
 			skipPDF = true
 		} else {
 			slog.Info("initializing PDF extractor backend", "pool_size", p.workers)
@@ -189,7 +186,7 @@ func (p *Pipeline) Run(ctx context.Context, vaultPath string, glob string) error
 	staleSlugs := make([]string, 0, len(hashes))
 	for slug, meta := range hashes {
 		if _, ok := validSlugs[slug]; !ok {
-			if skipPDF && meta.FileType == fileTypePDF {
+			if skipPDF && meta.FileType == store.FileTypePDF {
 				continue
 			}
 			staleSlugs = append(staleSlugs, slug)
@@ -383,7 +380,7 @@ func (p *Pipeline) processFile(ctx context.Context, vaultPath string, filePath s
 
 	// Frontmatter title overrides the filename-derived title for markdown
 	// notes only; PDF titles come from the file name (see processPdfFile).
-	return p.buildIngestData(ctx, relPath, slug, title, hash, fileTypeMD, string(content), true)
+	return p.buildIngestData(ctx, relPath, slug, title, hash, store.FileTypeMD, string(content), true)
 }
 
 // estimateTokens returns a conservative rough token count for English/mixed text.
@@ -488,7 +485,7 @@ func (p *Pipeline) processPdfFile(ctx context.Context, vaultPath string, filePat
 	// Empty LLM output is usually a transient conversion failure. Preserve the
 	// previously indexed PDF instead of deleting it from the index; an empty
 	// batch would remove its chunks permanently (see buildChunkRecords).
-	return p.buildIngestData(ctx, relPath, slug, title, hash, fileTypePDF, markdown, false)
+	return p.buildIngestData(ctx, relPath, slug, title, hash, store.FileTypePDF, markdown, false)
 }
 
 // noteIdentity reads, identifies, and hashes a note file. changed=false means

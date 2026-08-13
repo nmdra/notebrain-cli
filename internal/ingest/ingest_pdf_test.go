@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/nmdra/notebrain-cli/v2/internal/store"
 )
 
 type mockPDFBackend struct{}
@@ -60,7 +62,7 @@ func TestProcessPdfFile(t *testing.T) {
 	}
 
 	chunk := res.ChunkRecords[0]
-	if chunk.FileType != fileTypePDF {
+	if chunk.FileType != store.FileTypePDF {
 		t.Errorf("Expected FileType 'pdf', got %q", chunk.FileType)
 	}
 	if chunk.HeadingPath != "Dummy PDF Page" {

@@ -14,6 +14,14 @@ const (
 	CollectionLinks  = "nb_links"
 )
 
+// FileTypeMD and FileTypePDF are the file_type metadata values written on
+// ingested chunks. Kept in store (not ingest) because store queries filter on
+// them; ingest imports store, so there is no import cycle.
+const (
+	FileTypeMD  = "md"
+	FileTypePDF = "pdf"
+)
+
 var defaultChunksMeta = map[string]any{
 	"hnsw:space":           "cosine",
 	"hnsw:search_ef":       50, // Lower value improves query speed

@@ -113,6 +113,9 @@ func attachmentKind(target string) string {
 	if _, ok := imageExts[ext]; ok {
 		return "image"
 	}
+	// "attachment" covers every non-image embed (audio, video, generic
+	// files). The label differs from refs' "other" kind but is baked into
+	// stored chunk text: changing it would force a full re-ingest.
 	return "attachment"
 }
 
