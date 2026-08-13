@@ -189,14 +189,14 @@ The `note` object shape is the same for the `get` modes: default returns the ful
 
 Rows are deduped by resolved path (or exact URL) in first-occurrence order. No kind flags = every kind.
 
-TSV shape — header `path<TAB>kind<TAB>missing<TAB>relative_path`; the `missing` cell is empty for external links:
+TSV shape — header `path<TAB>kind<TAB>missing<TAB>relative_path`; the `missing` cell shows `false` for external links:
 
 <!-- markdownlint-disable MD010 -->
 ```text
 path	kind	missing	relative_path
 /home/user/vault/Attachments/eda-diagram.png	image	false	Attachments/eda-diagram.png
 /home/user/vault/broken.png	image	true	broken.png
-https://martinfowler.com/articles/eda.html	external-links		
+https://martinfowler.com/articles/eda.html	external-links	false	
 ```
 <!-- markdownlint-enable MD010 -->
 

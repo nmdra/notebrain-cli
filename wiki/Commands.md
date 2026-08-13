@@ -160,7 +160,7 @@ notebrain ingest [<glob>] [flags]
 | `--min-chunk-words` | `integer` | `10`    | Does not include chunks that have fewer words than this value.                                                 |
 | `--chunk-size`      | `integer` | `800`   | The maximum number of runes per chunk for the parser.                                                 |
 | `--chunk-overlap`   | `integer` | `100`   | The number of overlap runes between sub-chunks when the parser splits a section.                               |
-| `--enable-pdf`      | `boolean` | `false` | Enables the extraction of PDF text. This requires `--llm-model`.                      |
+| `--with-pdf`       | `boolean` | `false` | Enables the extraction of PDF text. This requires `--llm-model`. Deprecated alias: `--enable-pdf`. |
 | `--llm-model`       | `string`  | `""`    | The LLM model to parse PDFs (for example, `openrouter/anthropic/claude-3.5-haiku`). |
 | `--llm-context-window` | `integer` | `128000` | The total context window size of the LLM in tokens.                                         |
 | `--respect-exclude` | `boolean` | `false` | Obeys the Obsidian user filters and attachment exclusions during ingestion. |
@@ -216,7 +216,7 @@ notebrain search [<query>] [flags]
 | `--has-tasks` | `boolean` | `false`  | Shows only the chunks that contain markdown task lists (`- [ ]`).|
 | `--has-code`  | `boolean` | `false`  | Shows only the chunks that contain code blocks.                  |
 | `--with-pdf`  | `boolean` | `false`  | Includes the PDF results in the search (the default is markdown only). |
-| `--exclude-note` | `string` | _(None)_ | Excludes notes from the results. Accepts a note slug, title, or path; repeat the flag or use comma-separated values to exclude multiple notes. |
+| `--exclude-notes` | `string` | _(None)_ | Excludes notes from the results. Accepts a note slug, title, or path; repeat the flag or use comma-separated values to exclude multiple notes. Deprecated alias: `--exclude-note`. |
 
 #### Examples
 
@@ -234,11 +234,11 @@ notebrain search "message brokers" "redis queue"
 notebrain search "redis streams" --show-tags
 
 # Exclude private and archive notes from results (slug, title, or path)
-notebrain search "reconciliation loop in kubernetes" --exclude-note "private/daily-journal" --exclude-note "archive"
-notebrain search "redis queues" --exclude-note "zeta-note.md,beta.md"
+notebrain search "reconciliation loop in kubernetes" --exclude-notes "private/daily-journal" --exclude-notes "archive"
+notebrain search "redis queues" --exclude-notes "zeta-note.md,beta.md"
 
 # Text output notes that some notes were excluded
-notebrain search "kubernetes" --exclude-note "archive"
+notebrain search "kubernetes" --exclude-notes "archive"
 ```
 
 #### How Multi-Query Matching and Ranking Works
@@ -306,13 +306,13 @@ notebrain refs <note> [flags]
 
 | Flag | Description |
 | --- | --- |
-| `--images` | Include image attachments only |
-| `--pdf` | Include PDF attachments only |
-| `--other` | Include other attachments (video, audio, archives, office docs) |
-| `--external-links` | Include external website links (URLs) only |
+| `--only-images` | Limit to image attachments only |
+| `--only-pdf` | Limit to PDF attachments only |
+| `--only-other` | Limit to other attachments (video, audio, archives, office docs) |
+| `--only-external-links` | Limit to external website links (URLs) only |
 | `--include-missing` | Include references whose file is missing from the vault (marked `missing: true`) |
 
-Filters combine with OR semantics; with no filter flags every kind is listed.
+Flags combine with OR semantics; with no filter flags every kind is listed. The old names `--images`/`--pdf`/`--other`/`--external-links` still parse but are deprecated.
 
 #### Examples
 
@@ -321,16 +321,16 @@ Filters combine with OR semantics; with no filter flags every kind is listed.
 notebrain refs "kubernetes-notes"
 
 # List image attachments as machine-readable JSON
-notebrain refs "kubernetes-notes" --images --format=json
+notebrain refs "kubernetes-notes" --only-images --format=json
 
 # List PDF attachments as TSV
-notebrain refs "kubernetes-notes" --pdf --format=tsv
+notebrain refs "kubernetes-notes" --only-pdf --format=tsv
 
 # List external website links
-notebrain refs "kubernetes-notes" --external-links --format=json
+notebrain refs "kubernetes-notes" --only-external-links --format=json
 
 # Feed attachment paths straight into a script
-notebrain refs "$SLUG" --images --jsonpath='$.refs[*].path'
+notebrain refs "$SLUG" --only-images --jsonpath='$.refs[*].path'
 ```
 
 #### JSON shape
@@ -425,8 +425,7 @@ notebrain hidden <note> [flags]
 | :----------------- | :-------- | :------ | :----------------------------------------------------------------------------------------------------------------------------------- |
 | `--deep`           | `boolean` | `false` | Does a chunk-by-chunk analysis across individual note sections with the stored vectors.                                       |
 | `--include-linked` | `boolean` | `false` | Includes notes that already have direct or indirect links in the hidden connections output. This strictly excludes self-references. |
-| `--candidate-chunks` | `integer` | _(None)_ | The maximum number of matching target sections to evaluate and show for each candidate note (in `--deep` mode). Replaces `--top-k`. |
-| `--top-k`          | `integer` | `3`     | A deprecated alias for `--candidate-chunks`.                                                                                                      |
+| `--candidate-chunks` | `integer` | `3`     | The maximum number of matching target sections to evaluate and show for each candidate note (in `--deep` mode). |
 | `--limit`          | `integer` | `10`    | The maximum number of hidden connections to show.                                                                                      |
 
 #### How `--deep` Ranking Works

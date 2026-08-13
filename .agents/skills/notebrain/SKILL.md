@@ -46,7 +46,7 @@ notebrain search "<topic>" --format json --include-text --context-window 1 --lim
 **Lean shapes:**
 - Top candidates/slugs only: drop `--context-window`, use `--jsonpath="$.results[*].note_slug"`.
 - Note-level (not chunk-level) list: `--group-by-note` to collapse to the best chunk per note; `dedupe` via `--jsonpath="$.results[*].note_slug" | sort -u`.
-- Weak matches above the `--min-score 0.5` floor, or `--tag`, `--section`, `--has-tasks`, `--has-code`, `--exclude-note`.
+- Weak matches above the `--min-score 0.5` floor, or `--tag`, `--section`, `--has-tasks`, `--has-code`, `--exclude-notes`.
 - Multi-topic at once — boost by adding positional queries: `search "redis pubsub" "kafka brokers"`.
 - A show-tags + `--jsonpath="$.results[0].tags"` reveals real note tags in one call.
 

@@ -15,7 +15,7 @@ Quick reference: the major scenarios with the proven command sequence. Pair with
 | 5   | List all notes tagged X  | `notebrain tags "X" --children --limit 50 --format tsv`                                                                                    |
 | 6   | Semantic search          | `search "<q>" --format=json --include-text --limit 3`; escalate: `--top-k 2 --context-window 1`; stop when top score ≥ 0.75                |
 | 7   | Multi-topic comparison   | `notebrain search "redis pubsub" "kafka brokers" --limit 5 --top-k 2 --format json`                                                        |
-| 8   | Filtered search          | add `--tag "kubernetes"`, `--section "Architecture > Components"`, `--has-tasks`, `--has-code`, `--exclude-note "<slug>"`, `--min-score 0.3` |
+| 8   | Filtered search          | add `--tag "kubernetes"`, `--section "Architecture > Components"`, `--has-tasks`, `--has-code`, `--exclude-notes "<slug>"`, `--min-score 0.3` |
 | 9   | Zero-result handling     | short common words now fall back to a lexical token scan (`"lexical": true`, `score: 0`); if still nothing → longer descriptive phrase or `tags` query; never grep the vault          |
 | 10  | Backlinks                | `notebrain backlinks "<slug>" --format json --limit 10`                                                                                    |
 | 11  | Connections              | `notebrain connections "<slug>" --hops 2 --format tsv`                                                                                     |
@@ -24,7 +24,7 @@ Quick reference: the major scenarios with the proven command sequence. Pair with
 | 14  | Metadata-only extraction | `--jsonpath`, `--format tsv`, `--show-file-path=false` (cuts ~40–50% of tokens)                                                            |
 | 15  | Context vs full `get`    | context: `--context-window 1 --include-text`; full note only on explicit demand: `get "<slug>"`                                            |
 | 16  | Stale-index recovery     | a slug that 404s mid-conversation → re-resolve: `search "<title>" --limit 3 --jsonpath="$.results[*].note_slug"`                           |
-| 17  | Reference inventory      | `notebrain refs "<slug>" --format json` (all kinds); kind filters: `--images` / `--pdf` / `--other` / `--external-links`                    |
+| 17  | Reference inventory      | `notebrain refs "<slug>" --format json` (all kinds); kind filters: `--only-images` / `--only-pdf` / `--only-other` / `--only-external-links`                    |
 | 18  | Broken-link audit        | `notebrain refs "<slug>" --include-missing --format tsv` → rows with `missing` = `true` are broken; omit `--include-missing` to see only existing files |
 
 ## Semantics (verified)

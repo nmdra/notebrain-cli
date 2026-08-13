@@ -8,7 +8,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Reference Listing**: `notebrain refs <note>` lists a note's local attachments (images, PDFs, archives, …) and external website links, filterable with `--images`, `--pdf`, `--other`, and `--external-links`. Broken links are hidden by default and surfaced with `--include-missing` (`feat(cmd)`).
+- **Reference Listing**: `notebrain refs <note>` lists a note's local attachments (images, PDFs, archives, …) and external website links, filterable with `--only-images`, `--only-pdf`, `--only-other`, and `--only-external-links`. Broken links are hidden by default and surfaced with `--include-missing` (`feat(cmd)`).
+
+### Changed
+- **Refs kind filters renamed**: `refs` filters are now `--only-images`/`--only-pdf`/`--only-other`/`--only-external-links` with "limit to" semantics; no flags = all kinds, combine to union (`refactor(cmd)`).
+- **PDF flag unified**: `ingest` now uses `--with-pdf` (matching `search`/`boosted`); the config key is `with-pdf` (`refactor(cmd)`).
+- **Hidden depth flag**: `--candidate-chunks` is now the single flag for `hidden --deep` depth (`refactor(cmd)`).
+- **Search exclude flag**: `--exclude-note` is now `--exclude-notes` (`refactor(cmd)`).
+- **Get positional**: `get` positional argument renamed `<SLUG>` → `<NOTE>` in documentation and conventions (`refactor(cmd)`).
+- **TSV parity**: `search` TSV header `slug` → `note_slug`; `get` TSV fields escaped; scores at 4 decimal places in TSV, matching JSON (`fix(output)`).
+- **Refs TSV**: external-link rows now emit `false` in the `missing` column instead of a blank cell (`fix(output)`).
+- **JSONPath envelope parity**: `get` and `stats` apply `--jsonpath` to their full command envelope; `$.command` now works, and `get` paths shift from `$.note_slug` to `$.note.note_slug` (`fix(output)`).
+
+### Deprecated
+- `refs --images`/`--pdf`/`--other`/`--external-links` — use `--only-*` (aliases still parse, hidden from `--help`).
+- `ingest --enable-pdf` (and config key `enable-pdf`) — use `--with-pdf` (`with-pdf`).
+- `search --exclude-note` — use `--exclude-notes`.
+
+### Removed
+- `hidden --top-k` (alias of `--candidate-chunks`) — breaking; use `--candidate-chunks`, which now defaults to `3`.
 
 ## [v2.12.0] - 2026-08-02
 

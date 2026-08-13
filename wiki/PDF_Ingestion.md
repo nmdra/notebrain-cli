@@ -22,12 +22,12 @@ NoteBrain detects the provider automatically. It uses the model prefix or the av
 
 ## How to Enable
 
-To index PDFs during an ingestion run, provide the `--enable-pdf` and `--llm-model` flags:
+To index PDFs during an ingestion run, provide the `--with-pdf` and `--llm-model` flags:
 
 ```bash
 export OPENROUTER_API_KEY="your-key-here"
 
-notebrain ingest --enable-pdf --llm-model="tencent/hy3"
+notebrain ingest --with-pdf --llm-model="tencent/hy3"
 ```
 
 You can set these values permanently with the CLI wizard:
@@ -45,7 +45,7 @@ llm_model = "tencent/hy3"
 
 ## Fallbacks and Cost Control
 
-If you run `notebrain ingest` with `--enable-pdf` but your API key is missing, NoteBrain has a fallback process:
+If you run `notebrain ingest` with `--with-pdf` but your API key is missing, NoteBrain has a fallback process:
 
 - NoteBrain prints a warning that PDF ingestion is disabled.
 - NoteBrain skips new or updated PDFs.

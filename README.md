@@ -32,7 +32,7 @@ NoteBrain includes an [AI agent skill](wiki/Skill_Usage.md) and an [OpenCode Age
 - **Graph-Boosted Ranking**: Combine semantic similarity with graph relationships for better search results.
 - **Advanced Filtering**: Filter results by sections, tags, code blocks, tasks, and other metadata.
 - **Full Note Retrieval**: Get the complete note from the indexed content.
-- **Reference Listing**: List a note's local attachments (images, PDFs, archives) and external website links with `notebrain refs`, filterable by kind — `--images`, `--pdf`, or `--external-links`.
+- **Reference Listing**: List a note's local attachments (images, PDFs, archives) and external website links with `notebrain refs`, filterable by kind — `--only-images`, `--only-pdf`, or `--only-external-links`.
 - **Structured Output**: Export results as JSON or TSV. Use built-in JSONPath queries for automation.
 - **AI Agent Integration**: NoteBrain has a built-in AI agent skill for autonomous knowledge retrieval.
 - **Terminal Hyperlinks**: Use OSC 8 hyperlinks to open notes from supported terminals.
@@ -85,7 +85,7 @@ This command starts an interactive wizard. The wizard configures your vault path
 notebrain ingest
 
 # To index PDFs, you must provide an LLM model and an API key (DEEPSEEK_API_KEY, OPENROUTER_API_KEY, etc.):
-# OPENROUTER_API_KEY="sk-or-..." notebrain ingest --enable-pdf --llm-model "tencent/hy3"
+# OPENROUTER_API_KEY="sk-or-..." notebrain ingest --with-pdf --llm-model "tencent/hy3"
 ```
 
 > Note: The first indexing operation takes several minutes. The time depends on your vault size and the quantity of PDFs.
@@ -139,7 +139,7 @@ SLUG=$(notebrain search "message broker" --limit 1 --jsonpath="$.results[0].note
 notebrain get "$SLUG" --jsonpath="$.text"
 
 # Fetch absolute paths of the note's image attachments
-notebrain refs "$SLUG" --images --jsonpath='$.refs[*].path'
+notebrain refs "$SLUG" --only-images --jsonpath='$.refs[*].path'
 ```
 
 **7. Automate indexing:** Set a cron job or systemd timer to keep your index current. Read [Scheduled Ingestion](wiki/Scheduled_Ingestion.md).
