@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/alecthomas/kong"
+
 	"github.com/nmdra/notebrain-cli/v2/internal/store"
 )
 
@@ -106,27 +108,45 @@ func TestRefsFilters(t *testing.T) {
 	}{
 		{
 			name:    "images only",
-			cmd:     RefsCmd{Note: "router", Images: true},
+			cmd:     RefsCmd{Note: "router", OnlyImages: true},
 			include: []string{filepath.Join(vaultDir, "Notes", "cover.png")},
 			exclude: []string{"att.pdf", "https://example.com/docs", "[external-links]"},
 		},
 		{
 			name:    "pdf only",
-			cmd:     RefsCmd{Note: "router", PDF: true},
+			cmd:     RefsCmd{Note: "router", OnlyPDF: true},
 			include: []string{filepath.Join(vaultDir, "99.Storage-Shed", "Attachments", "att.pdf")},
 			exclude: []string{"cover.png", "https://example.com/docs"},
 		},
 		{
 			name:    "external links only",
-			cmd:     RefsCmd{Note: "router", ExternalLinks: true},
+			cmd:     RefsCmd{Note: "router", OnlyExternal: true},
 			include: []string{"[external-links] https://example.com/docs", "[external-links] https://links.example.com"},
 			exclude: []string{"cover.png", "att.pdf", "localhost", ".png"},
 		},
 		{
 			name:    "combined or",
-			cmd:     RefsCmd{Note: "router", Images: true, PDF: true},
+			cmd:     RefsCmd{Note: "router", OnlyImages: true, OnlyPDF: true},
 			include: []string{filepath.Join(vaultDir, "Notes", "cover.png"), filepath.Join(vaultDir, "99.Storage-Shed", "Attachments", "att.pdf")},
 			exclude: []string{"https://example.com"},
+		},
+		{
+			name:    "deprecated images alias",
+			cmd:     RefsCmd{Note: "router", Images: true},
+			include: []string{filepath.Join(vaultDir, "Notes", "cover.png")},
+			exclude: []string{"att.pdf", "https://example.com/docs", "[external-links]"},
+		},
+		{
+			name:    "deprecated pdf alias",
+			cmd:     RefsCmd{Note: "router", PDF: true},
+			include: []string{filepath.Join(vaultDir, "99.Storage-Shed", "Attachments", "att.pdf")},
+			exclude: []string{"cover.png", "https://example.com/docs"},
+		},
+		{
+			name:    "deprecated mixed aliases",
+			cmd:     RefsCmd{Note: "router", Images: true, OnlyExternal: true},
+			include: []string{filepath.Join(vaultDir, "Notes", "cover.png"), "[external-links] https://example.com/docs"},
+			exclude: []string{"att.pdf"},
 		},
 	}
 	for _, tt := range tests {
@@ -327,7 +347,7 @@ func TestRefsTSV(t *testing.T) {
 		t.Errorf("tsv row = %q, want %q", lines[1], want)
 	}
 	last := lines[len(lines)-1]
-	if want := "https://links.example.com\texternal-links\t\t"; last != want {
+	if want := "https://links.example.com\texternal-links\tfalse\t"; last != want {
 		t.Errorf("external tsv row = %q, want %q", last, want)
 	}
 }
@@ -424,6 +444,109 @@ func TestRefsNoteNotFoundPassthrough(t *testing.T) {
 	}
 }
 
+// refsParser builds a kong parser bound to a RefsCmd so flag-level behavior
+// (alias parsing, help visibility) can be asserted without running the command.
+func refsParser(t *testing.T) (*kong.Kong, *RefsCmd) {
+	t.Helper()
+	var cli struct {
+		Globals Globals `embed:""`
+		Refs    RefsCmd `cmd:""`
+	}
+	parser, err := kong.New(&cli, kong.ExplicitGroups(helpGroups()))
+	if err != nil {
+		t.Fatalf("kong.New: %v", err)
+	}
+	return parser, &cli.Refs
+}
+
+func TestRefsOnlyFlagsParseAndLegacyAliasesHidden(t *testing.T) {
+	parser, _ := refsParser(t)
+
+	tests := []struct {
+		name string
+		args []string
+	}{
+		{name: "only-images", args: []string{"refs", "x", "--only-images"}},
+		{name: "only-pdf", args: []string{"refs", "x", "--only-pdf"}},
+		{name: "only-other", args: []string{"refs", "x", "--only-other"}},
+		{name: "only-external-links", args: []string{"refs", "x", "--only-external-links"}},
+		{name: "include-missing", args: []string{"refs", "x", "--include-missing"}},
+		{name: "legacy images alias", args: []string{"refs", "x", "--images"}},
+		{name: "legacy pdf alias", args: []string{"refs", "x", "--pdf"}},
+		{name: "legacy other alias", args: []string{"refs", "x", "--other"}},
+		{name: "legacy external-links alias", args: []string{"refs", "x", "--external-links"}},
+		{name: "new and legacy mixed", args: []string{"refs", "x", "--only-images", "--pdf"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, err := parser.Parse(tt.args)
+			if err != nil {
+				t.Fatalf("parse %v: %v", tt.args, err)
+			}
+			if !strings.HasPrefix(ctx.Command(), "refs ") {
+				t.Errorf("command = %q, want refs", ctx.Command())
+			}
+		})
+	}
+
+	var help strings.Builder
+	parser.Stdout = &help
+	ctx, err := parser.Parse([]string{"refs", "x"})
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if err := ctx.PrintUsage(false); err != nil {
+		t.Fatalf("PrintUsage: %v", err)
+	}
+	for _, visible := range []string{"--only-images", "--only-pdf", "--only-other", "--only-external-links", "--include-missing"} {
+		if !strings.Contains(help.String(), visible) {
+			t.Errorf("help must show %s:\n%s", visible, help.String())
+		}
+	}
+	for _, hidden := range []string{"--images", "--image", "--pdf", "--other", "--external-links", "deprecated"} {
+		if strings.Contains(help.String(), hidden) {
+			t.Errorf("help must not show deprecated alias %q:\n%s", hidden, help.String())
+		}
+	}
+
+	var cli struct {
+		Globals Globals `embed:""`
+		Refs    RefsCmd `cmd:""`
+	}
+	flagParser, err := kong.New(&cli, kong.ExplicitGroups(helpGroups()))
+	if err != nil {
+		t.Fatalf("kong.New: %v", err)
+	}
+	if _, err := flagParser.Parse([]string{"refs", "x", "--only-images"}); err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if !cli.Refs.OnlyImages {
+		t.Errorf("--only-images did not set OnlyImages")
+	}
+}
+
+func TestRefsMultipleOnlyFlagsUnion(t *testing.T) {
+	parser, refs := refsParser(t)
+
+	t.Run("only-images + only-pdf", func(t *testing.T) {
+		_, err := parser.Parse([]string{"refs", "x", "--only-images", "--only-pdf"})
+		if err != nil {
+			t.Fatalf("parse: %v", err)
+		}
+		if !refs.OnlyImages || !refs.OnlyPDF {
+			t.Errorf("expected both flags set, got %+v", *refs)
+		}
+	})
+	t.Run("only-images + legacy pdf", func(t *testing.T) {
+		if _, err := parser.Parse([]string{"refs", "x", "--only-images", "--pdf"}); err != nil {
+			t.Fatalf("parse: %v", err)
+		}
+		if !refs.OnlyImages || !refs.PDF {
+			t.Errorf("expected new + legacy flags set, got %+v", *refs)
+		}
+	})
+}
+
 func TestPrintRefsFormattedToWriter(t *testing.T) {
 	env := refsEnvelope{
 		Command:  "refs",
@@ -479,7 +602,7 @@ func TestPrintRefsFormattedToWriter(t *testing.T) {
 		if err := printRefsFormattedToWriter(&sb, env, &Globals{Format: formatTSV}); err != nil {
 			t.Fatal(err)
 		}
-		want := "path\tkind\tmissing\trelative_path\n/vault/Notes/cover.png\timage\tfalse\tNotes/cover.png\nhttps://example.com\texternal-links\t\t\n"
+		want := "path\tkind\tmissing\trelative_path\n/vault/Notes/cover.png\timage\tfalse\tNotes/cover.png\nhttps://example.com\texternal-links\tfalse\t\n"
 		if sb.String() != want {
 			t.Errorf("tsv = %q, want %q", sb.String(), want)
 		}

@@ -23,6 +23,7 @@ package cmd
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -46,11 +47,18 @@ const (
 
 type RefsCmd struct {
 	Note           string `arg:"" help:"note slug, title, or file path (auto-resolved)" completion-predictor:"note-slug"`
-	Images         bool   `group:"refs" help:"include image attachments" default:"false"`
-	PDF            bool   `group:"refs" help:"include PDF attachments" default:"false"`
-	Other          bool   `group:"refs" help:"include other attachments (video, audio, archives, office docs)" default:"false"`
-	ExternalLinks  bool   `group:"refs" name:"external-links" help:"include external website links (URLs)" default:"false"`
+	OnlyImages     bool   `group:"refs" name:"only-images" help:"limit to image attachments (no filter = all kinds; combine filters to union)" default:"false"`
+	OnlyPDF        bool   `group:"refs" name:"only-pdf" help:"limit to PDF attachments (no filter = all kinds; combine filters to union)" default:"false"`
+	OnlyOther      bool   `group:"refs" name:"only-other" help:"limit to other attachments (video, audio, archives, office docs) (no filter = all kinds; combine filters to union)" default:"false"`
+	OnlyExternal   bool   `group:"refs" name:"only-external-links" help:"limit to external website links (URLs) (no filter = all kinds; combine filters to union)" default:"false"`
 	IncludeMissing bool   `group:"refs" name:"include-missing" help:"include references whose file is missing from the vault" default:"false"`
+
+	// Deprecated aliases for the kind filters, kept parseable but hidden from
+	// --help. Use the --only-* flags instead.
+	Images        bool `group:"refs" name:"images" hidden:"" help:"deprecated: use --only-images" default:"false"`
+	PDF           bool `group:"refs" name:"pdf" hidden:"" help:"deprecated: use --only-pdf" default:"false"`
+	Other         bool `group:"refs" name:"other" hidden:"" help:"deprecated: use --only-other" default:"false"`
+	ExternalLinks bool `group:"refs" name:"external-links" hidden:"" help:"deprecated: use --only-external-links" default:"false"`
 }
 
 // refEntry is one resolved reference row. Path is absolute for attachments and
@@ -75,7 +83,7 @@ func (c *RefsCmd) Run(globals *Globals) error {
 	ctx := globals.Ctx
 	vaultPath := globals.VaultPath
 	if vaultPath == "" {
-		return &UsageError{Err: fmt.Errorf("--vault-path flag or config file setting must be specified — run 'notebrain init' to create a config")}
+		return &UsageError{Err: errors.New(vaultPathUsageError)}
 	}
 	if strings.TrimSpace(c.Note) == "" {
 		return &UsageError{Err: fmt.Errorf("%s requires a note slug, title, or file path", groupRefs)}
@@ -239,29 +247,51 @@ func filterExistingRefs(entries []refEntry) []refEntry {
 }
 
 // filterRefKinds keeps rows matching any selected kind flag; no flags select
-// every kind.
+// every kind. Deprecated aliases (Images/PDF/Other/ExternalLinks) count the
+// same as their --only-* replacements.
 func filterRefKinds(entries []refEntry, c *RefsCmd) []refEntry {
-	if !c.Images && !c.PDF && !c.Other && !c.ExternalLinks {
+	if len(entries) == 0 {
+		return entries
+	}
+	filter := refsKindFilterFromCmd(c)
+	if !filter.images && !filter.pdf && !filter.other && !filter.external {
 		return entries
 	}
 	kept := make([]refEntry, 0, len(entries))
 	for _, e := range entries {
-		keep := false
-		switch e.Kind {
-		case kindImage:
-			keep = c.Images
-		case kindPDF:
-			keep = c.PDF
-		case kindOther:
-			keep = c.Other
-		case kindExternal:
-			keep = c.ExternalLinks
-		}
-		if keep {
+		if filter.keep(e.Kind) {
 			kept = append(kept, e)
 		}
 	}
 	return kept
+}
+
+// refsKindFilter merges the --only-* flags with their deprecated aliases.
+type refsKindFilter struct {
+	images, pdf, other, external bool
+}
+
+func refsKindFilterFromCmd(c *RefsCmd) refsKindFilter {
+	return refsKindFilter{
+		images:   c.OnlyImages || c.Images,
+		pdf:      c.OnlyPDF || c.PDF,
+		other:    c.OnlyOther || c.Other,
+		external: c.OnlyExternal || c.ExternalLinks,
+	}
+}
+
+func (f refsKindFilter) keep(kind string) bool {
+	switch kind {
+	case kindImage:
+		return f.images
+	case kindPDF:
+		return f.pdf
+	case kindOther:
+		return f.other
+	case kindExternal:
+		return f.external
+	}
+	return false
 }
 
 // printRefsFormatted renders a refs envelope to stdout based on the requested
@@ -284,9 +314,6 @@ func printRefsFormattedToWriter(w io.Writer, env refsEnvelope, globals *Globals)
 		_, _ = fmt.Fprintln(w, "path\tkind\tmissing\trelative_path")
 		for _, r := range env.Refs {
 			missing := strconv.FormatBool(r.Missing)
-			if r.Kind == kindExternal {
-				missing = ""
-			}
 			_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", tsvEscape(r.Path), r.Kind, missing, tsvEscape(r.RelativePath))
 		}
 		return nil
