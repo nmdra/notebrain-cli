@@ -65,12 +65,12 @@ func TestRefsText(t *testing.T) {
 	})
 
 	wantLines := []string{
-		"[image] " + filepath.Join(vaultDir, "Notes", "cover.png"),
-		"[image] " + filepath.Join(vaultDir, "assets", "arch.png"),
-		"[image] " + filepath.Join(vaultDir, "Notes", "local.png"),
-		"[image] " + filepath.Join(vaultDir, "Notes", "Router Modes.webp"),
-		"[pdf] " + filepath.Join(vaultDir, "99.Storage-Shed", "Attachments", "att.pdf"),
-		"[image] " + filepath.Join(vaultDir, "Notes", "a.png"),
+		"[image] Notes/cover.png",
+		"[image] assets/arch.png",
+		"[image] Notes/local.png",
+		"[image] Notes/Router Modes.webp",
+		"[pdf] 99.Storage-Shed/Attachments/att.pdf",
+		"[image] Notes/a.png",
 		"[external-links] https://example.com/docs",
 		"[external-links] https://links.example.com",
 	}
@@ -78,6 +78,9 @@ func TestRefsText(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Errorf("text output missing %q:\n%s", want, out)
 		}
+	}
+	if !strings.Contains(out, "Router") {
+		t.Errorf("text output missing the note title header:\n%s", out)
 	}
 	if strings.Contains(out, "broken.png") {
 		t.Errorf("missing reference shown without --include-missing:\n%s", out)
@@ -109,13 +112,13 @@ func TestRefsFilters(t *testing.T) {
 		{
 			name:    "images only",
 			cmd:     RefsCmd{Note: "router", OnlyImages: true},
-			include: []string{filepath.Join(vaultDir, "Notes", "cover.png")},
+			include: []string{"Notes/cover.png"},
 			exclude: []string{"att.pdf", "https://example.com/docs", "[external-links]"},
 		},
 		{
 			name:    "pdf only",
 			cmd:     RefsCmd{Note: "router", OnlyPDF: true},
-			include: []string{filepath.Join(vaultDir, "99.Storage-Shed", "Attachments", "att.pdf")},
+			include: []string{"99.Storage-Shed/Attachments/att.pdf"},
 			exclude: []string{"cover.png", "https://example.com/docs"},
 		},
 		{
@@ -127,25 +130,25 @@ func TestRefsFilters(t *testing.T) {
 		{
 			name:    "combined or",
 			cmd:     RefsCmd{Note: "router", OnlyImages: true, OnlyPDF: true},
-			include: []string{filepath.Join(vaultDir, "Notes", "cover.png"), filepath.Join(vaultDir, "99.Storage-Shed", "Attachments", "att.pdf")},
+			include: []string{"Notes/cover.png", "99.Storage-Shed/Attachments/att.pdf"},
 			exclude: []string{"https://example.com"},
 		},
 		{
 			name:    "deprecated images alias",
 			cmd:     RefsCmd{Note: "router", Images: true},
-			include: []string{filepath.Join(vaultDir, "Notes", "cover.png")},
+			include: []string{"Notes/cover.png"},
 			exclude: []string{"att.pdf", "https://example.com/docs", "[external-links]"},
 		},
 		{
 			name:    "deprecated pdf alias",
 			cmd:     RefsCmd{Note: "router", PDF: true},
-			include: []string{filepath.Join(vaultDir, "99.Storage-Shed", "Attachments", "att.pdf")},
+			include: []string{"99.Storage-Shed/Attachments/att.pdf"},
 			exclude: []string{"cover.png", "https://example.com/docs"},
 		},
 		{
 			name:    "deprecated mixed aliases",
 			cmd:     RefsCmd{Note: "router", Images: true, OnlyExternal: true},
-			include: []string{filepath.Join(vaultDir, "Notes", "cover.png"), "[external-links] https://example.com/docs"},
+			include: []string{"Notes/cover.png", "[external-links] https://example.com/docs"},
 			exclude: []string{"att.pdf"},
 		},
 	}
@@ -175,7 +178,7 @@ func TestRefsMissingHiddenUnlessFlagged(t *testing.T) {
 	fs := &fakeStore{noteMeta: &store.NoteContent{NoteSlug: "router", Title: "Router", FilePath: "Notes/router.md"}}
 	withFakeStore(t, fs)
 
-	missingPath := filepath.Join(vaultDir, "Notes", "broken.png")
+	missingPath := "Notes/broken.png"
 
 	out := captureStdout(t, func() {
 		if err := (&RefsCmd{Note: "router"}).Run(refsTestGlobals(vaultDir)); err != nil {
@@ -249,9 +252,9 @@ func TestRefsCrossKindOrder(t *testing.T) {
 	})
 	wantLines := []string{
 		"[external-links] https://example.com/docs",
-		"[image] " + filepath.Join(vaultDir, "Notes", "cover.png"),
+		"[image] " + "Notes/cover.png",
 		"[external-links] https://links.example.com",
-		"[image] " + filepath.Join(vaultDir, "Notes", "second.png"),
+		"[image] Notes/second.png",
 	}
 	idxs := make([]int, len(wantLines))
 	for i, want := range wantLines {
@@ -362,7 +365,7 @@ func TestRefsJSONPath(t *testing.T) {
 			t.Errorf("Run: %v", err)
 		}
 	})
-	want := filepath.Join(vaultDir, "Notes", "cover.png")
+	want := "Notes/cover.png"
 	if !strings.Contains(out, want) {
 		t.Errorf("jsonpath output missing %q:\n%s", want, out)
 	}
@@ -565,7 +568,7 @@ func TestPrintRefsFormattedToWriter(t *testing.T) {
 		if err := printRefsFormattedToWriter(&sb, env, globals); err != nil {
 			t.Fatal(err)
 		}
-		want := "[image] /vault/Notes/cover.png\n[external-links] https://example.com\n"
+		want := "Router\n      \n──────\n[image] Notes/cover.png\n[external-links] https://example.com\n"
 		if sb.String() != want {
 			t.Errorf("text = %q, want %q", sb.String(), want)
 		}

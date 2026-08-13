@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **TSV parity**: `search` TSV header `slug` → `note_slug`; `get` TSV fields escaped; scores at 4 decimal places in TSV, matching JSON (`fix(output)`).
 - **Refs TSV**: external-link rows now emit `false` in the `missing` column instead of a blank cell (`fix(output)`).
 - **JSONPath envelope parity**: `get` and `stats` apply `--jsonpath` to their full command envelope; `$.command` now works, and `get` paths shift from `$.note_slug` to `$.note.note_slug` (`fix(output)`).
+- **Refs text styling**: `refs` text output now matches the house style — note title header, per-kind colored `[kind]` chips (images, PDFs, other, external links), amber `(missing)` markers, clickable links (obsidian:// for attachments, the URL for external links), vault-relative paths instead of absolute ones, and terminal-width truncation (`feat(cmd)`).
 
 ### Deprecated
 - `refs --images`/`--pdf`/`--other`/`--external-links` — use `--only-*` (aliases still parse, hidden from `--help`).

@@ -32,6 +32,9 @@ import (
 	"strconv"
 	"strings"
 
+	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
+
 	"github.com/nmdra/notebrain-cli/v2/internal/ingest"
 	"github.com/nmdra/notebrain-cli/v2/internal/parser"
 )
@@ -318,17 +321,72 @@ func printRefsFormattedToWriter(w io.Writer, env refsEnvelope, globals *Globals)
 		}
 		return nil
 	default: // "text"
+		initStyles()
+		title := env.Title
+		if title == "" {
+			title = env.NoteSlug
+		}
+		_, _ = fmt.Fprintln(w, headerStyle.Render(title))
+
 		if len(env.Refs) == 0 {
-			_, _ = fmt.Fprintln(w, "No references found")
+			_, _ = fmt.Fprintln(w, hintStyle.Render("  No references found"))
 			return nil
 		}
+
+		termWidth := getTerminalWidth()
+		useLinks := hyperlinkSupported() && globals.ShowFilePath
+
 		for _, r := range env.Refs {
-			marker := ""
-			if r.Missing {
-				marker = " (missing)"
+			chip := refKindChipStyle(r.Kind).Render("[" + r.Kind + "]")
+
+			// Text mode shows vault-relative paths (no base-vault clutter);
+			// external links keep their URL, which is the path itself.
+			display := r.Path
+			if r.Kind != kindExternal && r.RelativePath != "" {
+				display = r.RelativePath
 			}
-			_, _ = fmt.Fprintf(w, "[%s] %s%s\n", r.Kind, r.Path, marker)
+
+			path := display
+			if useLinks {
+				switch r.Kind {
+				case kindExternal:
+					path = hyperlink(true, r.Path, display)
+				default:
+					if r.RelativePath != "" {
+						path = hyperlink(true, ObsidianURI(globals.VaultName, r.RelativePath), display)
+					}
+				}
+			}
+			line := fmt.Sprintf("%s %s", chip, path)
+			if r.Missing {
+				line += " " + warnBoldStyle.Render("(missing)")
+			}
+			if termWidth > 0 && ansi.StringWidth(line) > termWidth {
+				line = ansi.Truncate(line, termWidth, "…")
+			}
+			_, _ = fmt.Fprintln(w, line)
+		}
+
+		if useLinks {
+			_, _ = fmt.Fprintln(w, "\n  "+extraStyle.Render("(Ctrl+click / Cmd+click a reference to open it)"))
 		}
 		return nil
+	}
+}
+
+// refKindChipStyle returns the style for a ref kind chip in text output:
+// images use the accent, PDFs the blue tag used by search, other
+// attachments the muted gray, and external links the bold label.
+func refKindChipStyle(kind string) lipgloss.Style {
+	initStyles()
+	switch kind {
+	case kindImage:
+		return titleStyle
+	case kindPDF:
+		return pdfTagStyle
+	case kindOther:
+		return metaStyle
+	default: // kindExternal
+		return labelStyle
 	}
 }
