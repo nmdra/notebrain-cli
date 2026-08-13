@@ -42,7 +42,8 @@ type SearchCmd struct {
 	HasTasks     bool     `group:"search" help:"only return chunks containing task lists (checkboxes)"`
 	HasCode      bool     `group:"search" help:"only return chunks containing fenced code blocks"`
 	WithPDF      bool     `group:"search" help:"include PDF results in search"`
-	ExcludeNotes []string `group:"search" name:"exclude-note" help:"exclude notes from results (slug, title, or path; repeatable or comma-separated)" completion-predictor:"note-slug"`
+	ExcludeNotes []string `group:"search" name:"exclude-notes" help:"exclude notes from results (slug, title, or path; repeatable or comma-separated)" completion-predictor:"note-slug"`
+	ExcludeNote  []string `group:"search" name:"exclude-note" hidden:"" help:"deprecated: use --exclude-notes"`
 	ChunkDisplayFlags
 }
 
@@ -111,6 +112,9 @@ func (c *SearchCmd) Run(globals *Globals) error {
 	}
 	defer func() { _ = st.Close() }()
 
+	if len(c.ExcludeNote) > 0 {
+		c.ExcludeNotes = append(append([]string(nil), c.ExcludeNotes...), c.ExcludeNote...)
+	}
 	excluded, err := c.resolveExcludes(ctx, st)
 	if err != nil {
 		return err
@@ -126,7 +130,8 @@ func (c *SearchCmd) Run(globals *Globals) error {
 	return c.runStatic(ctx, globals, st, emb, resolved, displayQueries, excluded)
 }
 
-// resolveExcludes normalizes, resolves, and validates --exclude-note values.
+// resolveExcludes normalizes, resolves, and validates --exclude-notes
+// (and the deprecated --exclude-note alias) values.
 // Each value may be a slug, title, filename, or partial path (the same
 // resolution `get` and `hidden` use). Values that resolve to nothing are
 // reported as a warning so typos do not silently no-op. Returns the resolved

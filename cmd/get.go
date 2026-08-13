@@ -10,7 +10,7 @@ import (
 )
 
 type GetCmd struct {
-	Slug string `arg:"" help:"note slug, title, or file path (auto-resolved)" completion-predictor:"note-slug"`
+	Note string `arg:"" help:"note slug, title, or file path (auto-resolved)" completion-predictor:"note-slug"`
 	Meta bool   `group:"get" help:"show only the note header (title, path, tags, chunk count) without any text" default:"false"`
 	Head int    `group:"get" help:"show only the first N chunks of text (0 = full note)" default:"0"`
 }
@@ -26,31 +26,32 @@ func (c *GetCmd) Run(globals *Globals) error {
 	var note *store.NoteContent
 	switch {
 	case c.Meta:
-		note, err = st.GetNoteMeta(ctx, c.Slug)
+		note, err = st.GetNoteMeta(ctx, c.Note)
 	case c.Head > 0:
-		note, err = st.GetNoteHead(ctx, c.Slug, c.Head)
+		note, err = st.GetNoteHead(ctx, c.Note, c.Head)
 	default:
-		note, err = st.GetNote(ctx, c.Slug)
+		note, err = st.GetNote(ctx, c.Note)
 	}
 	if err != nil {
 		return err
 	}
 
+	env := struct {
+		Command string             `json:"command"`
+		Query   string             `json:"query"`
+		Note    *store.NoteContent `json:"note"`
+	}{
+		Command: groupGet,
+		Query:   c.Note,
+		Note:    note,
+	}
+
 	if globals.JSONPath != "" {
-		return printJSONPathResult(note, globals.JSONPath)
+		return printJSONPathResult(env, globals.JSONPath)
 	}
 
 	switch globals.Format {
 	case formatJSON:
-		env := struct {
-			Command string             `json:"command"`
-			Query   string             `json:"query"`
-			Note    *store.NoteContent `json:"note"`
-		}{
-			Command: groupGet,
-			Query:   c.Slug,
-			Note:    note,
-		}
 		enc := json.NewEncoder(os.Stdout)
 		enc.SetIndent("", "  ")
 		return enc.Encode(env)
@@ -59,7 +60,7 @@ func (c *GetCmd) Run(globals *Globals) error {
 		fmt.Println("note_slug\ttitle\tfile_path\ttags\tchunks\ttext")
 		tagsStr := formatTags(note.Tags)
 		fmt.Printf("%s\t%s\t%s\t%s\t%d\t%s\n",
-			note.NoteSlug, note.Title, note.FilePath, tagsStr, note.Chunks, note.Text)
+			tsvEscape(note.NoteSlug), tsvEscape(note.Title), tsvEscape(note.FilePath), tsvEscape(tagsStr), note.Chunks, tsvEscape(note.Text))
 		return nil
 
 	default: // "text"

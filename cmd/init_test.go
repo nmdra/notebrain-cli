@@ -12,7 +12,7 @@ import (
 // initTestConfig is a minimal stand-in for config.example.toml containing the
 // marker lines the init wizard rewrites.
 const initTestConfig = `# vault-path = "/home/user/Documents/Obsidian Vault"
-# enable-pdf = false
+# with-pdf = false
 `
 
 func TestInitCmdWritesConfig(t *testing.T) {
@@ -38,8 +38,8 @@ func TestInitCmdWritesConfig(t *testing.T) {
 	if !strings.Contains(s, wantVault) {
 		t.Errorf("config missing %q, got:\n%s", wantVault, s)
 	}
-	if !strings.Contains(s, "enable-pdf = true") {
-		t.Errorf("config missing enable-pdf = true, got:\n%s", s)
+	if !strings.Contains(s, "with-pdf = true") {
+		t.Errorf("config missing with-pdf = true, got:\n%s", s)
 	}
 }
 

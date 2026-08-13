@@ -15,7 +15,8 @@ type InitCmd struct{}
 // existingConfig mirrors the config keys the wizard can prefill.
 type existingConfig struct {
 	VaultPath string `toml:"vault-path"`
-	EnablePDF bool   `toml:"enable-pdf"`
+	WithPDF   bool   `toml:"with-pdf"`
+	EnablePDF bool   `toml:"enable-pdf"` // deprecated config key, still honored
 }
 
 func (c *InitCmd) Run(globals *Globals) error {
@@ -72,11 +73,11 @@ func (c *InitCmd) Run(globals *Globals) error {
 	}
 
 	// Ask for PDF support
-	enablePDF := askYesNo(reader, "Enable text extraction for PDF attachments?", existing.EnablePDF)
+	enablePDF := askYesNo(reader, "Enable text extraction for PDF attachments?", existing.WithPDF || existing.EnablePDF)
 
 	// Preview the changes before writing anything.
 	fmt.Println()
-	printWarning("Ready to write", fmt.Sprintf("vault-path = %q\nenable-pdf  = %t", vaultPath, enablePDF))
+	printWarning("Ready to write", fmt.Sprintf("vault-path = %q\nwith-pdf   = %t", vaultPath, enablePDF))
 	if !askYesNo(reader, fmt.Sprintf("Write configuration to %s?", configPath), true) {
 		fmt.Println("Initialization aborted.")
 		return nil
@@ -92,7 +93,7 @@ func (c *InitCmd) Run(globals *Globals) error {
 
 	// Replace PDF flag
 	if enablePDF {
-		configStr = strings.Replace(configStr, "# enable-pdf = false", "enable-pdf = true", 1)
+		configStr = strings.Replace(configStr, "# with-pdf = false", "with-pdf = true", 1)
 	}
 
 	// Write the config file

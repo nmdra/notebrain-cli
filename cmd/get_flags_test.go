@@ -15,7 +15,7 @@ func TestGetMetaMode(t *testing.T) {
 	withFakeStore(t, fs)
 
 	out := captureStdout(t, func() {
-		if err := (&GetCmd{Slug: "multi", Meta: true}).Run(&Globals{Ctx: context.Background(), Format: formatText}); err != nil {
+		if err := (&GetCmd{Note: "multi", Meta: true}).Run(&Globals{Ctx: context.Background(), Format: formatText}); err != nil {
 			t.Errorf("Run: %v", err)
 		}
 	})
@@ -37,7 +37,7 @@ func TestGetHeadMode(t *testing.T) {
 	withFakeStore(t, fs)
 
 	out := captureStdout(t, func() {
-		if err := (&GetCmd{Slug: "multi", Head: 2}).Run(&Globals{Ctx: context.Background(), Format: formatText}); err != nil {
+		if err := (&GetCmd{Note: "multi", Head: 2}).Run(&Globals{Ctx: context.Background(), Format: formatText}); err != nil {
 			t.Errorf("Run: %v", err)
 		}
 	})
@@ -54,7 +54,7 @@ func TestGetFullModeUsesGetNote(t *testing.T) {
 	withFakeStore(t, fs)
 
 	_ = captureStdout(t, func() {
-		_ = (&GetCmd{Slug: "multi"}).Run(&Globals{Ctx: context.Background(), Format: formatJSON})
+		_ = (&GetCmd{Note: "multi"}).Run(&Globals{Ctx: context.Background(), Format: formatJSON})
 	})
 	if fs.metaCalls != 0 || fs.headCalls != 0 {
 		t.Errorf("full get must not call meta/head (metaCalls=%d headCalls=%d)", fs.metaCalls, fs.headCalls)

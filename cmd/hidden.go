@@ -33,8 +33,7 @@ type HiddenCmd struct {
 	Note            string `arg:"" help:"note slug, title, or file path (auto-resolved)" completion-predictor:"note-slug"`
 	Limit           int    `group:"hidden" help:"maximum number of hidden connections to return" default:"10"`
 	Deep            bool   `group:"hidden" help:"analyze each chunk individually for granular section-level matches"`
-	TopK            int    `group:"hidden" name:"top-k" help:"chunks to evaluate per candidate note in --deep mode (deprecated alias: --candidate-chunks)" default:"3"`
-	CandidateChunks int    `group:"hidden" name:"candidate-chunks" help:"chunks to evaluate per candidate note in --deep mode (replaces --top-k)"`
+	CandidateChunks int    `group:"hidden" name:"candidate-chunks" help:"chunks to evaluate per candidate note in --deep mode" default:"3"`
 	IncludeLinked   bool   `group:"hidden" name:"include-linked" help:"include notes even if they are already linked directly or indirectly"`
 	ChunkDisplayFlags
 }
@@ -42,10 +41,7 @@ type HiddenCmd struct {
 func (c *HiddenCmd) Run(globals *Globals) error {
 	targetNote := c.Note
 	limit := c.Limit
-	topK := c.TopK
-	if c.CandidateChunks != 0 {
-		topK = c.CandidateChunks
-	}
+	topK := c.CandidateChunks
 
 	ctx := globals.Ctx
 	st, err := openStore(ctx, globals)
@@ -102,7 +98,7 @@ func (c *HiddenCmd) Run(globals *Globals) error {
 		return err
 	}
 
-	cmdName := "hidden"
+	cmdName := groupHidden
 	title := fmt.Sprintf("Hidden connections for: %q (slug: %s)", targetNote, targetSlug)
 	if c.IncludeLinked {
 		cmdName = "hidden --include-linked"
