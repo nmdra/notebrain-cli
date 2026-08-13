@@ -91,7 +91,9 @@ func (c *InitCmd) Run(globals *Globals) error {
 	newVaultLine := fmt.Sprintf(`vault-path = %q`, vaultPath)
 	configStr = strings.Replace(configStr, targetVaultLine, newVaultLine, 1)
 
-	// Replace PDF flag
+	// Replace PDF flag. The target line is the single with-pdf key in the
+	// Ingestion Pipeline Settings section; config keys are flat, so this one
+	// key governs both ingest and search.
 	if enablePDF {
 		configStr = strings.Replace(configStr, "# with-pdf = false", "with-pdf = true", 1)
 	}

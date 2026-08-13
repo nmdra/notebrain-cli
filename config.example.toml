@@ -90,6 +90,8 @@
 # ------------------------------------------------------------------------------
 
 # Include PDF text extraction results in semantic search (notebrain search / boosted).
+# Note: this is the same global with-pdf key as in Ingestion Pipeline Settings above;
+# one value governs both ingest and search (config keys are flat, not section-scoped).
 # with-pdf = false # default: false
 
 # Include matched markdown text snippets in search results.
