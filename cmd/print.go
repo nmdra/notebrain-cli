@@ -184,10 +184,10 @@ func tsvEscape(s string) string {
 }
 
 func printTSVResults(w io.Writer, filtered []store.Result) {
-	_, _ = fmt.Fprintln(w, "slug\ttitle\tfile_path\tscore\ttags\textra\theading_path\ttext")
+	_, _ = fmt.Fprintln(w, "note_slug\ttitle\tfile_path\tscore\ttags\textra\theading_path\ttext")
 	for _, r := range filtered {
 		tagsStr := formatTags(r.Tags)
-		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%f\t%s\t%s\t%s\t%s\n",
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%.4f\t%s\t%s\t%s\t%s\n",
 			tsvEscape(r.NoteSlug), tsvEscape(r.Title), tsvEscape(r.FilePath), r.Score,
 			tsvEscape(tagsStr), tsvEscape(r.Extra), tsvEscape(r.HeadingPath), tsvEscape(r.Text))
 	}
@@ -260,7 +260,7 @@ func printTextResults(w io.Writer, commandName, query string, queries []string, 
 		rank := rankStyle.Render(fmt.Sprintf("%d.", i+1))
 
 		displayTitle := r.Title
-		if r.FileType == kindPDF {
+		if r.FileType == store.FileTypePDF {
 			displayTitle = pdfTagStyle.Render("[PDF] ") + displayTitle
 		}
 

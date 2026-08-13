@@ -45,18 +45,19 @@ func (c *StatsCmd) Run(globals *Globals) error {
 		return err
 	}
 
+	env := struct {
+		Command string `json:"command"`
+		*store.Stats
+	}{
+		Command: "stats",
+		Stats:   stats,
+	}
+
 	if globals.JSONPath != "" {
-		return printJSONPathResult(stats, globals.JSONPath)
+		return printJSONPathResult(env, globals.JSONPath)
 	}
 
 	if globals.Format == formatJSON {
-		env := struct {
-			Command string `json:"command"`
-			*store.Stats
-		}{
-			Command: "stats",
-			Stats:   stats,
-		}
 		enc := json.NewEncoder(os.Stdout)
 		enc.SetIndent("", "  ")
 		return enc.Encode(env)

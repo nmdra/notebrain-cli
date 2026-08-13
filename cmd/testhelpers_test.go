@@ -25,6 +25,7 @@ type fakeStore struct {
 	noteMeta    *store.NoteContent
 	noteMetaErr error
 	noteHead    *store.NoteContent
+	stats       *store.Stats
 }
 
 func (f *fakeStore) Close() error { return nil }
@@ -122,7 +123,9 @@ func (f *fakeStore) GetNoteMetadata(context.Context) (map[string]store.NoteMeta,
 }
 
 func (f *fakeStore) Stats(context.Context) (*store.Stats, error) {
-	return &store.Stats{}, nil
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.stats, nil
 }
 
 func (f *fakeStore) PopulateContext(context.Context, []store.Result, int) error {

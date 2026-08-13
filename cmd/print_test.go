@@ -336,7 +336,7 @@ func TestPrintResultsFormatted_Formats(t *testing.T) {
 	globals.Format = "tsv"
 	printResultsFormattedToWriter(&buf, "search", "query", "query", nil, results, globals, nil)
 	outTSV := buf.String()
-	if !strings.Contains(outTSV, "slug\ttitle\tfile_path") || !strings.Contains(outTSV, "json-note\tJSON Note") {
+	if !strings.Contains(outTSV, "note_slug\ttitle\tfile_path") || !strings.Contains(outTSV, "json-note\tJSON Note") {
 		t.Errorf("Expected tsv header and row, got %q", outTSV)
 	}
 }
@@ -370,6 +370,27 @@ func TestPrintTSVResults_EscapesMultilineText(t *testing.T) {
 	}
 	if !strings.Contains(out, `first line\nsecond\tline`) {
 		t.Errorf("Expected newline and tab escaped in text, got %q", out)
+	}
+}
+
+func TestPrintTSVResults_ScoreFourDecimalPlaces(t *testing.T) {
+	var buf bytes.Buffer
+	results := []store.Result{
+		{NoteSlug: "score-note", Title: "Score Note", Score: 0.123456},
+	}
+	globals := &Globals{Format: "tsv"}
+	printResultsFormattedToWriter(&buf, "search", "query", "query", nil, results, globals, nil)
+	lines := strings.Split(buf.String(), "\n")
+	if len(lines) < 3 {
+		t.Fatalf("expected header+row, got %q", buf.String())
+	}
+	line := lines[1]
+	cols := strings.Split(line, "\t")
+	if len(cols) < 5 {
+		t.Fatalf("row has %d cols, want >= 5: %q", len(cols), line)
+	}
+	if cols[3] != "0.1235" {
+		t.Errorf("score col = %q, want 0.1235 (4dp, same rounding as JSON)", cols[3])
 	}
 }
 

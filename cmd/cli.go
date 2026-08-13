@@ -30,17 +30,18 @@ type ChunkDisplayFlags struct {
 // Flag group keys. The order here determines the order of the titled
 // sections in --help output.
 const (
-	groupGlobal  = "global"
-	groupDisplay = "display"
-	groupIngest  = "ingest"
-	groupSearch  = "search"
-	groupConn    = "connections"
-	groupHidden  = "hidden"
-	groupBoosted = "boosted"
-	groupTags    = "tags"
-	groupReset   = "reset"
-	groupGet     = "get"
-	groupRefs    = "refs"
+	groupGlobal     = "global"
+	groupDisplay    = "display"
+	groupIngest     = "ingest"
+	groupSearch     = "search"
+	groupConn       = "connections"
+	groupHidden     = "hidden"
+	groupBoosted    = "boosted"
+	groupTags       = "tags"
+	groupReset      = "reset"
+	groupGet        = "get"
+	groupRefs       = "refs"
+	groupCompletion = "completion"
 )
 
 // helpGroups returns the titled flag groups shown in --help output. Flags in
@@ -130,6 +131,10 @@ func ParseAndRun(ctx context.Context, version, commit, date string, defaultConfi
 // operational failures (1).
 type UsageError struct{ Err error }
 
+// vaultPathUsageError is shared by every command that requires an explicit
+// vault location; keep the wording in one place.
+const vaultPathUsageError = "--vault-path flag or config file setting must be specified — run 'notebrain init' to create a config"
+
 func (e *UsageError) Error() string { return e.Err.Error() }
 func (e *UsageError) Unwrap() error { return e.Err }
 
@@ -184,6 +189,37 @@ func argsWantJSON(args []string) bool {
 		}
 	}
 	return false
+}
+
+// warnIgnoredOutputFlags tells the user (once, on stderr) that a text-only
+// command does not honor --format/--jsonpath. stdout stays clean for
+// machine consumers.
+func warnIgnoredOutputFlags(w io.Writer, format, jsonpath, cmdName string) {
+	switch {
+	case format != formatText && jsonpath != "":
+		fmt.Fprintf(w, "warning: --format and --jsonpath are ignored by '%s' (output is textual only)\n", cmdName)
+	case format != formatText:
+		fmt.Fprintf(w, "warning: --format is ignored by '%s' (output is textual only)\n", cmdName)
+	case jsonpath != "":
+		fmt.Fprintf(w, "warning: --jsonpath is ignored by '%s' (output is textual only)\n", cmdName)
+	}
+}
+
+// textOnlyCommands are the commands whose output is inherently textual and
+// never honors --format/--jsonpath.
+var textOnlyCommands = map[string]bool{
+	groupIngest:     true,
+	"reset":         true,
+	"doctor":        true,
+	"doctor-probe":  true,
+	"init":          true,
+	"version":       true,
+	groupCompletion: true,
+	"suggest-notes": true,
+}
+
+func isTextOnlyCommand(cmdName string) bool {
+	return textOnlyCommands[cmdName]
 }
 
 // validateLogLevel rejects log level values that are not one of the supported
@@ -284,6 +320,10 @@ Examples:
 		if home != "" && home != "." {
 			cli.ChromaPath = filepath.Join(home, cli.ChromaPath[2:])
 		}
+	}
+
+	if isTextOnlyCommand(ctxParser.Command()) {
+		warnIgnoredOutputFlags(os.Stderr, cli.Format, cli.JSONPath, ctxParser.Command())
 	}
 
 	err = ctxParser.Run(&cli.Globals)
