@@ -16,7 +16,7 @@ automation workflows.
 
 ## Global Flags
 
-You can apply these flags to `notebrain` before a subcommand (for example, `notebrain --debug search "query"`). You can also put them in your configuration file.
+You can apply these flags to `notebrain` before a subcommand. You can also put them in your configuration file.
 
 > Note: In `notebrain <command> --help` output, the flags are grouped under titled sections: `Global Flags` (shared by all commands), the command-specific section (for example, `Search Flags`), and `Output Flags` (`--include-text`, `--context-window`, `--min-score`).
 
@@ -27,7 +27,6 @@ You can apply these flags to `notebrain` before a subcommand (for example, `note
 | `--vault-path`      | `string`  | _(None)_                          | **Required.** The absolute path to your Obsidian vault.                                                          |
 | `--vault-name`      | `string`  | _(Basename of vault)_             | The name of the Obsidian vault (to generate `obsidian://` URI links).                                           |
 | `--log-level`       | `string`  | `info`                            | The logging severity level: `debug`, `info`, `warn`, or `error`. You can set it with the `NOTEBRAIN_LOG_LEVEL` environment variable. Flag and config file values take precedence over the environment variable. |
-| `--debug`           | `boolean` | `false`                           | Enables the debug-level log output to stderr. This is a legacy alias for `--log-level=debug`.                    |
 | `--log-file`        | `string`  | _(None)_                          | Writes logs to this file (JSON) in addition to stderr. The file rotates on size. You can set it with the `NOTEBRAIN_LOG_FILE` environment variable. Flag and config file values take precedence over the environment variable. |
 | `--log-max-size-mb` | `integer` | `10`                              | The max size of each log file in MiB before rotation (`0` uses the default `10`).                                  |
 | `--log-max-backups` | `integer` | `5`                               | The number of rotated log file backups to keep (`0` uses the default `5`). Rotated files are named `<file>.1`, `<file>.2`, and so on. |
@@ -160,7 +159,7 @@ notebrain ingest [<glob>] [flags]
 | `--min-chunk-words` | `integer` | `10`    | Does not include chunks that have fewer words than this value.                                                 |
 | `--chunk-size`      | `integer` | `800`   | The maximum number of runes per chunk for the parser.                                                 |
 | `--chunk-overlap`   | `integer` | `100`   | The number of overlap runes between sub-chunks when the parser splits a section.                               |
-| `--with-pdf`       | `boolean` | `false` | Enables the extraction of PDF text. This requires `--llm-model`. Deprecated alias: `--enable-pdf`. |
+| `--with-pdf`       | `boolean` | `false` | Enables the extraction of PDF text. This requires `--llm-model`. |
 | `--llm-model`       | `string`  | `""`    | The LLM model to parse PDFs (for example, `openrouter/anthropic/claude-3.5-haiku`). |
 | `--llm-context-window` | `integer` | `128000` | The total context window size of the LLM in tokens.                                         |
 | `--respect-exclude` | `boolean` | `false` | Obeys the Obsidian user filters and attachment exclusions during ingestion. |
@@ -216,7 +215,7 @@ notebrain search [<query>] [flags]
 | `--has-tasks` | `boolean` | `false`  | Shows only the chunks that contain markdown task lists (`- [ ]`).|
 | `--has-code`  | `boolean` | `false`  | Shows only the chunks that contain code blocks.                  |
 | `--with-pdf`  | `boolean` | `false`  | Includes the PDF results in the search (the default is markdown only). |
-| `--exclude-notes` | `string` | _(None)_ | Excludes notes from the results. Accepts a note slug, title, or path; repeat the flag or use comma-separated values to exclude multiple notes. Deprecated alias: `--exclude-note`. |
+| `--exclude-notes` | `string` | _(None)_ | Excludes notes from the results. Accepts a note slug, title, or path; repeat the flag or use comma-separated values to exclude multiple notes. |
 
 #### Examples
 
@@ -312,7 +311,7 @@ notebrain refs <note> [flags]
 | `--only-external-links` | Limit to external website links (URLs) only |
 | `--include-missing` | Include references whose file is missing from the vault (marked `missing: true`) |
 
-Flags combine with OR semantics; with no filter flags every kind is listed. The old names `--images`/`--pdf`/`--other`/`--external-links` still parse but are deprecated.
+Flags combine with OR semantics; with no filter flags every kind is listed.
 
 #### Examples
 

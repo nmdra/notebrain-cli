@@ -21,7 +21,7 @@ These flags are available only on the commands listed.
 | `--with-pdf`            | Include PDF text extraction results in the search. Defaults to false (Markdown-only).                                                                                               | `false` |
 | `--min-score F`         | Suppress results below this similarity score (0.0–1.0). Use to filter weak matches (e.g. `0.3` for meaningful hits, `0.5` for precision). Also available on `hidden` and `boosted`. | `0`     |
 | `--group-by-note`       | Collapse results to one row per note: keeps the best-scoring chunk, drops the rest. When a note has multiple matching chunks, the surviving row gains `extra: "N matching chunks"`. Text/TSV/JSON all flow through this — handy for note-level result lists. | `false` |
-| `--exclude-notes "SLUG"` | Exclude notes from results. Accepts a note slug, title, or path, resolved automatically; repeat the flag or use comma-separated values. Unknown notes are skipped with a warning. Deprecated alias: `--exclude-note`.   | —       |
+| `--exclude-notes "SLUG"` | Exclude notes from results. Accepts a note slug, title, or path, resolved automatically; repeat the flag or use comma-separated values. Unknown notes are skipped with a warning.   | —       |
 
 > **Lexical fallback:** When semantic retrieval returns zero results — or every result is below `--min-score` — `search` automatically falls back to a token-based lexical scan over note titles, paths, tags, and text (case-insensitive, substring-style token matching, min token length 2). The header reads `Lexical Search (no semantic matches)` and rows are marked with `"lexical": true` in JSON (`score: 0`). This is why short queries like `Lecture` now return hits even when no semantic match clears the score bar. There is no lexical fallback for `boosted` or `hidden`.
 
@@ -86,7 +86,7 @@ Takes a single positional argument: `<slug>` (note slug, title, or file path —
 | `--only-external-links` | Limit to external http(s) website links.                                                                                     | `false` |
 | `--include-missing` | Include references whose file is missing from the vault (broken links). Hidden by default.                                  | `false` |
 
-Takes a single positional argument: `<note>` (note slug, title, or file path — auto-resolved, markdown notes only; PDF extractions error out). No kind flags = every kind; combine `--only-*` flags to union kinds. The old names `--images`/`--pdf`/`--other`/`--external-links` still parse but are deprecated. `refs` reads the note file fresh from disk, so results never go stale — but they cover only what the current file contains. External links are never `missing` and are never contacted over the network. Note: `refs` lists attachments and external links only — links to other notes are not included (use `backlinks`/`connections`).
+Takes a single positional argument: `<note>` (note slug, title, or file path — auto-resolved, markdown notes only; PDF extractions error out). No kind flags = every kind; combine `--only-*` flags to union kinds. `refs` reads the note file fresh from disk, so results never go stale — but they cover only what the current file contains. External links are never `missing` and are never contacted over the network. Note: `refs` lists attachments and external links only — links to other notes are not included (use `backlinks`/`connections`).
 
 ## Global Flags (Available on Subcommands)
 
@@ -120,6 +120,5 @@ These flags work on `search`, `backlinks`, `connections`, `hidden`, `tags`, `boo
 | `--vault-path PATH`   | Path to the Obsidian vault directory.          | (from config)                     |
 | `--vault-name STRING` | Vault display name for Obsidian URI links.     | basename of `--vault-path`        |
 | `--config PATH`       | Path to config file.                           | `~/.notebrain/config/config.toml` |
-| `--debug`             | Enable debug-level logging to stderr.          | `false`                           |
 
 > Hyperlink suppression: To disable OSC 8 terminal hyperlinks, set environment variable `NO_HYPERLINKS=1`.

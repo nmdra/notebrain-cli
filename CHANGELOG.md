@@ -22,12 +22,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Refs text styling**: `refs` text output now matches the house style — note title header, per-kind colored `[kind]` chips (images, PDFs, other, external links), amber `(missing)` markers, clickable links (obsidian:// for attachments, the URL for external links), vault-relative paths instead of absolute ones, and terminal-width truncation (`feat(cmd)`).
 
 ### Deprecated
-- `refs --images`/`--pdf`/`--other`/`--external-links` — use `--only-*` (aliases still parse, hidden from `--help`).
-- `ingest --enable-pdf` (and config key `enable-pdf`) — use `--with-pdf` (`with-pdf`).
-- `search --exclude-note` — use `--exclude-notes`.
+
+_None._
 
 ### Removed
 - `hidden --top-k` (alias of `--candidate-chunks`) — breaking; use `--candidate-chunks`, which now defaults to `3`.
+- `refs --images`/`--pdf`/`--other`/`--external-links` — breaking; use `--only-*`.
+- `ingest --enable-pdf` and config key `enable-pdf` — breaking; use `--with-pdf` (`with-pdf`).
+- `search --exclude-note` — breaking; use `--exclude-notes`.
+- `--debug` (and config key `debug`) — breaking; use `--log-level=debug` (`log-level = "debug"`).
+- `hide-tags` config key — breaking; use `show-tags`.
 
 ## [v2.12.0] - 2026-08-02
 
