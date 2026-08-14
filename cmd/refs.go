@@ -39,15 +39,6 @@ import (
 	"github.com/nmdra/notebrain-cli/v2/internal/parser"
 )
 
-// refs kinds. They mirror parser.AttachmentKind but are plain strings so the
-// output layer stays independent of the parser package.
-const (
-	kindImage    = "image"
-	kindPDF      = "pdf"
-	kindOther    = "other"
-	kindExternal = "external-links"
-)
-
 type RefsCmd struct {
 	Note           string `arg:"" help:"note slug, title, or file path (auto-resolved)" completion-predictor:"note-slug"`
 	OnlyImages     bool   `group:"refs" name:"only-images" help:"limit to image attachments (no filter = all kinds; combine filters to union)" default:"false"`
@@ -55,22 +46,15 @@ type RefsCmd struct {
 	OnlyOther      bool   `group:"refs" name:"only-other" help:"limit to other attachments (video, audio, archives, office docs) (no filter = all kinds; combine filters to union)" default:"false"`
 	OnlyExternal   bool   `group:"refs" name:"only-external-links" help:"limit to external website links (URLs) (no filter = all kinds; combine filters to union)" default:"false"`
 	IncludeMissing bool   `group:"refs" name:"include-missing" help:"include references whose file is missing from the vault" default:"false"`
-
-	// Deprecated aliases for the kind filters, kept parseable but hidden from
-	// --help. Use the --only-* flags instead.
-	Images        bool `group:"refs" name:"images" hidden:"" help:"deprecated: use --only-images" default:"false"`
-	PDF           bool `group:"refs" name:"pdf" hidden:"" help:"deprecated: use --only-pdf" default:"false"`
-	Other         bool `group:"refs" name:"other" hidden:"" help:"deprecated: use --only-other" default:"false"`
-	ExternalLinks bool `group:"refs" name:"external-links" hidden:"" help:"deprecated: use --only-external-links" default:"false"`
 }
 
 // refEntry is one resolved reference row. Path is absolute for attachments and
 // the URL for external links; external rows never carry relative_path.
 type refEntry struct {
-	Path         string `json:"path"`
-	RelativePath string `json:"relative_path,omitempty"`
-	Kind         string `json:"kind"`
-	Missing      bool   `json:"missing"`
+	Path         string                `json:"path"`
+	RelativePath string                `json:"relative_path,omitempty"`
+	Kind         parser.AttachmentKind `json:"kind"`
+	Missing      bool                  `json:"missing"`
 }
 
 // refsEnvelope is the machine-readable shape of "refs" output.
@@ -128,11 +112,26 @@ func (c *RefsCmd) Run(globals *Globals) error {
 	return printRefsFormatted(env, globals)
 }
 
+// refResolver resolves attachment references against one note's vault
+// context: the vault root, the note's folder, and the attachment folder.
+type refResolver struct {
+	vaultPath        string
+	noteDir          string
+	attachmentFolder string
+}
+
+func newRefResolver(vaultPath, noteFilePath string) *refResolver {
+	return &refResolver{
+		vaultPath:        vaultPath,
+		noteDir:          filepath.Dir(filepath.Join(vaultPath, filepath.FromSlash(noteFilePath))),
+		attachmentFolder: ingest.LoadAttachmentFolderPath(vaultPath),
+	}
+}
+
 // resolveRefs turns extracted references into resolved entries, deduped by
 // resolved absolute path (or exact URL) in first-occurrence order.
 func (c *RefsCmd) resolveRefs(vaultPath, noteFilePath string, extracted parser.ExtractedRefs) []refEntry {
-	noteDir := filepath.Dir(filepath.Join(vaultPath, filepath.FromSlash(noteFilePath)))
-	attachmentFolder := ingest.LoadAttachmentFolderPath(vaultPath)
+	resolver := newRefResolver(vaultPath, noteFilePath)
 
 	var entries []refEntry
 	seen := make(map[string]struct{})
@@ -146,10 +145,10 @@ func (c *RefsCmd) resolveRefs(vaultPath, noteFilePath string, extracted parser.E
 
 	for _, ref := range extracted.Refs {
 		if ref.Kind == parser.KindExternalLinks {
-			add(refEntry{Path: ref.Target, Kind: kindExternal})
+			add(refEntry{Path: ref.Target, Kind: parser.KindExternalLinks})
 			continue
 		}
-		if entry, ok := c.resolveAttachment(vaultPath, noteDir, attachmentFolder, ref); ok {
+		if entry, ok := resolver.resolveAttachment(ref); ok {
 			add(entry)
 		}
 	}
@@ -162,53 +161,53 @@ func (c *RefsCmd) resolveRefs(vaultPath, noteFilePath string, extracted parser.E
 // A reference that escapes the vault is rejected outright (dropped, never
 // even listed as missing); one that matches no existing file resolves to its
 // first candidate marked missing.
-func (c *RefsCmd) resolveAttachment(vaultPath, noteDir, attachmentFolder string, ref parser.Ref) (refEntry, bool) {
+func (r *refResolver) resolveAttachment(ref parser.Ref) (refEntry, bool) {
 	var candidates []string
 	switch ref.Source {
 	case parser.SrcMarkdown:
-		candidates = []string{resolveMarkdownDestination(noteDir, ref.Target)}
+		candidates = []string{r.markdownDestination(ref.Target)}
 	default:
-		candidates = wikiCandidates(vaultPath, noteDir, attachmentFolder, ref.Target)
+		candidates = r.wikiCandidates(ref.Target)
 	}
 	first := candidates[0]
-	if !insideVault(vaultPath, first) {
+	if !r.insideVault(first) {
 		return refEntry{}, false
 	}
 	for _, cand := range candidates {
-		if !insideVault(vaultPath, cand) {
+		if !r.insideVault(cand) {
 			continue
 		}
 		if _, err := os.Stat(cand); err == nil {
-			return refEntry{Path: cand, RelativePath: vaultRelativePath(vaultPath, cand), Kind: string(ref.Kind)}, true
+			return refEntry{Path: cand, RelativePath: r.vaultRelativePath(cand), Kind: ref.Kind}, true
 		}
 	}
-	return refEntry{Path: first, RelativePath: vaultRelativePath(vaultPath, first), Kind: string(ref.Kind), Missing: true}, true
+	return refEntry{Path: first, RelativePath: r.vaultRelativePath(first), Kind: ref.Kind, Missing: true}, true
 }
 
 // wikiCandidates returns candidate paths for a wiki target in Obsidian
 // resolution order. Targets containing "/" start at the vault root; "./"
 // resolves relative to the note's folder; bare names search the note folder,
 // then the vault root, then the configured attachment folder.
-func wikiCandidates(vaultPath, noteDir, attachmentFolder, target string) []string {
+func (r *refResolver) wikiCandidates(target string) []string {
 	switch {
 	case strings.HasPrefix(target, "./"):
-		return []string{filepath.Join(noteDir, filepath.FromSlash(strings.TrimPrefix(target, "./")))}
+		return []string{filepath.Join(r.noteDir, filepath.FromSlash(strings.TrimPrefix(target, "./")))}
 	case strings.Contains(target, "/"):
-		return []string{filepath.Join(vaultPath, filepath.FromSlash(target))}
+		return []string{filepath.Join(r.vaultPath, filepath.FromSlash(target))}
 	}
-	candidates := []string{filepath.Join(noteDir, filepath.FromSlash(target))}
-	if vaultPath != noteDir {
-		candidates = append(candidates, filepath.Join(vaultPath, filepath.FromSlash(target)))
+	candidates := []string{filepath.Join(r.noteDir, filepath.FromSlash(target))}
+	if r.vaultPath != r.noteDir {
+		candidates = append(candidates, filepath.Join(r.vaultPath, filepath.FromSlash(target)))
 	}
-	if attachmentFolder != "" {
-		candidates = append(candidates, filepath.Join(vaultPath, filepath.FromSlash(attachmentFolder), filepath.FromSlash(target)))
+	if r.attachmentFolder != "" {
+		candidates = append(candidates, filepath.Join(r.vaultPath, filepath.FromSlash(r.attachmentFolder), filepath.FromSlash(target)))
 	}
 	return candidates
 }
 
-// resolveMarkdownDestination decodes a markdown link destination (fragment
-// stripped, percent-encoding unescaped) and joins it to the note's folder.
-func resolveMarkdownDestination(noteDir, target string) string {
+// markdownDestination decodes a markdown link destination (fragment stripped,
+// percent-encoding unescaped) and joins it to the note's folder.
+func (r *refResolver) markdownDestination(target string) string {
 	decoded := target
 	if before, _, ok := strings.Cut(target, "#"); ok {
 		decoded = before
@@ -216,13 +215,13 @@ func resolveMarkdownDestination(noteDir, target string) string {
 	if unescaped, err := url.PathUnescape(decoded); err == nil {
 		decoded = unescaped
 	}
-	return filepath.Join(noteDir, filepath.FromSlash(decoded))
+	return filepath.Join(r.noteDir, filepath.FromSlash(decoded))
 }
 
 // insideVault reports whether abs stays within the vault, rejecting `..`
 // traversal escapes via filepath.Rel.
-func insideVault(vaultPath, abs string) bool {
-	rel, err := filepath.Rel(vaultPath, abs)
+func (r *refResolver) insideVault(abs string) bool {
+	rel, err := filepath.Rel(r.vaultPath, abs)
 	if err != nil {
 		return false
 	}
@@ -230,8 +229,8 @@ func insideVault(vaultPath, abs string) bool {
 }
 
 // vaultRelativePath renders abs as a slash-separated vault-relative path.
-func vaultRelativePath(vaultPath, abs string) string {
-	rel, err := filepath.Rel(vaultPath, abs)
+func (r *refResolver) vaultRelativePath(abs string) string {
+	rel, err := filepath.Rel(r.vaultPath, abs)
 	if err != nil {
 		return ""
 	}
@@ -250,8 +249,7 @@ func filterExistingRefs(entries []refEntry) []refEntry {
 }
 
 // filterRefKinds keeps rows matching any selected kind flag; no flags select
-// every kind. Deprecated aliases (Images/PDF/Other/ExternalLinks) count the
-// same as their --only-* replacements.
+// every kind.
 func filterRefKinds(entries []refEntry, c *RefsCmd) []refEntry {
 	if len(entries) == 0 {
 		return entries
@@ -269,29 +267,29 @@ func filterRefKinds(entries []refEntry, c *RefsCmd) []refEntry {
 	return kept
 }
 
-// refsKindFilter merges the --only-* flags with their deprecated aliases.
+// refsKindFilter holds the selected --only-* kind flags.
 type refsKindFilter struct {
 	images, pdf, other, external bool
 }
 
 func refsKindFilterFromCmd(c *RefsCmd) refsKindFilter {
 	return refsKindFilter{
-		images:   c.OnlyImages || c.Images,
-		pdf:      c.OnlyPDF || c.PDF,
-		other:    c.OnlyOther || c.Other,
-		external: c.OnlyExternal || c.ExternalLinks,
+		images:   c.OnlyImages,
+		pdf:      c.OnlyPDF,
+		other:    c.OnlyOther,
+		external: c.OnlyExternal,
 	}
 }
 
-func (f refsKindFilter) keep(kind string) bool {
+func (f refsKindFilter) keep(kind parser.AttachmentKind) bool {
 	switch kind {
-	case kindImage:
+	case parser.KindImage:
 		return f.images
-	case kindPDF:
+	case parser.KindPDF:
 		return f.pdf
-	case kindOther:
+	case parser.KindOther:
 		return f.other
-	case kindExternal:
+	case parser.KindExternalLinks:
 		return f.external
 	}
 	return false
@@ -337,19 +335,19 @@ func printRefsFormattedToWriter(w io.Writer, env refsEnvelope, globals *Globals)
 		useLinks := hyperlinkSupported() && globals.ShowFilePath
 
 		for _, r := range env.Refs {
-			chip := refKindChipStyle(r.Kind).Render("[" + r.Kind + "]")
+			chip := refKindChipStyle(r.Kind).Render("[" + string(r.Kind) + "]")
 
 			// Text mode shows vault-relative paths (no base-vault clutter);
 			// external links keep their URL, which is the path itself.
 			display := r.Path
-			if r.Kind != kindExternal && r.RelativePath != "" {
+			if r.Kind != parser.KindExternalLinks && r.RelativePath != "" {
 				display = r.RelativePath
 			}
 
 			path := display
 			if useLinks {
 				switch r.Kind {
-				case kindExternal:
+				case parser.KindExternalLinks:
 					path = hyperlink(true, r.Path, display)
 				default:
 					if r.RelativePath != "" {
@@ -377,16 +375,16 @@ func printRefsFormattedToWriter(w io.Writer, env refsEnvelope, globals *Globals)
 // refKindChipStyle returns the style for a ref kind chip in text output:
 // images use the accent, PDFs the blue tag used by search, other
 // attachments the muted gray, and external links the bold label.
-func refKindChipStyle(kind string) lipgloss.Style {
+func refKindChipStyle(kind parser.AttachmentKind) lipgloss.Style {
 	initStyles()
 	switch kind {
-	case kindImage:
+	case parser.KindImage:
 		return titleStyle
-	case kindPDF:
+	case parser.KindPDF:
 		return pdfTagStyle
-	case kindOther:
+	case parser.KindOther:
 		return metaStyle
-	default: // kindExternal
+	default: // parser.KindExternalLinks
 		return labelStyle
 	}
 }

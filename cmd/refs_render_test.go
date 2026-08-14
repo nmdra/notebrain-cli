@@ -5,6 +5,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/nmdra/notebrain-cli/v2/internal/parser"
 )
 
 func TestPrintRefsFormatted_Rendering(t *testing.T) {
@@ -14,9 +16,9 @@ func TestPrintRefsFormatted_Rendering(t *testing.T) {
 		Title:    "Router",
 		Total:    3,
 		Refs: []refEntry{
-			{Path: "/vault/Notes/cover.png", RelativePath: "Notes/cover.png", Kind: kindImage},
-			{Path: "/vault/Attachments/att.pdf", RelativePath: "Attachments/att.pdf", Kind: kindPDF, Missing: true},
-			{Path: "https://example.com/docs", Kind: kindExternal},
+			{Path: "/vault/Notes/cover.png", RelativePath: "Notes/cover.png", Kind: parser.KindImage},
+			{Path: "/vault/Attachments/att.pdf", RelativePath: "Attachments/att.pdf", Kind: parser.KindPDF, Missing: true},
+			{Path: "https://example.com/docs", Kind: parser.KindExternalLinks},
 		},
 	}
 	globals := &Globals{Format: formatText}

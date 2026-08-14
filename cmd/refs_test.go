@@ -11,6 +11,7 @@ import (
 
 	"github.com/alecthomas/kong"
 
+	"github.com/nmdra/notebrain-cli/v2/internal/parser"
 	"github.com/nmdra/notebrain-cli/v2/internal/store"
 )
 
@@ -134,20 +135,14 @@ func TestRefsFilters(t *testing.T) {
 			exclude: []string{"https://example.com"},
 		},
 		{
-			name:    "deprecated images alias",
-			cmd:     RefsCmd{Note: "router", Images: true},
-			include: []string{"Notes/cover.png"},
-			exclude: []string{"att.pdf", "https://example.com/docs", "[external-links]"},
-		},
-		{
-			name:    "deprecated pdf alias",
-			cmd:     RefsCmd{Note: "router", PDF: true},
+			name:    "only-pdf",
+			cmd:     RefsCmd{Note: "router", OnlyPDF: true},
 			include: []string{"99.Storage-Shed/Attachments/att.pdf"},
 			exclude: []string{"cover.png", "https://example.com/docs"},
 		},
 		{
-			name:    "deprecated mixed aliases",
-			cmd:     RefsCmd{Note: "router", Images: true, OnlyExternal: true},
+			name:    "only-images + only-external-links union",
+			cmd:     RefsCmd{Note: "router", OnlyImages: true, OnlyExternal: true},
 			include: []string{"Notes/cover.png", "[external-links] https://example.com/docs"},
 			exclude: []string{"att.pdf"},
 		},
@@ -462,7 +457,7 @@ func refsParser(t *testing.T) (*kong.Kong, *RefsCmd) {
 	return parser, &cli.Refs
 }
 
-func TestRefsOnlyFlagsParseAndLegacyAliasesHidden(t *testing.T) {
+func TestRefsOnlyFlagsParse(t *testing.T) {
 	parser, _ := refsParser(t)
 
 	tests := []struct {
@@ -474,11 +469,6 @@ func TestRefsOnlyFlagsParseAndLegacyAliasesHidden(t *testing.T) {
 		{name: "only-other", args: []string{"refs", "x", "--only-other"}},
 		{name: "only-external-links", args: []string{"refs", "x", "--only-external-links"}},
 		{name: "include-missing", args: []string{"refs", "x", "--include-missing"}},
-		{name: "legacy images alias", args: []string{"refs", "x", "--images"}},
-		{name: "legacy pdf alias", args: []string{"refs", "x", "--pdf"}},
-		{name: "legacy other alias", args: []string{"refs", "x", "--other"}},
-		{name: "legacy external-links alias", args: []string{"refs", "x", "--external-links"}},
-		{name: "new and legacy mixed", args: []string{"refs", "x", "--only-images", "--pdf"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -491,6 +481,20 @@ func TestRefsOnlyFlagsParseAndLegacyAliasesHidden(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("legacy aliases rejected", func(t *testing.T) {
+		for _, args := range [][]string{
+			{"refs", "x", "--images"},
+			{"refs", "x", "--pdf"},
+			{"refs", "x", "--other"},
+			{"refs", "x", "--external-links"},
+			{"refs", "x", "--only-images", "--pdf"},
+		} {
+			if _, err := parser.Parse(args); err == nil {
+				t.Errorf("parse %v: expected error, got none", args)
+			}
+		}
+	})
 
 	var help strings.Builder
 	parser.Stdout = &help
@@ -506,10 +510,8 @@ func TestRefsOnlyFlagsParseAndLegacyAliasesHidden(t *testing.T) {
 			t.Errorf("help must show %s:\n%s", visible, help.String())
 		}
 	}
-	for _, hidden := range []string{"--images", "--image", "--pdf", "--other", "--external-links", "deprecated"} {
-		if strings.Contains(help.String(), hidden) {
-			t.Errorf("help must not show deprecated alias %q:\n%s", hidden, help.String())
-		}
+	if strings.Contains(help.String(), "deprecated") {
+		t.Errorf("help must not mention deprecated aliases:\n%s", help.String())
 	}
 
 	var cli struct {
@@ -540,14 +542,6 @@ func TestRefsMultipleOnlyFlagsUnion(t *testing.T) {
 			t.Errorf("expected both flags set, got %+v", *refs)
 		}
 	})
-	t.Run("only-images + legacy pdf", func(t *testing.T) {
-		if _, err := parser.Parse([]string{"refs", "x", "--only-images", "--pdf"}); err != nil {
-			t.Fatalf("parse: %v", err)
-		}
-		if !refs.OnlyImages || !refs.PDF {
-			t.Errorf("expected new + legacy flags set, got %+v", *refs)
-		}
-	})
 }
 
 func TestPrintRefsFormattedToWriter(t *testing.T) {
@@ -557,8 +551,8 @@ func TestPrintRefsFormattedToWriter(t *testing.T) {
 		Title:    "Router",
 		Total:    2,
 		Refs: []refEntry{
-			{Path: "/vault/Notes/cover.png", RelativePath: "Notes/cover.png", Kind: kindImage, Missing: false},
-			{Path: "https://example.com", Kind: kindExternal, Missing: false},
+			{Path: "/vault/Notes/cover.png", RelativePath: "Notes/cover.png", Kind: parser.KindImage, Missing: false},
+			{Path: "https://example.com", Kind: parser.KindExternalLinks, Missing: false},
 		},
 	}
 	globals := &Globals{}
