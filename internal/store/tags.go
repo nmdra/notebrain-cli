@@ -60,13 +60,13 @@ func (s *Store) SuggestTags(ctx context.Context, input string, limit int) ([]str
 	if err != nil {
 		return nil, err
 	}
-	return ClosestTags(all, input, limit), nil
+	return closestTags(all, input, limit), nil
 }
 
-// ClosestTags ranks tags by Levenshtein distance to input (ties broken by
+// closestTags ranks tags by Levenshtein distance to input (ties broken by
 // count descending, then tag ascending) and returns the top-limit of them,
 // excluding the exact input itself.
-func ClosestTags(all []TagCount, input string, limit int) []string {
+func closestTags(all []TagCount, input string, limit int) []string {
 	in := strings.ToLower(strings.TrimSpace(input))
 
 	type scored struct {
@@ -80,7 +80,7 @@ func ClosestTags(all []TagCount, input string, limit int) []string {
 		if lower == in {
 			continue
 		}
-		scoredTags = append(scoredTags, scored{dist: Levenshtein(in, lower), count: t.Count, tag: t.Tag})
+		scoredTags = append(scoredTags, scored{dist: levenshtein(in, lower), count: t.Count, tag: t.Tag})
 	}
 	sort.Slice(scoredTags, func(i, j int) bool {
 		if scoredTags[i].dist != scoredTags[j].dist {
@@ -102,9 +102,9 @@ func ClosestTags(all []TagCount, input string, limit int) []string {
 	return out
 }
 
-// Levenshtein computes the edit distance between two strings (case-sensitive;
+// levenshtein computes the edit distance between two strings (case-sensitive;
 // callers normalize case beforehand).
-func Levenshtein(a, b string) int {
+func levenshtein(a, b string) int {
 	if a == "" {
 		return len(b)
 	}
