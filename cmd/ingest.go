@@ -38,7 +38,6 @@ type IngestCmd struct {
 	ChunkOverlap     int    `group:"ingest" name:"chunk-overlap" help:"overlap runes between sub-chunks" default:"100"`
 	RespectExclude   bool   `group:"ingest" help:"respect Obsidian userIgnoreFilters and attachmentFolderPath settings during ingest" default:"false"`
 	WithPDF          bool   `group:"ingest" name:"with-pdf" help:"include PDF attachments in indexing" default:"false"`
-	EnablePDF        bool   `group:"ingest" name:"enable-pdf" hidden:"" help:"deprecated: use --with-pdf" default:"false"`
 	LLMModel         string `group:"ingest" name:"llm-model" help:"LLM model to use for PDF parsing (e.g. openrouter/anthropic/claude-sonnet, deepseek-chat). Requires API key in env." default:"" completion-predictor:"llm-model"`
 	LLMContextWindow int    `group:"ingest" name:"llm-context-window" help:"total context window size of the LLM in tokens. Set this to match your specific model." default:"128000"`
 }
@@ -73,7 +72,7 @@ func (c *IngestCmd) Run(globals *Globals) error {
 	pipeline := ingest.NewPipeline(st, emb, workers)
 
 	pipeline.RespectExclude = c.RespectExclude
-	pipeline.EnablePDF = c.WithPDF || c.EnablePDF
+	pipeline.EnablePDF = c.WithPDF
 	pipeline.LLMModel = c.LLMModel
 	pipeline.LLMContextWindow = c.LLMContextWindow
 	pipeline.MinChunkWords = c.MinChunkWords

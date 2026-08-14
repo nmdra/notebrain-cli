@@ -23,7 +23,7 @@ func ingestParser(t *testing.T) (*kong.Kong, *IngestCmd) {
 	return parser, &cli.Ingest
 }
 
-func TestIngestWithPDFFlagAndLegacyAlias(t *testing.T) {
+func TestIngestWithPDFFlag(t *testing.T) {
 	parser, ingest := ingestParser(t)
 
 	for _, tt := range []struct {
@@ -31,8 +31,6 @@ func TestIngestWithPDFFlagAndLegacyAlias(t *testing.T) {
 		args []string
 	}{
 		{name: "with-pdf", args: []string{"ingest", "--with-pdf"}},
-		{name: "legacy enable-pdf alias", args: []string{"ingest", "--enable-pdf"}},
-		{name: "both", args: []string{"ingest", "--with-pdf", "--enable-pdf"}},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx, err := parser.Parse(tt.args)
@@ -44,6 +42,12 @@ func TestIngestWithPDFFlagAndLegacyAlias(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("legacy enable-pdf alias rejected", func(t *testing.T) {
+		if _, err := parser.Parse([]string{"ingest", "--enable-pdf"}); err == nil {
+			t.Error("parse --enable-pdf: expected error, got none")
+		}
+	})
 
 	if _, err := parser.Parse([]string{"ingest", "--with-pdf"}); err != nil {
 		t.Fatalf("parse: %v", err)
@@ -86,9 +90,6 @@ func TestIngestWithPDFFlagAndLegacyAlias(t *testing.T) {
 
 func TestIngestFlagValuesDefault(t *testing.T) {
 	_, ingest := ingestParser(t)
-	if ingest.EnablePDF {
-		t.Errorf("deprecated EnablePDF must default false")
-	}
 	if ingest.WithPDF {
 		t.Errorf("WithPDF must default false")
 	}

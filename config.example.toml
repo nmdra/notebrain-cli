@@ -66,9 +66,6 @@
 # Enable text extraction from PDF attachments during ingestion (requires --llm-model).
 # with-pdf = false # default: false
 
-# Deprecated config key for the same setting; use with-pdf instead.
-# enable-pdf = false
-
 # LLM model for converting PDF attachments into clean Markdown.
 # Backend is auto-detected based on which API key environment variable is present (DEEPSEEK_API_KEY, OPENROUTER_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY, OLLAMA_HOST).
 # llm-model = "" # default: ""

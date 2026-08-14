@@ -16,7 +16,6 @@ type InitCmd struct{}
 type existingConfig struct {
 	VaultPath string `toml:"vault-path"`
 	WithPDF   bool   `toml:"with-pdf"`
-	EnablePDF bool   `toml:"enable-pdf"` // deprecated config key, still honored
 }
 
 func (c *InitCmd) Run(globals *Globals) error {
@@ -73,7 +72,7 @@ func (c *InitCmd) Run(globals *Globals) error {
 	}
 
 	// Ask for PDF support
-	enablePDF := askYesNo(reader, "Enable text extraction for PDF attachments?", existing.WithPDF || existing.EnablePDF)
+	enablePDF := askYesNo(reader, "Enable text extraction for PDF attachments?", existing.WithPDF)
 
 	// Preview the changes before writing anything.
 	fmt.Println()
