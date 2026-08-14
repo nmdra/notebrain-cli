@@ -171,17 +171,6 @@ func (c *SearchCmd) resolveExcludes(ctx context.Context, st storeAPI) ([]string,
 	return out, nil
 }
 
-// lexicalFallback runs the keyword fallback for a query that produced no
-// semantic matches (or none above --min-score). It returns nil when the
-// fallback also finds nothing.
-func (c *SearchCmd) lexicalFallback(ctx context.Context, st storeAPI, query string, limit int, whereFilter store.WhereFilter) ([]store.Result, error) {
-	results, err := st.LexicalSearch(ctx, query, limit, whereFilter)
-	if err != nil {
-		return nil, err
-	}
-	return results, nil
-}
-
 // allBelowMinScore reports whether every row would be dropped by the
 // --min-score filter (used to decide whether the lexical fallback should
 // run even when the store returned rows).
@@ -235,7 +224,7 @@ func (c *SearchCmd) runStatic(ctx context.Context, globals *Globals, st storeAPI
 		}
 		header := fmt.Sprintf("Multi-Hit Semantic Search: %q", strings.Join(resolved, ", "))
 		if len(results) == 0 || allBelowMinScore(results, c.MinScore) {
-			results, err = c.lexicalFallback(ctx, st, strings.Join(resolved, " "), c.Limit, whereFilter)
+			results, err = st.LexicalSearch(ctx, strings.Join(resolved, " "), c.Limit, whereFilter)
 			if err != nil {
 				return err
 			}
@@ -263,7 +252,7 @@ func (c *SearchCmd) runStatic(ctx context.Context, globals *Globals, st storeAPI
 	}
 	header := fmt.Sprintf("Semantic Search: %q%s", resolved[0], excludeSuffix)
 	if len(results) == 0 || allBelowMinScore(results, c.MinScore) {
-		results, err = c.lexicalFallback(ctx, st, resolved[0], c.Limit, whereFilter)
+		results, err = st.LexicalSearch(ctx, resolved[0], c.Limit, whereFilter)
 		if err != nil {
 			return err
 		}
