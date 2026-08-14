@@ -247,7 +247,7 @@ limit = 5
 	}
 }
 
-func TestTOMLResolver_DeprecatedHideTags(t *testing.T) {
+func TestTOMLResolver_UnknownKeyIgnored(t *testing.T) {
 	tomlData := []byte(`
 hide-tags = false
 `)
@@ -263,12 +263,11 @@ hide-tags = false
 		t.Fatalf("kong.New failed: %v", err)
 	}
 
-	_, err = parser.Parse([]string{})
-	if err != nil {
+	if _, err := parser.Parse([]string{}); err != nil {
 		t.Fatalf("parser.Parse failed: %v", err)
 	}
 
-	if cli.ShowTags != true {
-		t.Errorf("Expected ShowTags true when hide-tags=false is in TOML, got %v", cli.ShowTags)
+	if cli.ShowTags {
+		t.Errorf("unknown hide-tags key must be ignored, ShowTags = %v", cli.ShowTags)
 	}
 }

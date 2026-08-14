@@ -12,11 +12,6 @@ import (
 	"github.com/pelletier/go-toml/v2"
 )
 
-// deprecatedKeys maps old TOML config keys to their current replacements.
-var deprecatedKeys = map[string]string{
-	"hide-tags": "show-tags",
-}
-
 // normalizeKey strips hyphens and underscores and converts to lowercase
 // so that snake_case, kebab-case, and PascalCase keys match interchangeably.
 func normalizeKey(s string) string {
@@ -67,27 +62,6 @@ func TOMLResolver(r io.Reader) (kong.Resolver, error) {
 		}
 		if val, ok := normalized[normalizeKey(name)]; ok {
 			return val, nil
-		}
-
-		for oldKey, newKey := range deprecatedKeys {
-			if newKey == name {
-				var val any
-				var found bool
-				if v, ok := parsed[oldKey]; ok {
-					val, found = v, true
-				} else if v, ok := normalized[normalizeKey(oldKey)]; ok {
-					val, found = v, true
-				}
-				if found {
-					slog.Warn("deprecated config key used in config file", "old_key", oldKey, "new_key", newKey)
-					if oldKey == "hide-tags" {
-						if b, isBool := val.(bool); isBool {
-							return !b, nil
-						}
-					}
-					return val, nil
-				}
-			}
 		}
 
 		return nil, nil
