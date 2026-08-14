@@ -41,7 +41,7 @@ type HiddenCmd struct {
 func (c *HiddenCmd) Run(globals *Globals) error {
 	targetNote := c.Note
 	limit := c.Limit
-	topK := c.CandidateChunks
+	candidateChunks := c.CandidateChunks
 
 	ctx := globals.Ctx
 	st, err := openStore(ctx, globals)
@@ -62,7 +62,7 @@ func (c *HiddenCmd) Run(globals *Globals) error {
 			results    []store.Result
 			seedChunks []string
 		)
-		results, seedChunks, err = st.HiddenConnectionsDeep(ctx, targetSlug, limit, topK, c.IncludeText, opts...)
+		results, seedChunks, err = st.HiddenConnectionsDeep(ctx, targetSlug, limit, candidateChunks, c.IncludeText, opts...)
 		if err != nil {
 			return err
 		}
