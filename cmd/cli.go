@@ -71,7 +71,6 @@ type Globals struct {
 	Format        string           `group:"global" help:"output format: text, json, or tsv" enum:"text,json,tsv" default:"text"`
 	JSONPath      string           `group:"global" name:"jsonpath" help:"extract fields using JSONPath (e.g. '$.results[*].note_slug')"`
 	LogLevel      string           `group:"global" name:"log-level" placeholder:"debug|info|warn|error" help:"logging severity level (default: info; env: NOTEBRAIN_LOG_LEVEL)" default:""`
-	Debug         bool             `group:"global" help:"enable debug logging (legacy: alias for --log-level=debug)" default:"false"`
 	LogFile       string           `group:"global" name:"log-file" help:"write logs to this file (JSON) in addition to stderr; rotates on size (env: NOTEBRAIN_LOG_FILE)"`
 	LogMaxSizeMB  int              `group:"global" name:"log-max-size-mb" help:"max size of each log file in MiB before rotation (0 = default 10)" default:"10"`
 	LogMaxBackups int              `group:"global" name:"log-max-backups" help:"number of rotated log file backups to keep (0 = default 5)" default:"5"`
@@ -300,7 +299,7 @@ Examples:
 		return &UsageError{Err: verr}
 	}
 
-	logWriter, err := setupLogging(cli.LogLevel, cli.Debug, cli.LogFile, cli.LogMaxSizeMB, cli.LogMaxBackups)
+	logWriter, err := setupLogging(cli.LogLevel, cli.LogFile, cli.LogMaxSizeMB, cli.LogMaxBackups)
 	if err != nil {
 		return fmt.Errorf("setup logging: %w", err)
 	}
@@ -345,12 +344,9 @@ Examples:
 }
 
 // resolveLogLevel resolves the effective slog level. Precedence:
-// --log-level/--debug flag and config file (logLevel) > NOTEBRAIN_LOG_LEVEL
+// --log-level flag and config file (logLevel) > NOTEBRAIN_LOG_LEVEL
 // env var > default info.
-func resolveLogLevel(logLevel string, debug bool) slog.Level {
-	if debug {
-		return slog.LevelDebug
-	}
+func resolveLogLevel(logLevel string) slog.Level {
 	level := logLevel
 	if level == "" {
 		level = os.Getenv("NOTEBRAIN_LOG_LEVEL")
@@ -408,8 +404,8 @@ func colorAllowed() bool {
 // setupLogging configures slog for stderr and, when logFile is set, adds a
 // rotating JSON file sink that receives the same events (tee). The returned
 // writer must be closed by the caller.
-func setupLogging(logLevel string, debug bool, logFile string, maxSizeMB, maxBackups int) (*logging.RotatingWriter, error) {
-	level := resolveLogLevel(logLevel, debug)
+func setupLogging(logLevel string, logFile string, maxSizeMB, maxBackups int) (*logging.RotatingWriter, error) {
+	level := resolveLogLevel(logLevel)
 	slog.SetDefault(slog.New(buildHandler(level, os.Stderr, stderrIsTTY(), colorAllowed())))
 
 	logFile = resolveLogFile(logFile)

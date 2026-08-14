@@ -16,23 +16,21 @@ func TestResolveLogLevel(t *testing.T) {
 	tests := []struct {
 		name      string
 		flagLevel string
-		debug     bool
 		env       string
 		want      slog.Level
 	}{
-		{"flag wins over env", "warn", false, "debug", slog.LevelWarn},
-		{"debug flag wins over everything", "error", true, "debug", slog.LevelDebug},
-		{"env used when flag empty", "", false, "debug", slog.LevelDebug},
-		{"default info", "", false, "", slog.LevelInfo},
-		{"unknown env falls back to info", "", false, "verbose", slog.LevelInfo},
-		{"unknown flag falls back to info", "verbose", false, "debug", slog.LevelInfo},
+		{"flag wins over env", "warn", "debug", slog.LevelWarn},
+		{"env used when flag empty", "", "debug", slog.LevelDebug},
+		{"default info", "", "", slog.LevelInfo},
+		{"unknown env falls back to info", "", "verbose", slog.LevelInfo},
+		{"unknown flag falls back to info", "verbose", "debug", slog.LevelInfo},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Setenv("NOTEBRAIN_LOG_LEVEL", tt.env)
-			if got := resolveLogLevel(tt.flagLevel, tt.debug); got != tt.want {
-				t.Errorf("resolveLogLevel(%q, %v) = %v, want %v", tt.flagLevel, tt.debug, got, tt.want)
+			if got := resolveLogLevel(tt.flagLevel); got != tt.want {
+				t.Errorf("resolveLogLevel(%q) = %v, want %v", tt.flagLevel, got, tt.want)
 			}
 		})
 	}

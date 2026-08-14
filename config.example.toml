@@ -27,9 +27,6 @@
 # Precedence: flag > config > NOTEBRAIN_LOG_LEVEL env var > "info".
 # log-level = "info" # default: "info"
 
-# Legacy debug flag (alias for log-level = "debug").
-# debug = false # default: false
-
 # Write logs to this file (JSON) in addition to stderr. The file rotates on
 # size. Precedence: flag > config > NOTEBRAIN_LOG_FILE env var.
 # log-file = "" # default: "" (env: NOTEBRAIN_LOG_FILE)
