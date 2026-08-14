@@ -2,7 +2,7 @@
 
 This reference documents command-specific and global flags. Read this when you need precise default values, flag availability per command, or flag interactions that aren't covered in the main SKILL.md.
 
-> **Defaults can be overridden by config.** The defaults below are the CLI's built-in flag defaults (`notebrain --help`). `~/.notebrain/config/config.toml` (or `--config`) can change effective defaults — notably `include-text`, `context-window`, `min-score`, `limit`, and `top-k` have config keys (`search & query settings` section). Example: with `include-text = true` and `context-window = 1` in config, every search result includes `text` and `context` **even when the flags are omitted**. If you need lean output, pass the flags explicitly (`--include-text=false`, `--context-window=0`) rather than assuming the built-in defaults.
+> **Defaults can be overridden by config.** The defaults below are the CLI's built-in flag defaults (`notebrain --help`); `~/.notebrain/config/config.toml` (or `--config`) can change effective defaults for `include-text`, `context-window`, `min-score`, `limit`, and `top-k`. Behavioral consequences (over-filtered queries, unexpected `text`/`context` in output): the config trap in [SKILL.md](../SKILL.md).
 
 ## Command-Specific Flags
 
@@ -23,7 +23,7 @@ These flags are available only on the commands listed.
 | `--group-by-note`       | Collapse results to one row per note: keeps the best-scoring chunk, drops the rest. When a note has multiple matching chunks, the surviving row gains `extra: "N matching chunks"`. Text/TSV/JSON all flow through this — handy for note-level result lists. | `false` |
 | `--exclude-notes "SLUG"` | Exclude notes from results. Accepts a note slug, title, or path, resolved automatically; repeat the flag or use comma-separated values. Unknown notes are skipped with a warning.   | —       |
 
-> **Lexical fallback:** When semantic retrieval returns zero results — or every result is below `--min-score` — `search` automatically falls back to a token-based lexical scan over note titles, paths, tags, and text (case-insensitive, substring-style token matching, min token length 2). The header reads `Lexical Search (no semantic matches)` and rows are marked with `"lexical": true` in JSON (`score: 0`). This is why short queries like `Lecture` now return hits even when no semantic match clears the score bar. There is no lexical fallback for `boosted` or `hidden`.
+> **Lexical fallback:** when semantic retrieval returns zero results — or every result is below `--min-score` — `search` retries with a token-based scan (titles, paths, tags, first-chunk text). Rows arrive `"lexical": true`, `score: 0`. No lexical fallback for `boosted` or `hidden`. Full behavior: [SKILL.md](../SKILL.md).
 
 > Note: To execute multi-query search with multi-hit boosting, pass multiple positional query arguments: `notebrain search "query1" "query2" --format json`. When a title contains a literal comma, escape it with a backslash (`\,`) so it is not split into separate exclude values.
 
@@ -52,7 +52,7 @@ These flags are available only on the commands listed.
 | `--min-shared N` | Minimum number of shared tags required to include a result (only applies when --shared is active).        | `1`     |
 | `--limit N`      | Maximum number of results (0 = no limit for `--list`; searches default to 50). A `limit` key in config overrides this default — pass `--limit 0` explicitly for a full `--list` enumeration. | `0`     |
 
-> Tag input is normalized: the `#` prefix is optional and matching is case-insensitive, so `tags "Kubernetes"` and `tags "#kubernetes"` are equivalent. Without `--children` the match is **exact** — `tags "k8s"` does not match the tag `kubernetes`. `--children` enables hierarchical prefix matching (`kubernetes` also matches `kubernetes/cka`). Tags are stored bare and lowercase; the JSON `tags` field is only emitted with `--show-tags`.
+> Tag input is normalized: the `#` prefix is optional and matching is case-insensitive, so `tags "Kubernetes"` and `tags "#kubernetes"` are equivalent. Without `--children` the match is **exact** — `tags "k8s"` does not match the tag `kubernetes`. `--children` enables hierarchical prefix matching (`kubernetes` also matches `kubernetes/cka`).
 >
 > When a tag search finds nothing, the CLI prints a "Did you mean: #go, #golang?" hint (Levenshtein-based, text output only — machine formats stay clean). Tag counts from `--list` are per-note (a note counts once even with many chunks).
 >
@@ -74,7 +74,7 @@ These flags are available only on the commands listed.
 | `--meta`    | Header only: title, path, tags, and total chunk count — no note text. Cheap way to read tags/slug/path. | `false` |
 | `--head N`  | Return only the first N chunks of text. `Chunks` still reports the full total.                            | `0`     |
 
-Takes a single positional argument: `<slug>` (note slug, title, or file path — auto-resolved). Without flags, `get` returns the full reconstructed note; in text format, the header block prints a `Tags:` line (rendered as `#`-chips). Text output is for human reading (e.g. showing the note to the user); the machine path for metadata is `--meta --format json` with `--jsonpath` (e.g. `--jsonpath="$.note.tags"`). `--meta`/`--head` are mutually independent modes; `--head 0` means full note.
+Takes a single positional argument: `<slug>` (note slug, title, or file path — auto-resolved). Without flags, `get` returns the full reconstructed note. `--meta`/`--head` are mutually independent modes; `--head 0` means full note. Text vs machine formats: [SKILL.md](../SKILL.md) (output format discipline).
 
 ### `refs`
 
@@ -86,7 +86,7 @@ Takes a single positional argument: `<slug>` (note slug, title, or file path —
 | `--only-external-links` | Limit to external http(s) website links.                                                                                     | `false` |
 | `--include-missing` | Include references whose file is missing from the vault (broken links). Hidden by default.                                  | `false` |
 
-Takes a single positional argument: `<note>` (note slug, title, or file path — auto-resolved, markdown notes only; PDF extractions error out). No kind flags = every kind; combine `--only-*` flags to union kinds. `refs` reads the note file fresh from disk, so results never go stale — but they cover only what the current file contains. External links are never `missing` and are never contacted over the network. Note: `refs` lists attachments and external links only — links to other notes are not included (use `backlinks`/`connections`).
+Takes a single positional argument: `<note>` (note slug, title, or file path — auto-resolved, markdown notes only; PDF extractions error out). No kind flags = every kind; combine `--only-*` flags to union kinds. Scope and freshness semantics: [SKILL.md](../SKILL.md).
 
 ## Global Flags (Available on Subcommands)
 

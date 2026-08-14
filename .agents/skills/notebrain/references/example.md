@@ -29,23 +29,16 @@ Quick reference: the major scenarios with the proven command sequence. Pair with
 
 ## Semantics (verified)
 
-- **Format policy**: the skill mandates `--format json` or `--format tsv` on every call — never the default `text`. `text` is for human-facing display only (showing a full note via `get`, or raw CLI output the user asked to see). Agents parse only `json`/`tsv`/`--jsonpath` output.
-- **Tag matching**: exact match, case-insensitive, `#`-optional — `tags "Kubernetes"` ≡ `tags "#kubernetes"`. Substrings do **not** match (`tags "k8s"` finds nothing for `kubernetes`). `--children` = hierarchical prefix (`kubernetes` also matches `kubernetes/cka`).
-- **Tags in JSON**: present only with `--show-tags`; bare and lowercase (`["kubernetes"]`); omitted for untagged notes. Text output renders them as `#`-chips.
 - **`--section` is exact-match**: it compares against the stored `heading_path` string verbatim. Partial or parent paths return 0 results silently — copy the full `heading_path` from a search result.
-- **`--jsonpath`**: dotted paths, `[*]`, and `[0]` only — no jq-style pipe expressions, filters, or object construction. Multi-field extraction → `--format tsv` or two `--jsonpath` calls.
-- **Config overrides defaults**: `~/.notebrain/config/config.toml` can enable `include-text`/`context-window` (and set `min-score`/`limit`/`top-k`) — output then carries `text`/`context` even without flags. Pass `--include-text=false`/`--context-window=0` explicitly for lean output.
-- **`refs` reads the file, not the index**: results come from a fresh parse of the note on disk — never stale, but only reflect what the current file contains. Order is first occurrence in the note; rows dedupe by resolved path (or exact URL).
+- **`refs` reads the file, not the index**: results reflect the current file contents, never stale index state. Scope and ordering: [SKILL.md](../SKILL.md).
+- **Rules shared with the main skill**: format policy and the config-overrides trap → [SKILL.md](../SKILL.md); tag matching, `--jsonpath` dialect, and weak-match floors → [flags.md](flags.md); tags-in-JSON and output shapes → [schema.md](schema.md). Each meaning lives in exactly one place — read it there.
 
 ## Pitfalls (verified)
 
 - **Tag discovery**: never guess tag spelling — discover via scenario 3 (vault tags drift: you remember `K8S`, the vault stores `kubernetes`).
-- **Slug discipline**: always pass the exact `note_slug` (never bare titles) to `get`/`backlinks`/`connections`/`hidden`/`boosted`. Near-duplicate titles can silently resolve to a phantom slug; `hidden --deep` then fails with `note "<slug>" has no indexed chunks ... run 'notebrain ingest' first` (misleading hint — re-resolve via `search`).
 - **Duplicate rows**: one note can span multiple chunk rows — normal. For distinct notes use `--top-k 1`, or dedupe: `--jsonpath="$.results[*].note_slug" | sort -u` (piping `notebrain` stdout is fine).
-- **Weak matches**: add `--min-score 0.3` (or `0.5` for precision); results below ~0.30 are noise. Note: config may already set a `min-score` floor, so low-score results can be absent by design.
-- **`get`**: `--meta` (header only: title, path, tags, chunk count) or `--head N` (first N chunks, `Chunks` still shows the total) cover most needs for cheap reads — reach for the full note only on demand. For metadata see also scenarios 3/14.
-- **Stale index**: scheduled re-ingest can invalidate cached slugs mid-conversation; re-verify via `search` before `--deep`/`backlinks` after any 404.
-- **`refs` scope**: attachments (image/pdf/other) and external http(s) links only — links to other notes never appear (use `backlinks`/`connections`). So `refs --include-missing` catches broken attachments, not broken `[[wikilinks]]` to notes. `refs` is markdown-notes only; PDF extractions error out.
+- **Slug discipline & staleness**: pass the exact `note_slug` from a prior `search`/`tags` — never a bare title; re-resolve via `search` when a slug 404s (scenario 16). Details: [SKILL.md](../SKILL.md).
+- **Command-specific gotchas**: `get` `--meta`/`--head` modes ([flags.md](flags.md)); `refs` covers attachments and external links only, never note-to-note links ([SKILL.md](../SKILL.md)); weak matches → `--min-score` precision floors ([flags.md](flags.md)).
 
 ## Phrase → Scenario Map
 

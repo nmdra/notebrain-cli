@@ -4,13 +4,7 @@ This reference documents the structure of NoteBrain's output in each format. Rea
 
 ## Output Formats (`--format`)
 
-The CLI's built-in default is `text`, but the skill mandates machine formats for agents. `text` is reserved for human-facing display only (showing a note body via `get`, or when the user asks to see raw CLI output).
-
-| Format | Agent Use |
-| ------ | --------- |
-| `json` | Default for agents. Structured envelope with `results` array. Pair with `--jsonpath` for extraction. |
-| `tsv`  | Token-optimized for wide, shallow scans — no repeating key names. Use for `tags --list`, `backlinks`, `connections`, `refs` audits, `--group-by-note` lists. |
-| `text` | Human reading only. Never for parsing or summarizing — it carries headers, `#`-chips, and "Did you mean" hints. |
+The CLI's built-in default is `text`, but the skill mandates machine formats for agents — `text` is for human-facing display only. The rules live in [SKILL.md](../SKILL.md) (output format discipline); the per-command mapping is below.
 
 ### Per-command preference
 
@@ -162,7 +156,7 @@ Tag matching and normalization semantics: see `tags` in [flags.md](flags.md).
 | `text`      | Full reconstructed note, section headers (`##`) prepended by the CLI. |
 | `chunks`    | Total indexed chunk count for the note.                  |
 
-The `note` object shape is the same for the `get` modes: default returns the full text, `--meta` returns the header with `text` empty (and `chunks` still the total), and `--head N` returns the first N chunks while `chunks` still reports the full total. For metadata-only lookups use `get "<slug>" --meta --format json` (extract with `--jsonpath`, e.g. `$.note.tags`). The full note in `text` format is for human reading — show it to the user, don't parse it.
+The `note` object shape is the same for the `get` modes: default returns the full text, `--meta` returns the header with `text` empty (and `chunks` still the total), and `--head N` returns the first N chunks while `chunks` still reports the full total. Mode and format guidance: [flags.md](flags.md) and [SKILL.md](../SKILL.md).
 
 ### `refs`
 
@@ -244,7 +238,7 @@ First line is the header row (always emitted). Columns are tab-separated. Tags a
 }
 ```
 
-Use this for pre-flight checks — if `chunks` is `0`, the vault hasn't been indexed yet.
+Use this for pre-flight checks — `chunks` is `0` when the vault isn't indexed (procedure: [SKILL.md](../SKILL.md)).
 
 ## Extracting Fields via `--jsonpath`
 

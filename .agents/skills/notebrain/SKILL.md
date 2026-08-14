@@ -57,10 +57,9 @@ notebrain search "<topic>" --format json --include-text --context-window 1 --lim
 
 **Lean shapes:**
 - Top candidates/slugs only: drop `--context-window`, use `--jsonpath="$.results[*].note_slug"`.
-- Note-level (not chunk-level) list: `--group-by-note` to collapse to the best chunk per note; `dedupe` via `--jsonpath="$.results[*].note_slug" | sort -u`.
+- Note-level (not chunk-level) list: `--group-by-note` to collapse to the best chunk per note (distinct-notes recipe: [example.md](references/example.md)).
 - Weak matches above the `--min-score 0.5` floor, or `--tag`, `--section`, `--has-tasks`, `--has-code`, `--exclude-notes`.
 - Multi-topic at once — boost by adding positional queries: `search "redis pubsub" "kafka brokers"`.
-- A show-tags + `--jsonpath="$.results[0].tags"` reveals real note tags in one call.
 
 Flag tables, `--min-score` semantics, filters: [flags.md](references/flags.md).
 
@@ -103,7 +102,7 @@ Never guess a tag spelling — vault tags drift (`K8S` remembered vs `kubernetes
 3. From the header: `get "<slug>" --meta --format json --jsonpath="$.note.tags"`.
 4. Then query: `tags "<tag>"` with `--children` for the whole family.
 
-Tag semantics: `#` optional, case-insensitive, exact unless `--children` (then hierarchical prefix `kubernetes` ⊃ `kubernetes/cka`). JSON emits tags only with `--show-tags`, bare and lowercase — so in answer text render them as written.
+Tag semantics (`#` optional, case-insensitive, exact unless `--children`, matching rules): [flags.md](references/flags.md). JSON emits tags only with `--show-tags`, bare and lowercase — so in answer text render them as written.
 
 ## Response format
 
