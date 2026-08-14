@@ -24,8 +24,8 @@ github.com/PaesslerAG/jsonpath v0.1.1 h1:c1/AToHQMVsduPAa4Vh6xp2U0evy4t8SWp8imEs
 github.com/PaesslerAG/jsonpath v0.1.1/go.mod h1:lVboNxFGal/VwW6d9JzIy56bUsYAP6tH/x80vjnCseY=
 github.com/alecthomas/assert/v2 v2.11.0 h1:2Q9r3ki8+JYXvGsDyBXwH3LcJ+WK5D0gc5E8vS6K3D0=
 github.com/alecthomas/assert/v2 v2.11.0/go.mod h1:Bze95FyfUr7x34QZrjL+XP+0qgp/zg8yS+TtBj1WA3k=
-github.com/alecthomas/kong v1.16.0 h1:g92/kUxBcdcTPOM79yE63viJgtcp5dNyrB3/O2cjYT4=
-github.com/alecthomas/kong v1.16.0/go.mod h1:wrlbXem1CWqUV5Vbmss5ISYhsVPkBb1Yo7YKJghju2I=
+github.com/alecthomas/kong v1.16.1 h1:ixhCt93XkJ98kGposQ54+bl0IK6XwqB40AsMynU7Z8E=
+github.com/alecthomas/kong v1.16.1/go.mod h1:wrlbXem1CWqUV5Vbmss5ISYhsVPkBb1Yo7YKJghju2I=
 github.com/alecthomas/repr v0.5.2 h1:SU73FTI9D1P5UNtvseffFSGmdNci/O6RsqzeXJtP0Qs=
 github.com/alecthomas/repr v0.5.2/go.mod h1:Fr0507jx4eOXV7AlPV6AVZLYrLIuIeSOWtW57eE/O/4=
 github.com/amikos-tech/chroma-go v0.4.1 h1:WIcFTSjRgnVTYKWhgZYKaEUOjK6+BpGfVQRqdMIAfrw=
@@ -185,8 +185,8 @@ github.com/jotaen/kong-completion v0.0.14 h1:R/SZOwnr/an8xDwo1T4gLygyeF6yNqCL1i/
 github.com/jotaen/kong-completion v0.0.14/go.mod h1:dyIG20e3qq128SUBtF8jzI7YtkfzjWMlgbqkAJd6xHQ=
 github.com/klauspost/compress v1.18.0 h1:c/Cqfb0r+Yi+JtIEq73FWXVkRonBlf0CRNYc8Zttxdo=
 github.com/klauspost/compress v1.18.0/go.mod h1:2Pp+KzxcywXVXMr50+X0Q/Lsb43OQHYWRCY2AiWywWQ=
-github.com/klippa-app/go-pdfium v1.19.6 h1:MocMc/6ie+9eBFu+9tFMX66i3EDqnsMDoBtOy9Mx2/g=
-github.com/klippa-app/go-pdfium v1.19.6/go.mod h1:poSiUJYFicnfT8dazUfVnxcqPlKQxO3aHdGbOa1lG1w=
+github.com/klippa-app/go-pdfium v1.19.7 h1:iMn5ylzxfJ3P3YYkBcjqJCOPY65g3XNAkQ+UsPB7/O8=
+github.com/klippa-app/go-pdfium v1.19.7/go.mod h1:poSiUJYFicnfT8dazUfVnxcqPlKQxO3aHdGbOa1lG1w=
 github.com/kljensen/snowball v0.10.0 h1:8qgaBLraSuUVHtGH5tJ+VdGpqgfcaE2WkswL/C3nVhY=
 github.com/kljensen/snowball v0.10.0/go.mod h1:bJcxtur1W5Qw4fVj9tk5W88zyRcGQQjqahFErdcDTHk=
 github.com/leanovate/gopter v0.2.11 h1:vRjThO1EKPb/1NsDXuDrzldR28RLkBflWYcU9CvzWu4=

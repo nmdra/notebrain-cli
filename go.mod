@@ -5,13 +5,13 @@ go 1.26.4
 require (
 	charm.land/lipgloss/v2 v2.0.5
 	github.com/PaesslerAG/jsonpath v0.1.1
-	github.com/alecthomas/kong v1.16.0
+	github.com/alecthomas/kong v1.16.1
 	github.com/amikos-tech/chroma-go v0.4.1
 	github.com/bmatcuk/doublestar/v4 v4.10.0
 	github.com/charmbracelet/x/ansi v0.11.7
 	github.com/charmbracelet/x/term v0.2.2
 	github.com/jotaen/kong-completion v0.0.14
-	github.com/klippa-app/go-pdfium v1.19.6
+	github.com/klippa-app/go-pdfium v1.19.7
 	github.com/pelletier/go-toml/v2 v2.4.3
 	github.com/posener/complete v1.2.3
 	github.com/soypat/goldmark-latex v0.1.4

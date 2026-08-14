@@ -60,7 +60,7 @@ func NixShell() (string, error) {
 }
 
 func AndroidShell() (string, error) {
-	shell := os.Getenv("SHELL")
+	shell := os.Getenv("SHELL");
 	if shell == "" {
 		return "", errors.New("SHELL not defined in android.")
 	}
