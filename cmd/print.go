@@ -303,7 +303,7 @@ func printTextResults(w io.Writer, commandName, query string, queries []string, 
 				line = ansi.Truncate(line, termWidth, "…")
 			}
 			_, _ = fmt.Fprintln(w, line)
-			printDeepDetails(w, r, termWidth, globals)
+			printDeepDetails(w, r, termWidth)
 			if i < len(filtered)-1 {
 				_, _ = fmt.Fprintln(w)
 			}
@@ -336,7 +336,7 @@ func printTextResults(w io.Writer, commandName, query string, queries []string, 
 // long section lists remain readable without wrapping or mid-path truncation.
 const maxMatchedSectionsShown = 3
 
-func printDeepDetails(w io.Writer, r store.Result, termWidth int, _ *Globals) {
+func printDeepDetails(w io.Writer, r store.Result, termWidth int) {
 	var details []string
 	if len(r.MatchedQueries) > 0 {
 		shown := r.MatchedQueries
@@ -387,6 +387,21 @@ func normalizeJSONPath(jp string) string {
 
 func printJSONPathResult(obj any, jp string) error {
 	return printJSONPathResultToWriter(os.Stdout, obj, jp)
+}
+
+// printEnvelopeJSON handles the JSON and JSONPath output branches shared by
+// every command envelope: JSONPath extraction first (a single selected value),
+// then the indented JSON form. It reports whether the envelope was printed.
+func printEnvelopeJSON(w io.Writer, env any, globals *Globals) (bool, error) {
+	if globals.JSONPath != "" {
+		return true, printJSONPathResultToWriter(w, env, globals.JSONPath)
+	}
+	if globals.Format == formatJSON {
+		enc := json.NewEncoder(w)
+		enc.SetIndent("", "  ")
+		return true, enc.Encode(env)
+	}
+	return false, nil
 }
 
 func printJSONPathResultToWriter(w io.Writer, obj any, jp string) error {
@@ -449,15 +464,11 @@ func printTagsFormattedToWriter(w io.Writer, commandName string, tags []store.Ta
 	initStyles()
 	env := tagListEnvelope{Command: commandName, Total: len(tags), Tags: tags}
 
-	if globals.JSONPath != "" {
-		return printJSONPathResultToWriter(w, env, globals.JSONPath)
+	if handled, err := printEnvelopeJSON(w, env, globals); handled {
+		return err
 	}
 
 	switch globals.Format {
-	case formatJSON:
-		enc := json.NewEncoder(w)
-		enc.SetIndent("", "  ")
-		return enc.Encode(env)
 	case formatTSV:
 		_, _ = fmt.Fprintln(w, "tag\tcount")
 		for _, t := range tags {
