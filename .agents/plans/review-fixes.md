@@ -1,11 +1,50 @@
 # Plan: Post-release review fixes (v2.12.0 → HEAD)
 
-Status: **in progress** — approved 2026-08-14, implementation underway.
+Status: **complete** — all items landed 2026-08-14 (13 commits, see below); full suite + lint green.
 Sources: agy-delegate review run (gemini-3.1-pro-high, read-only) + code-review skill
 (Standards + Spec axes) over `git diff v2.12.0...HEAD` (40 commits, 77 files).
 
 User selection: fix items 1–9 + 11; skip #10 (Plan.md drift — the refs text
 styling/relative-path deviation was user-requested post-plan, sanctioned).
+
+## Landed commits (in order)
+
+1. `chore(plan)`: record this plan (0bbbc5b)
+2. `refactor(store)`: unexport Levenshtein and ClosestTags (32b6a00) — items 1
+3. `refactor(cmd)`: drop unused Globals param, share JSON envelope printing (1014084) — items 2+7 (print.go merged: hunk staging misaligned, merged into one focused single-file commit)
+4. `test(cmd)`: cover get/stats JSONPath envelope (a5c977d) — item 3
+5. `refactor(cmd)`: rename topK local to candidateChunks in hidden deep mode (6d1a585) — item 4
+6. `refactor(cmd)`: type refs kinds via parser constants, group resolution in refResolver, drop deprecated alias flags (6204eb9) — items 6+9+10 (hunk-entangled in refs.go: Kind field typing, const deletion, and alias-field removal share adjacent regions; kept as one coherent refs refactor; tests updated in the same commit)
+7. `refactor(cmd)`: use shared JSON envelope printing in get, stats, refs (47e80a7) — item 7 remainder
+8. `refactor(cmd)`: inline lexicalFallback middle man (cf883c4) — item 8
+9. `refactor(cmd)!`: remove deprecated --enable-pdf flag and enable-pdf config key (128e251) — item 11a
+10. `refactor(cmd)!`: remove deprecated --exclude-note flag (a0fe047) — item 11b
+11. `refactor(cmd)!`: remove legacy --debug flag (c1eb82d) — item 11c
+12. `refactor(config)!`: remove deprecated hide-tags config key (a97bbb5) — item 11d
+13. `docs`: purge removed flag aliases from docs and changelog (ab28f86) — docs sweep
+
+## Deviations from plan (approved scope, noted for review)
+
+- **Item 5 (groupCompletion) — no change**: the constant is a live `textOnlyCommands`
+  map key, and inlining it trips `goconst` (3 occurrences). Kept as-is; finding was a
+  false positive.
+- **Items 6+9+10 merged** into one refs.go commit (hunk-level entanglement; splitting
+  risked mid-state commits that cannot compile — Kind field typing, const deletion,
+  and alias removal share adjacent hunks).
+- **Items 2+7 merged** for print.go (hunk staging misalignment).
+- **Docs updated in the final docs commit** (ab28f86) instead of per-code-commit.
+- Tests for removed aliases became rejection tests (parse must error); `TestRefsOnlyFlagsParse`,
+  `TestIngestWithPDFFlag`, `TestSearchExcludeNotesFlagRename` restructured accordingly.
+
+## Verification (all green)
+
+- `make test` (10 packages), `make lint` (0 issues), `make build`.
+- CLI probes: `refs --help` shows only `--only-*`; `ingest --help` only `--with-pdf`;
+  `search --help` only `--exclude-notes`; global help only `--log-level`;
+  `--enable-pdf`/`--exclude-note`/`--debug`/`refs --images` all rejected with usage errors.
+- Docs sweep: zero stale alias references (rg across README/wiki/AGENTS.md/skill/CHANGELOG/config.example.toml;
+  CHANGELOG keeps historical entries, Unreleased Deprecated section now empty).
+- `hide-tags` config key now ignored (test asserts ShowTags stays false).
 
 ## Commits (small commit per change, in order; each standalone-buildable)
 
