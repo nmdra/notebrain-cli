@@ -22,7 +22,6 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -302,20 +301,16 @@ func printRefsFormatted(env refsEnvelope, globals *Globals) error {
 }
 
 func printRefsFormattedToWriter(w io.Writer, env refsEnvelope, globals *Globals) error {
-	if globals.JSONPath != "" {
-		return printJSONPathResultToWriter(w, env, globals.JSONPath)
+	if handled, err := printEnvelopeJSON(w, env, globals); handled {
+		return err
 	}
 
 	switch globals.Format {
-	case formatJSON:
-		enc := json.NewEncoder(w)
-		enc.SetIndent("", "  ")
-		return enc.Encode(env)
 	case formatTSV:
 		_, _ = fmt.Fprintln(w, "path\tkind\tmissing\trelative_path")
 		for _, r := range env.Refs {
 			missing := strconv.FormatBool(r.Missing)
-			_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", tsvEscape(r.Path), r.Kind, missing, tsvEscape(r.RelativePath))
+			_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", tsvEscape(r.Path), string(r.Kind), missing, tsvEscape(r.RelativePath))
 		}
 		return nil
 	default: // "text"

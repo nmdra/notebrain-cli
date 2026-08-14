@@ -22,7 +22,6 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 
@@ -53,14 +52,8 @@ func (c *StatsCmd) Run(globals *Globals) error {
 		Stats:   stats,
 	}
 
-	if globals.JSONPath != "" {
-		return printJSONPathResult(env, globals.JSONPath)
-	}
-
-	if globals.Format == formatJSON {
-		enc := json.NewEncoder(os.Stdout)
-		enc.SetIndent("", "  ")
-		return enc.Encode(env)
+	if handled, err := printEnvelopeJSON(os.Stdout, env, globals); handled {
+		return err
 	}
 
 	if globals.Format == formatTSV {

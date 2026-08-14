@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -46,16 +45,11 @@ func (c *GetCmd) Run(globals *Globals) error {
 		Note:    note,
 	}
 
-	if globals.JSONPath != "" {
-		return printJSONPathResult(env, globals.JSONPath)
+	if handled, err := printEnvelopeJSON(os.Stdout, env, globals); handled {
+		return err
 	}
 
 	switch globals.Format {
-	case formatJSON:
-		enc := json.NewEncoder(os.Stdout)
-		enc.SetIndent("", "  ")
-		return enc.Encode(env)
-
 	case formatTSV:
 		fmt.Println("note_slug\ttitle\tfile_path\ttags\tchunks\ttext")
 		tagsStr := formatTags(note.Tags)
