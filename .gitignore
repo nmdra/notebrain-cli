@@ -40,3 +40,6 @@ graphify-out
 .graphifyignore
 
 .agents/skills/notebrain-workspace
+
+# Working plans (not version-controlled)
+.agents/plans/
