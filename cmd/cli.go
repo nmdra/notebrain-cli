@@ -41,6 +41,7 @@ const (
 	groupReset      = "reset"
 	groupGet        = "get"
 	groupRefs       = "refs"
+	groupStats      = "stats"
 	groupCompletion = "completion"
 )
 

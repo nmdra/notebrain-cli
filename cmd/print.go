@@ -385,10 +385,6 @@ func normalizeJSONPath(jp string) string {
 	return jp
 }
 
-func printJSONPathResult(obj any, jp string) error {
-	return printJSONPathResultToWriter(os.Stdout, obj, jp)
-}
-
 // printEnvelopeJSON handles the JSON and JSONPath output branches shared by
 // every command envelope: JSONPath extraction first (a single selected value),
 // then the indented JSON form. It reports whether the envelope was printed.

@@ -48,7 +48,7 @@ func (c *StatsCmd) Run(globals *Globals) error {
 		Command string `json:"command"`
 		*store.Stats
 	}{
-		Command: "stats",
+		Command: groupStats,
 		Stats:   stats,
 	}
 
