@@ -29,6 +29,18 @@ notebrain stats --format=json
 
 **The config trap:** `~/.notebrain/config/config.toml` (or `--config`) overrides built-in flag defaults — `include-text`, `context-window`, `min-score`, `limit`, `top-k` all have config keys. If config enables text/context, every result carries `text`+`context` even without the flags. For lean output pass `--include-text=false --context-window=0`. If a query looks over-filtered, a configured `min-score` floor (e.g. `0.4`) means low-score rows never appear — that's expected, not a bug. Details: [flags.md](references/flags.md).
 
+## Output format discipline
+
+The CLI's default output format is `text`, but text is for humans — the agent always works from machine formats:
+
+- **Every invocation passes `--format json` or `--format tsv` explicitly.** Never rely on the default `text`.
+- **`json` is the default choice** — the structured envelope carries nested fields (`text`, `context`, `heading_path`, `tags`, `matched_queries`). Shape: [schema.md](references/schema.md).
+- **`tsv` for wide, shallow scans** where columns suffice: `tags --list`, `backlinks`, `connections`, `refs` audits, and `--group-by-note` note lists.
+- **`--jsonpath` for single-field extraction** (slugs, scores, tags) — the leanest output; combine with `--limit`/`--show-file-path=false`.
+- **`--format text` only when the output is for the human**: showing a note body (`get "<slug>"`) or when the user asks to see the raw CLI output. Never parse text output, and never paste decorated text (headers, `#`-chips, "Did you mean" hints) into an answer — everything the agent reads or summarizes comes from `json`/`tsv`.
+
+Per-command preference: see the format table in [schema.md](references/schema.md).
+
 ## Retrieval ladder
 
 The vault is large; the context budget is not. Each step has one criterion that says **done**.
@@ -88,7 +100,7 @@ Never guess a tag spelling — vault tags drift (`K8S` remembered vs `kubernetes
 
 1. Enumerate cheaply: `tags --list --format tsv` (every tag + count). `--limit 0` = all; a config `limit` may cap — pass it explicitly.
 2. From content: `search "<topic>" --limit 1 --show-tags --jsonpath="$.results[0].tags"`.
-3. From the header: `get "<slug>" --format text`, read the `Tags:` line.
+3. From the header: `get "<slug>" --meta --format json --jsonpath="$.note.tags"`.
 4. Then query: `tags "<tag>"` with `--children` for the whole family.
 
 Tag semantics: `#` optional, case-insensitive, exact unless `--children` (then hierarchical prefix `kubernetes` ⊃ `kubernetes/cka`). JSON emits tags only with `--show-tags`, bare and lowercase — so in answer text render them as written.

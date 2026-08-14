@@ -25,7 +25,7 @@ These flags are available only on the commands listed.
 
 > **Lexical fallback:** When semantic retrieval returns zero results — or every result is below `--min-score` — `search` automatically falls back to a token-based lexical scan over note titles, paths, tags, and text (case-insensitive, substring-style token matching, min token length 2). The header reads `Lexical Search (no semantic matches)` and rows are marked with `"lexical": true` in JSON (`score: 0`). This is why short queries like `Lecture` now return hits even when no semantic match clears the score bar. There is no lexical fallback for `boosted` or `hidden`.
 
-> Note: To execute multi-query search with multi-hit boosting, pass multiple positional query arguments: `notebrain search "query1" "query2"`. When a title contains a literal comma, escape it with a backslash (`\,`) so it is not split into separate exclude values.
+> Note: To execute multi-query search with multi-hit boosting, pass multiple positional query arguments: `notebrain search "query1" "query2" --format json`. When a title contains a literal comma, escape it with a backslash (`\,`) so it is not split into separate exclude values.
 
 ### `hidden`
 
@@ -74,7 +74,7 @@ These flags are available only on the commands listed.
 | `--meta`    | Header only: title, path, tags, and total chunk count — no note text. Cheap way to read tags/slug/path. | `false` |
 | `--head N`  | Return only the first N chunks of text. `Chunks` still reports the full total.                            | `0`     |
 
-Takes a single positional argument: `<slug>` (note slug, title, or file path — auto-resolved). Without flags, `get` returns the full reconstructed note; in text format, the header block prints a `Tags:` line (rendered as `#`-chips) — a lightweight way to read a note's tags without JSON. `--meta`/`--head` are mutually independent modes; `--head 0` means full note.
+Takes a single positional argument: `<slug>` (note slug, title, or file path — auto-resolved). Without flags, `get` returns the full reconstructed note; in text format, the header block prints a `Tags:` line (rendered as `#`-chips). Text output is for human reading (e.g. showing the note to the user); the machine path for metadata is `--meta --format json` with `--jsonpath` (e.g. `--jsonpath="$.note.tags"`). `--meta`/`--head` are mutually independent modes; `--head 0` means full note.
 
 ### `refs`
 
@@ -96,7 +96,7 @@ These flags work on `search`, `backlinks`, `connections`, `hidden`, `tags`, `boo
 
 | Flag               | Purpose                                                                                                                                                                                                                                                                                                                                                   | Default |
 | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| `--format FORMAT`  | Output format: `json` (structured envelope), `tsv` (tab-separated, no key names), `text` (standard text).                                                                                                                                                                                                                                                 | `text`  |
+| `--format FORMAT`  | Output format: `json` (structured envelope), `tsv` (tab-separated, no key names), `text` (standard text). The built-in default is `text`, but this skill mandates that agents pass `json` or `tsv` explicitly on every call — `text` is for human-facing display only (see [schema.md](schema.md)). | `text`  |
 | `--show-file-path` | Include the `file_path` field in output (use `--show-file-path=false` to hide).                                                                                                                                                                                                                                                                           | `true`  |
 | `--jsonpath PATH`  | Extract specific JSON elements with JSONPath (e.g., `"$.results[*].note_slug"`). Drops the JSON envelope entirely. Dialect and valid/missing-path behavior: see the note below the table. For multi-field extraction use `--format tsv` or two `--jsonpath` calls. | —       |
 | `--include-text`   | Include the matched markdown text chunk in results. Omit during initial structure-mapping to save tokens.                                                                                                                                                                                                                                                 | off     |
