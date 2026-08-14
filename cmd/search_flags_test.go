@@ -44,12 +44,9 @@ func TestSearchExcludeNotesFlagRename(t *testing.T) {
 		}
 	})
 
-	t.Run("legacy exclude-note alias still parses", func(t *testing.T) {
-		if _, err := parser.Parse([]string{"search", "q", "--exclude-note", "alpha.md"}); err != nil {
-			t.Fatalf("parse legacy alias: %v", err)
-		}
-		if len(search.ExcludeNote) != 1 || search.ExcludeNote[0] != "alpha.md" {
-			t.Errorf("ExcludeNote = %v, want [alpha.md]", search.ExcludeNote)
+	t.Run("legacy exclude-note alias rejected", func(t *testing.T) {
+		if _, err := parser.Parse([]string{"search", "q", "--exclude-note", "alpha.md"}); err == nil {
+			t.Error("parse legacy alias: expected error, got none")
 		}
 	})
 
@@ -65,12 +62,12 @@ func TestSearchExcludeNotesFlagRename(t *testing.T) {
 	if !strings.Contains(help.String(), "--exclude-notes") {
 		t.Errorf("help must show --exclude-notes:\n%s", help.String())
 	}
-	if strings.Contains(strings.ReplaceAll(help.String(), "--exclude-notes", ""), "--exclude-note") || strings.Contains(help.String(), "deprecated") {
-		t.Errorf("help must hide deprecated --exclude-note alias:\n%s", help.String())
+	if strings.Contains(strings.ReplaceAll(help.String(), "--exclude-notes", ""), "--exclude-note") {
+		t.Errorf("help must not mention --exclude-note:\n%s", help.String())
 	}
 }
 
-func TestSearchMergesDeprecatedExcludeNoteAlias(t *testing.T) {
+func TestSearchExcludeNotesMultipleFlags(t *testing.T) {
 	var cli struct {
 		Globals Globals   `embed:""`
 		Search  SearchCmd `cmd:""`
@@ -79,12 +76,10 @@ func TestSearchMergesDeprecatedExcludeNoteAlias(t *testing.T) {
 	if err != nil {
 		t.Fatalf("kong.New: %v", err)
 	}
-	if _, err := parser.Parse([]string{"search", "q", "--exclude-notes", "a.md", "--exclude-note", "b.md"}); err != nil {
+	if _, err := parser.Parse([]string{"search", "q", "--exclude-notes", "a.md", "--exclude-notes", "b.md"}); err != nil {
 		t.Fatalf("parse: %v", err)
 	}
-	merged := append([]string(nil), cli.Search.ExcludeNotes...)
-	merged = append(merged, cli.Search.ExcludeNote...)
-	if len(merged) != 2 {
-		t.Errorf("merged excludes = %v, want [a.md b.md]", merged)
+	if len(cli.Search.ExcludeNotes) != 2 {
+		t.Errorf("excludes = %v, want [a.md b.md]", cli.Search.ExcludeNotes)
 	}
 }
