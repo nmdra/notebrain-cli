@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v2.13.0] - 2026-08-15
+
 ### Added
 - **Reference Listing**: `notebrain refs <note>` lists a note's local attachments (images, PDFs, archives, …) and external website links, filterable with `--only-images`, `--only-pdf`, `--only-other`, and `--only-external-links`. Broken links are hidden by default and surfaced with `--include-missing` (`feat(cmd)`).
 
