@@ -1,4 +1,4 @@
-# charm.land/lipgloss/v2 v2.0.5
+# charm.land/lipgloss/v2 v2.0.6
 ## explicit; go 1.25.0
 charm.land/lipgloss/v2
 # github.com/Masterminds/semver/v3 v3.5.0
@@ -41,10 +41,10 @@ github.com/bmatcuk/doublestar/v4
 # github.com/charmbracelet/colorprofile v0.4.3
 ## explicit; go 1.25.0
 github.com/charmbracelet/colorprofile
-# github.com/charmbracelet/ultraviolet v0.0.0-20260720091822-7cc6674724ac
+# github.com/charmbracelet/ultraviolet v0.0.0-20260811164956-006e29f97886
 ## explicit; go 1.25.0
 github.com/charmbracelet/ultraviolet
-# github.com/charmbracelet/x/ansi v0.11.7
+# github.com/charmbracelet/x/ansi v0.11.8
 ## explicit; go 1.24.2
 github.com/charmbracelet/x/ansi
 github.com/charmbracelet/x/ansi/kitty
@@ -119,7 +119,7 @@ github.com/jolestar/go-commons-pool/v2/concurrent
 # github.com/jotaen/kong-completion v0.0.14
 ## explicit; go 1.25
 github.com/jotaen/kong-completion
-# github.com/klippa-app/go-pdfium v1.19.7
+# github.com/klippa-app/go-pdfium v1.19.8
 ## explicit; go 1.25.0
 github.com/klippa-app/go-pdfium
 github.com/klippa-app/go-pdfium/enums
@@ -136,7 +136,7 @@ github.com/klippa-app/go-pdfium/webassembly/imports
 ## explicit; go 1.24.0
 github.com/leodido/go-urn
 github.com/leodido/go-urn/scim/schema
-# github.com/lucasb-eyer/go-colorful v1.4.0
+# github.com/lucasb-eyer/go-colorful v1.4.1
 ## explicit; go 1.12
 github.com/lucasb-eyer/go-colorful
 # github.com/mattn/go-runewidth v0.0.27
