@@ -11,10 +11,16 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/nmdra/notebrain-cli/v2/internal/embedder"
 )
 
 // sqliteMagic is the 16-byte header every SQLite database file starts with.
 const sqliteMagic = "SQLite format 3\x00"
+
+// checkModelAvailabilityFn is replaceable in doctor tests so database checks
+// remain independent of the host's ONNX model cache.
+var checkModelAvailabilityFn = embedder.CheckModelAvailability
 
 // sqliteHealth inspects the chroma.sqlite3 file without opening it through
 // the native library (which can abort on corrupted databases).

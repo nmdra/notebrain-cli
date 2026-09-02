@@ -33,6 +33,10 @@ import (
 	"github.com/nmdra/notebrain-cli/v2/internal/store"
 )
 
+// newLocalEmbedderFn is replaceable in command tests so semantic failures
+// can be asserted without loading the native ONNX runtime.
+var newLocalEmbedderFn = embedder.NewLocalEmbedder
+
 type SearchCmd struct {
 	Queries      []string `group:"search" arg:"" optional:"" name:"query" help:"search query (multiple args for multi-hit boosting)"`
 	Limit        int      `group:"search" help:"maximum number of results" default:"10"`
@@ -116,12 +120,18 @@ func (c *SearchCmd) Run(globals *Globals) error {
 		return err
 	}
 
-	slog.Debug("initializing embedding model")
-	emb, err := embedder.NewLocalEmbedder()
-	if err != nil {
-		return err
+	// Tag-only searches use Chroma's metadata path and do not need the local
+	// semantic model. Avoid initializing it unless a semantic query remains.
+	var emb embedderAPI
+	if len(resolved) > 0 {
+		slog.Debug("initializing embedding model")
+		localEmb, err := newLocalEmbedderFn()
+		if err != nil {
+			return err
+		}
+		emb = localEmb
+		defer func() { _ = emb.Close() }()
 	}
-	defer func() { _ = emb.Close() }()
 
 	return c.runStatic(ctx, globals, st, emb, resolved, displayQueries, excluded)
 }

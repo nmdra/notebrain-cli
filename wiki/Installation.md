@@ -56,3 +56,52 @@ NoteBrain uses a TOML file for persistent configuration. The default location is
    ```
 
 By default, NoteBrain stores the local ChromaDB database at `~/.notebrain/chroma`. You can override any setting with command-line flags (for example, `--chroma-path`, `--vault-path`, `--format`).
+
+## ONNX Model Recovery
+
+Semantic commands use the local `all-MiniLM-L6-v2` model. The model cache is:
+
+```text
+~/.cache/chroma/onnx_models/all-MiniLM-L6-v2/onnx/
+```
+
+The cache must contain these non-empty files:
+
+```text
+model.onnx
+tokenizer.json
+```
+
+Run the diagnostic command before you run a semantic command:
+
+```bash
+notebrain doctor
+```
+
+If the model is missing, download and verify the pinned Chroma archive:
+
+```bash
+archive=/tmp/notebrain-onnx.tar.gz
+url=https://chroma-onnx-models.s3.amazonaws.com/all-MiniLM-L6-v2/onnx.tar.gz
+curl -fL "$url" -o "$archive"
+printf '%s  %s\n' \
+  913d7300ceae3b2dbc2c50d1de4baacab4be7b9380491c27fab7418616a16ec3 \
+  "$archive" | sha256sum -c -
+model_dir=~/.cache/chroma/onnx_models/all-MiniLM-L6-v2/onnx
+mkdir -p "$model_dir"
+tar -xzf "$archive" -C "$model_dir"
+notebrain doctor
+```
+
+The archive URL and checksum are in `vendor/github.com/amikos-tech/chroma-go/pkg/embeddings/default_ef/download_utils.go`.
+
+If NoteBrain reports an active download lock, wait for the process to finish. Do not remove the lock.
+
+If NoteBrain reports a stale lock, confirm that the reported process ID is not running. Then remove only the lock file and run `notebrain doctor` again:
+
+```bash
+rm ~/.cache/chroma/onnx_models/.download.lock
+notebrain doctor
+```
+
+Do not remove the ChromaDB directory. The lock file and model cache are separate from the indexed vault data.

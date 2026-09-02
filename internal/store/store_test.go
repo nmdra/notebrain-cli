@@ -3,6 +3,9 @@ package store
 import (
 	"context"
 	"testing"
+
+	chroma "github.com/amikos-tech/chroma-go/pkg/api/v2"
+	"github.com/amikos-tech/chroma-go/pkg/embeddings"
 )
 
 func TestStoreOpenClose(t *testing.T) {
@@ -29,6 +32,105 @@ func TestStoreOpenClose(t *testing.T) {
 	}
 	if stats.Notes != 0 {
 		t.Errorf("Expected 0 notes, got %d", stats.Notes)
+	}
+}
+
+func TestStoreOpen_UsesNonDownloadingEmbeddingFunction(t *testing.T) {
+	st, err := Open(context.Background(), t.TempDir())
+	if err != nil {
+		t.Fatalf("Open failed without ONNX model: %v", err)
+	}
+	defer func() { _ = st.Close() }()
+
+	for _, collection := range []struct {
+		name string
+		col  chroma.Collection
+	}{
+		{name: CollectionChunks, col: st.chunks},
+		{name: CollectionLinks, col: st.links},
+	} {
+		raw, ok := collection.col.Configuration().GetRaw("embedding_function")
+		if !ok {
+			t.Fatalf("%s collection has no embedding function configuration", collection.name)
+		}
+		config, ok := raw.(map[string]any)
+		if !ok {
+			t.Fatalf("%s embedding function configuration has type %T", collection.name, raw)
+		}
+		if got, _ := config["name"].(string); got != "consistent_hash" {
+			t.Errorf("%s embedding function = %q, want consistent_hash", collection.name, got)
+		}
+	}
+}
+
+// defaultNamedEmbeddingFunction writes a persisted "default" embedding
+// function without constructing Chroma's download-backed implementation.
+type defaultNamedEmbeddingFunction struct{}
+
+func (defaultNamedEmbeddingFunction) EmbedDocuments(context.Context, []string) ([]embeddings.Embedding, error) {
+	return nil, nil
+}
+
+func (defaultNamedEmbeddingFunction) EmbedQuery(context.Context, string) (embeddings.Embedding, error) {
+	return nil, nil
+}
+
+func (defaultNamedEmbeddingFunction) Name() string { return "default" }
+
+func (defaultNamedEmbeddingFunction) GetConfig() embeddings.EmbeddingFunctionConfig {
+	return embeddings.EmbeddingFunctionConfig{}
+}
+
+func (defaultNamedEmbeddingFunction) DefaultSpace() embeddings.DistanceMetric {
+	return embeddings.COSINE
+}
+
+func (defaultNamedEmbeddingFunction) SupportedSpaces() []embeddings.DistanceMetric {
+	return []embeddings.DistanceMetric{embeddings.COSINE}
+}
+
+func TestStoreOpen_ReopensPersistedDefaultEmbeddingFunction(t *testing.T) {
+	ctx := context.Background()
+	path := t.TempDir()
+
+	client, err := chroma.NewPersistentClient(
+		chroma.WithPersistentPath(path),
+		chroma.WithPersistentAllowReset(true),
+		chroma.WithPersistentClientOption(
+			chroma.WithDatabaseAndTenant("default_database", "default_tenant"),
+		),
+	)
+	if err != nil {
+		t.Fatalf("create persistent client: %v", err)
+	}
+	_, err = client.CreateCollection(ctx, CollectionChunks,
+		chroma.WithCollectionMetadataMapCreateStrict(cloneMetaMap(defaultChunksMeta)),
+		chroma.WithEmbeddingFunctionCreate(defaultNamedEmbeddingFunction{}),
+	)
+	if err != nil {
+		_ = client.Close()
+		t.Fatalf("create default embedding collection: %v", err)
+	}
+	if err := client.Close(); err != nil {
+		t.Fatalf("close seed client: %v", err)
+	}
+
+	st, err := Open(ctx, path)
+	if err != nil {
+		t.Fatalf("Open failed when persisted default embedding function was present: %v", err)
+	}
+	defer func() { _ = st.Close() }()
+
+	raw, ok := st.chunks.Configuration().GetRaw("embedding_function")
+	if !ok {
+		t.Fatal("reopened collection has no embedding function configuration")
+	}
+	config, ok := raw.(map[string]any)
+	if !ok {
+		t.Fatalf("reopened embedding function configuration has type %T", raw)
+	}
+	if got, _ := config["name"].(string); got != "default" {
+		t.Errorf("reopened embedding function = %q, want persisted default", got)
 	}
 }
 

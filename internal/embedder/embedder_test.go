@@ -11,6 +11,9 @@ func TestLocalEmbedder(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping embedder test in short mode")
 	}
+	if err := embedder.CheckModelAvailability(); err != nil {
+		t.Skipf("skipping embedder integration test: %v", err)
+	}
 
 	emb, err := embedder.NewLocalEmbedder()
 	if err != nil {

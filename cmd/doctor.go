@@ -1,9 +1,12 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/nmdra/notebrain-cli/v2/internal/embedder"
 )
 
 type DoctorCmd struct{}
@@ -37,6 +40,33 @@ func (c *DoctorCmd) Run(globals *Globals) error {
 	}
 
 	hardFailures := 0
+
+	// Check the model before the native store probe. The probe intentionally
+	// opens Chroma without initializing the semantic embedder, so doctor can
+	// report both database and model problems without hanging in a downloader.
+	modelErr := checkModelAvailabilityFn()
+	if modelErr == nil {
+		printSuccess("ONNX model", "available")
+	} else {
+		hardFailures++
+		availabilityErr, ok := errors.AsType[*embedder.ModelAvailabilityError](modelErr)
+		if ok {
+			printError("ONNX model", availabilityErr.Error())
+			switch availabilityErr.Reason {
+			case embedder.AvailabilityDownloadActive:
+				printWarning("ONNX model recovery", "wait for the active download; do not remove its lock")
+			case embedder.AvailabilityDownloadStale:
+				printWarning("ONNX model recovery", "confirm the recorded PID is not running, then remove the stale lock and restore the model files")
+			case embedder.AvailabilityInvalidLock:
+				printWarning("ONNX model recovery", "inspect the lock metadata and remove it only after confirming no download is active")
+			default:
+				printWarning("ONNX model recovery", "restore the missing files, then rerun doctor")
+			}
+		} else {
+			printError("ONNX model", modelErr.Error())
+		}
+	}
+
 	err := os.MkdirAll(chromaPath, 0755)
 	if err != nil {
 		printError("ChromaDB Path", fmt.Sprintf("Cannot create/access directory %q: %v", chromaPath, err))
@@ -97,7 +127,7 @@ func (c *DoctorCmd) Run(globals *Globals) error {
 
 	fmt.Println()
 	if hardFailures > 0 {
-		return fmt.Errorf("doctor: %d database problem(s) found", hardFailures)
+		return fmt.Errorf("doctor: %d problem(s) found", hardFailures)
 	}
 	fmt.Println("Run complete.")
 	return nil

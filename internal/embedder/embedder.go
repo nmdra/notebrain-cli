@@ -18,6 +18,10 @@ type LocalEmbedder struct {
 }
 
 func NewLocalEmbedder() (*LocalEmbedder, error) {
+	if err := CheckModelAvailability(); err != nil {
+		return nil, fmt.Errorf("init local embedder: %w", err)
+	}
+
 	ef, destroy, err := ort.NewDefaultEmbeddingFunction()
 	if err != nil {
 		return nil, fmt.Errorf("init local embedder: %w", err)

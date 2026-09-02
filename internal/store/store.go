@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	chroma "github.com/amikos-tech/chroma-go/pkg/api/v2"
+	"github.com/amikos-tech/chroma-go/pkg/embeddings"
 )
 
 const (
@@ -33,6 +34,21 @@ var defaultChunksMeta = map[string]any{
 var defaultLinksMeta = map[string]any{
 	"hnsw:space":       "l2",
 	"hnsw:num_threads": 1,
+}
+
+// collectionEmbeddingOptions are only used to satisfy Chroma's collection
+// lifecycle. NoteBrain supplies explicit embeddings for every write and query,
+// so opening a collection must not initialize or download the MiniLM model.
+func collectionEmbeddingOptions() []chroma.CreateCollectionOption {
+	dense := embeddings.NewConsistentHashEmbeddingFunction()
+	content := embeddings.AdaptEmbeddingFunctionToContent(dense, embeddings.CapabilityMetadata{
+		Modalities:    []embeddings.Modality{embeddings.ModalityText},
+		SupportsBatch: true,
+	})
+	return []chroma.CreateCollectionOption{
+		chroma.WithEmbeddingFunctionCreate(dense),
+		chroma.WithContentEmbeddingFunctionCreate(content),
+	}
 }
 
 func cloneMetaMap(m map[string]any) map[string]any {
@@ -83,7 +99,10 @@ func Open(ctx context.Context, path string, opts ...Option) (*Store, error) {
 	chunksMeta := cloneMetaMap(defaultChunksMeta)
 
 	suppressOutputs(func() {
-		chunks, err = client.GetOrCreateCollection(ctx, CollectionChunks, chroma.WithCollectionMetadataMapCreateStrict(chunksMeta))
+		options := append([]chroma.CreateCollectionOption{
+			chroma.WithCollectionMetadataMapCreateStrict(chunksMeta),
+		}, collectionEmbeddingOptions()...)
+		chunks, err = client.GetOrCreateCollection(ctx, CollectionChunks, options...)
 		if err == nil {
 			_, _ = chunks.Count(ctx) // Force lazy-loading of HNSW index under suppressor
 		}
@@ -97,7 +116,10 @@ func Open(ctx context.Context, path string, opts ...Option) (*Store, error) {
 	linksMeta := cloneMetaMap(defaultLinksMeta)
 
 	suppressOutputs(func() {
-		links, err = client.GetOrCreateCollection(ctx, CollectionLinks, chroma.WithCollectionMetadataMapCreateStrict(linksMeta))
+		options := append([]chroma.CreateCollectionOption{
+			chroma.WithCollectionMetadataMapCreateStrict(linksMeta),
+		}, collectionEmbeddingOptions()...)
+		links, err = client.GetOrCreateCollection(ctx, CollectionLinks, options...)
 		if err == nil {
 			_, _ = links.Count(ctx) // Force lazy-loading of HNSW index under suppressor
 		}
@@ -130,12 +152,18 @@ func (s *Store) Reset(ctx context.Context) error {
 	}
 
 	var err error
-	s.chunks, err = s.client.GetOrCreateCollection(ctx, CollectionChunks, chroma.WithCollectionMetadataMapCreateStrict(cloneMetaMap(defaultChunksMeta)))
+	chunkOptions := append([]chroma.CreateCollectionOption{
+		chroma.WithCollectionMetadataMapCreateStrict(cloneMetaMap(defaultChunksMeta)),
+	}, collectionEmbeddingOptions()...)
+	s.chunks, err = s.client.GetOrCreateCollection(ctx, CollectionChunks, chunkOptions...)
 	if err != nil {
 		return fmt.Errorf("recreate chunks collection: %w", err)
 	}
 
-	s.links, err = s.client.GetOrCreateCollection(ctx, CollectionLinks, chroma.WithCollectionMetadataMapCreateStrict(cloneMetaMap(defaultLinksMeta)))
+	linkOptions := append([]chroma.CreateCollectionOption{
+		chroma.WithCollectionMetadataMapCreateStrict(cloneMetaMap(defaultLinksMeta)),
+	}, collectionEmbeddingOptions()...)
+	s.links, err = s.client.GetOrCreateCollection(ctx, CollectionLinks, linkOptions...)
 	if err != nil {
 		return fmt.Errorf("recreate links collection: %w", err)
 	}

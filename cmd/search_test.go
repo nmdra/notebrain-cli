@@ -12,9 +12,52 @@ import (
 
 	chroma "github.com/amikos-tech/chroma-go/pkg/api/v2"
 
+	"github.com/nmdra/notebrain-cli/v2/internal/embedder"
 	"github.com/nmdra/notebrain-cli/v2/internal/ingest"
 	"github.com/nmdra/notebrain-cli/v2/internal/store"
 )
+
+func TestSearchSemanticModelUnavailable(t *testing.T) {
+	withFakeStore(t, &fakeStore{})
+	modelErr := &embedder.ModelAvailabilityError{
+		Reason:  embedder.AvailabilityMissingArtifacts,
+		Missing: []string{"model.onnx", "tokenizer.json"},
+	}
+	orig := newLocalEmbedderFn
+	newLocalEmbedderFn = func() (*embedder.LocalEmbedder, error) {
+		return nil, modelErr
+	}
+	t.Cleanup(func() { newLocalEmbedderFn = orig })
+
+	err := (&SearchCmd{Queries: []string{"semantic query"}}).Run(&Globals{Ctx: context.Background()})
+	if !errors.Is(err, embedder.ErrModelUnavailable) {
+		t.Fatalf("error = %v, want ErrModelUnavailable", err)
+	}
+	var availabilityErr *embedder.ModelAvailabilityError
+	if !errors.As(err, &availabilityErr) {
+		t.Fatalf("error = %v, want ModelAvailabilityError", err)
+	}
+}
+
+func TestSearchTagDoesNotInitializeModel(t *testing.T) {
+	withFakeStore(t, &fakeStore{})
+	called := false
+	orig := newLocalEmbedderFn
+	newLocalEmbedderFn = func() (*embedder.LocalEmbedder, error) {
+		called = true
+		return nil, errors.New("semantic model should not be initialized")
+	}
+	t.Cleanup(func() { newLocalEmbedderFn = orig })
+
+	captureStdout(t, func() {
+		if err := (&SearchCmd{Tag: "golang"}).Run(&Globals{Ctx: context.Background()}); err != nil {
+			t.Fatalf("tag search: %v", err)
+		}
+	})
+	if called {
+		t.Fatal("tag search initialized the semantic model")
+	}
+}
 
 func TestResolveQueries(t *testing.T) {
 	tests := []struct {

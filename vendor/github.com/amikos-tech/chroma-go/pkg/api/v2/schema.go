@@ -4,11 +4,10 @@ import (
 	"encoding/json"
 	"regexp"
 
+	"github.com/amikos-tech/chroma-go/pkg/embeddings"
 	"github.com/creasty/defaults"
 	"github.com/go-playground/validator/v10"
 	"github.com/pkg/errors"
-
-	"github.com/amikos-tech/chroma-go/pkg/embeddings"
 )
 
 // Space represents the distance metric for vector similarity search
@@ -392,8 +391,12 @@ func (v *VectorIndexConfig) UnmarshalJSON(data []byte) error {
 	v.Hnsw = j.Hnsw
 	v.Spann = j.Spann
 
-	// Try to reconstruct EmbeddingFunction from EmbeddingFunctionInfo
-	if j.EmbeddingFunction != nil && j.EmbeddingFunction.IsKnown() {
+	// Reconstruct non-downloading embedding functions from persisted config.
+	// The default ONNX aliases acquire the model-download lock while they are
+	// built. Callers that provide an explicit embedding function must be able
+	// to open an existing collection without triggering that download.
+	if j.EmbeddingFunction != nil && j.EmbeddingFunction.IsKnown() &&
+		!isDownloadBackedEmbeddingFunction(j.EmbeddingFunction.Name) {
 		if embeddings.HasDense(j.EmbeddingFunction.Name) {
 			ef, err := embeddings.BuildDense(j.EmbeddingFunction.Name, j.EmbeddingFunction.Config)
 			if err == nil {
@@ -404,6 +407,15 @@ func (v *VectorIndexConfig) UnmarshalJSON(data []byte) error {
 	}
 
 	return nil
+}
+
+func isDownloadBackedEmbeddingFunction(name string) bool {
+	switch name {
+	case "default", "ort", "onnx_mini_lm_l6_v2":
+		return true
+	default:
+		return false
+	}
 }
 
 // VectorIndexOption configures a VectorIndexConfig
