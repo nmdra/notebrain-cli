@@ -151,6 +151,20 @@ func (i *pdfiumInstance) FORM_GetSelectedText(request *requests.FORM_GetSelected
 	return i.worker.Instance.FORM_GetSelectedText(request)
 }
 
+func (i *pdfiumInstance) FORM_GetTextDirection(request *requests.FORM_GetTextDirection) (resp *responses.FORM_GetTextDirection, err error) {
+	if i.closed {
+		return nil, errors.New("instance is closed")
+	}
+
+	defer func() {
+		if panicError := recover(); panicError != nil {
+			err = fmt.Errorf("panic occurred in %s: %v", "FORM_GetTextDirection", panicError)
+		}
+	}()
+
+	return i.worker.Instance.FORM_GetTextDirection(request)
+}
+
 func (i *pdfiumInstance) FORM_IsIndexSelected(request *requests.FORM_IsIndexSelected) (resp *responses.FORM_IsIndexSelected, err error) {
 	if i.closed {
 		return nil, errors.New("instance is closed")
@@ -429,6 +443,20 @@ func (i *pdfiumInstance) FORM_SetIndexSelected(request *requests.FORM_SetIndexSe
 	}()
 
 	return i.worker.Instance.FORM_SetIndexSelected(request)
+}
+
+func (i *pdfiumInstance) FORM_SetTextDirection(request *requests.FORM_SetTextDirection) (resp *responses.FORM_SetTextDirection, err error) {
+	if i.closed {
+		return nil, errors.New("instance is closed")
+	}
+
+	defer func() {
+		if panicError := recover(); panicError != nil {
+			err = fmt.Errorf("panic occurred in %s: %v", "FORM_SetTextDirection", panicError)
+		}
+	}()
+
+	return i.worker.Instance.FORM_SetTextDirection(request)
 }
 
 func (i *pdfiumInstance) FORM_Undo(request *requests.FORM_Undo) (resp *responses.FORM_Undo, err error) {
@@ -1815,6 +1843,20 @@ func (i *pdfiumInstance) FPDFBookmark_GetNextSibling(request *requests.FPDFBookm
 	}()
 
 	return i.worker.Instance.FPDFBookmark_GetNextSibling(request)
+}
+
+func (i *pdfiumInstance) FPDFBookmark_GetStyle(request *requests.FPDFBookmark_GetStyle) (resp *responses.FPDFBookmark_GetStyle, err error) {
+	if i.closed {
+		return nil, errors.New("instance is closed")
+	}
+
+	defer func() {
+		if panicError := recover(); panicError != nil {
+			err = fmt.Errorf("panic occurred in %s: %v", "FPDFBookmark_GetStyle", panicError)
+		}
+	}()
+
+	return i.worker.Instance.FPDFBookmark_GetStyle(request)
 }
 
 func (i *pdfiumInstance) FPDFBookmark_GetTitle(request *requests.FPDFBookmark_GetTitle) (resp *responses.FPDFBookmark_GetTitle, err error) {
@@ -4097,6 +4139,20 @@ func (i *pdfiumInstance) FPDFPath_CountSegments(request *requests.FPDFPath_Count
 	}()
 
 	return i.worker.Instance.FPDFPath_CountSegments(request)
+}
+
+func (i *pdfiumInstance) FPDFPath_GetBezierControlPoints(request *requests.FPDFPath_GetBezierControlPoints) (resp *responses.FPDFPath_GetBezierControlPoints, err error) {
+	if i.closed {
+		return nil, errors.New("instance is closed")
+	}
+
+	defer func() {
+		if panicError := recover(); panicError != nil {
+			err = fmt.Errorf("panic occurred in %s: %v", "FPDFPath_GetBezierControlPoints", panicError)
+		}
+	}()
+
+	return i.worker.Instance.FPDFPath_GetBezierControlPoints(request)
 }
 
 func (i *pdfiumInstance) FPDFPath_GetDrawMode(request *requests.FPDFPath_GetDrawMode) (resp *responses.FPDFPath_GetDrawMode, err error) {
