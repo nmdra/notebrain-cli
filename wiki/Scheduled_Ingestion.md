@@ -6,7 +6,7 @@ NoteBrain uses native OS schedulers (for example, **cron** and **systemd service
 
 - **Zero idle overhead**: NoteBrain uses zero RAM and zero CPU when it does not do an index operation.
 - **Fast incremental indexing**: NoteBrain calculates content hashes and word counts during ingestion. When you run NoteBrain on a schedule, it skips unmodified markdown notes in milliseconds.
-- **Robustness**: System schedulers manage wake-from-sleep events, missed executions, and log rotation. They do not require custom monitoring.
+- **Missed runs and wake-from-sleep**: System schedulers manage wake-from-sleep events, missed executions, and log rotation. They do not require custom monitoring.
 
 ## Recommended Schedule: 3-Hour Window
 

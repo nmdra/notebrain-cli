@@ -2,13 +2,13 @@
 
 Quick reference: the major scenarios with the proven command sequence. Pair with [flags.md](flags.md) (flag details) and [schema.md](schema.md) (output fields).
 
-> Outputs are illustrative — scores, counts, tags, and slugs vary per vault. Replace `<slug>` with real values from a prior `search`/`tags` call.
+> Outputs are illustrative: scores, counts, tags, and slugs vary per vault. Replace `<slug>` with real values from a prior `search`/`tags` call.
 
 ## Scenarios
 
 | #   | Scenario                 | Command(s)                                                                                                                                 |
 | --- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| 1   | Pre-flight               | `notebrain stats --format=json` — if `chunks: 0`, the vault is not indexed; tell the user to run `notebrain ingest`                        |
+| 1   | Pre-flight               | `notebrain stats --format=json`. If `chunks: 0`, the vault is not indexed; tell the user to run `notebrain ingest`                        |
 | 2   | Slug discovery           | `notebrain search "<topic>" --limit 3 --jsonpath="$.results[*].note_slug"`                                                                 |
 | 3   | Tag discovery            | `notebrain tags --list --format tsv` (full enumeration); or `search "<topic>" --limit 1 --show-tags --jsonpath="$.results[0].tags"`; fallback: `get "<slug>" --meta --format json --jsonpath="$.note.tags"`   |
 | 4   | Tag query                | `notebrain tags "kubernetes" --format json --show-tags`; children: `tags "kubernetes" --children`; shared: `tags "<slug>" --shared --min-shared 1` |
@@ -22,22 +22,22 @@ Quick reference: the major scenarios with the proven command sequence. Pair with
 | 12  | Hidden connections       | `notebrain hidden "<slug>" --limit 5 --format json`; section-level: `--deep`                                                               |
 | 13  | Boosted search           | `notebrain boosted --seed="<slug>" "<query>" --limit 5 --format json`                                                                      |
 | 14  | Metadata-only extraction | `--jsonpath`, `--format tsv`, `--show-file-path=false` (cuts ~40–50% of tokens)                                                            |
-| 15  | Context vs full `get`    | context: `--context-window 1 --include-text`; full note in `text` only when the note is for the user to read — otherwise stay on `json`/`--jsonpath` |
+| 15  | Context vs full `get`    | context: `--context-window 1 --include-text`; full note in `text` only when the note is for the user to read; otherwise stay on `json`/`--jsonpath` |
 | 16  | Stale-index recovery     | a slug that 404s mid-conversation → re-resolve: `search "<title>" --limit 3 --jsonpath="$.results[*].note_slug"`                           |
 | 17  | Reference inventory      | `notebrain refs "<slug>" --format json` (all kinds); kind filters: `--only-images` / `--only-pdf` / `--only-other` / `--only-external-links`                    |
 | 18  | Broken-link audit        | `notebrain refs "<slug>" --include-missing --format tsv` → rows with `missing` = `true` are broken; omit `--include-missing` to see only existing files |
 
 ## Semantics (verified)
 
-- **`--section` is exact-match**: it compares against the stored `heading_path` string verbatim. Partial or parent paths return 0 results silently — copy the full `heading_path` from a search result.
+- **`--section` is exact-match**: it compares against the stored `heading_path` string verbatim. Partial or parent paths return 0 results silently. Copy the full `heading_path` from a search result.
 - **`refs` reads the file, not the index**: results reflect the current file contents, never stale index state. Scope and ordering: [SKILL.md](../SKILL.md).
-- **Rules shared with the main skill**: format policy and the config-overrides trap → [SKILL.md](../SKILL.md); tag matching, `--jsonpath` dialect, and weak-match floors → [flags.md](flags.md); tags-in-JSON and output shapes → [schema.md](schema.md). Each meaning lives in exactly one place — read it there.
+- **Rules shared with the main skill**: format policy and the config-overrides trap → [SKILL.md](../SKILL.md); tag matching, `--jsonpath` dialect, and weak-match floors → [flags.md](flags.md); tags-in-JSON and output shapes → [schema.md](schema.md). Each meaning lives in exactly one place. Read it there.
 
 ## Pitfalls (verified)
 
-- **Tag discovery**: never guess tag spelling — discover via scenario 3 (vault tags drift: you remember `K8S`, the vault stores `kubernetes`).
-- **Duplicate rows**: one note can span multiple chunk rows — normal. For distinct notes use `--top-k 1`, or dedupe: `--jsonpath="$.results[*].note_slug" | sort -u` (piping `notebrain` stdout is fine).
-- **Slug discipline & staleness**: pass the exact `note_slug` from a prior `search`/`tags` — never a bare title; re-resolve via `search` when a slug 404s (scenario 16). Details: [SKILL.md](../SKILL.md).
+- **Tag discovery**: never guess tag spelling. Discover via scenario 3 (vault tags drift: you remember `K8S`, the vault stores `kubernetes`).
+- **Duplicate rows**: one note can span multiple chunk rows; that is normal. For distinct notes use `--top-k 1`, or dedupe: `--jsonpath="$.results[*].note_slug" | sort -u` (piping `notebrain` stdout is fine).
+- **Slug discipline & staleness**: pass the exact `note_slug` from a prior `search`/`tags`. Never a bare title. Re-resolve via `search` when a slug 404s (scenario 16). Details: [SKILL.md](../SKILL.md).
 - **Command-specific gotchas**: `get` `--meta`/`--head` modes ([flags.md](flags.md)); `refs` covers attachments and external links only, never note-to-note links ([SKILL.md](../SKILL.md)); weak matches → `--min-score` precision floors ([flags.md](flags.md)).
 
 ## Phrase → Scenario Map

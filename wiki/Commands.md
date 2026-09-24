@@ -5,11 +5,11 @@ NoteBrain has commands to ingest, query, and analyze your Obsidian vault.
 ```text
 Usage: notebrain <command> [flags]
 
-Index and search your Obsidian vault with semantic intelligence.
+Index and search your Obsidian vault.
 
-NoteBrain uses local LLM embeddings to index your Markdown notes into ChromaDB,
-enabling powerful semantic search, hidden graph connections, and AI-friendly
-automation workflows.
+NoteBrain uses local LLM embeddings to index your Markdown notes into ChromaDB
+for semantic search, hidden graph connections, and AI-friendly automation
+workflows.
 ```
 
 ---
@@ -127,8 +127,8 @@ When a search or graph command returns zero results in standard terminal `text` 
 Commands that target a specific note (`backlinks`, `connections`, `hidden`, `tags`, `boosted --seed=<note>`, `get`) accept these formats for the `<note>` parameter:
 
 1. **Exact note slug**: The normalized identifier in the database (for example, `kubernetes-networking-tools-spiffe`).
-2. **Note title**: The note title. This does not care about case (for example, `"SPIFFE"` or `"Rust Programming"`).
-3. **Filename**: The exact file name. This does not care about case (for example, `"SPIFFE.md"`).
+2. **Note title**: The note title. Matching ignores case (for example, `"SPIFFE"` or `"Rust Programming"`).
+3. **Filename**: The exact file name. Matching ignores case (for example, `"SPIFFE.md"`).
 4. **Partial path or suffix**: The end of the relative path inside your vault (for example, `"tools/SPIFFE.md"`).
 
 If multiple notes have the same title or filename in different directories, NoteBrain returns an ambiguity error. This error shows a list of the candidate slugs. You must then supply the exact path or slug.
@@ -354,7 +354,7 @@ External rows omit `relative_path`. TSV output uses the header `path\tkind\tmiss
 
 ### `backlinks`
 
-This command finds all the notes that link to the target note. It uses the local Wikilink graph. The link target resolution is fully canonicalized. This means that the tool removes `#anchor` headings and resolves subfolders against canonical paths. This makes sure that the tool finds connections across deeply nested vault hierarchies.
+This command finds all the notes that link to the target note. It uses the local Wikilink graph. The link target resolution is fully canonicalized. This means that the tool removes `#anchor` headings and resolves subfolders against canonical paths, so the tool finds connections across deeply nested vault hierarchies.
 
 #### Usage
 
@@ -524,15 +524,15 @@ notebrain boosted "caching strategies" --seed "Redis" --boost 2.0 --limit 5
 
 ### `doctor`
 
-This command runs a diagnostic health check on your environment. It makes sure that NoteBrain has the correct configuration and can access the necessary dependencies.
+This command runs a diagnostic health check on your environment. It checks that NoteBrain has the correct configuration and can access the necessary dependencies.
 
 Checks performed:
 
-- **Vault Path** — the configured vault directory exists and is accessible.
-- **ChromaDB Path** — the database directory is writable.
-- **ChromaDB sqlite** — `chroma.sqlite3` exists, has a valid SQLite header, and a sane file size.
-- **ChromaDB index** — each collection segment has all of its HNSW index files (missing or empty files mean an interrupted write).
-- **ChromaDB open test** — opens the database in a subprocess and forces the HNSW indexes to load. A corrupted native index aborts the subprocess. The doctor reports the signal and suggests `notebrain reset`.
+- **Vault Path**: the configured vault directory exists and is accessible.
+- **ChromaDB Path**: the database directory is writable.
+- **ChromaDB sqlite**: `chroma.sqlite3` exists, has a valid SQLite header, and a sane file size.
+- **ChromaDB index**: each collection segment has all of its HNSW index files (missing or empty files mean an interrupted write).
+- **ChromaDB open test**: opens the database in a subprocess and forces the HNSW indexes to load. A corrupted native index aborts the subprocess. The doctor reports the signal and suggests `notebrain reset`.
 
 The command exits non-zero when database problems are found.
 

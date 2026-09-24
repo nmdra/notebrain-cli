@@ -1,6 +1,6 @@
 # OpenCode Agent Integration Guide
 
-[OpenCode](https://opencode.ai) is an open-source AI coding and terminal agent. It supports autonomous development and multi-agent workflows. When you configure NoteBrain as a dedicated OpenCode agent (`notebrain-chat`), you make your Obsidian vault an interactive semantic knowledge base for your AI pair programming sessions.
+[OpenCode](https://opencode.ai) is an open-source AI coding and terminal agent. It supports autonomous development and multi-agent workflows. When you configure NoteBrain as a dedicated OpenCode agent (`notebrain-chat`), the agent answers coding-session questions from your Obsidian vault.
 
 ---
 
@@ -11,7 +11,7 @@ Obsidian vaults have thousands of interlinked notes, design documents, code snip
 1. **Context window flooding**: The agents run `grep` or read full markdown files. This puts thousands of irrelevant lines into the context and increases token consumption.
 2. **Missing semantic context**: Keyword search (`grep`) does not find synonyms, conceptual bridges, or structural graph hops (`wikilinks`).
 
-NoteBrain avoids these problems because it queries a local ChromaDB HNSW vector index. When you use the permission system of OpenCode, you can sandbox the agent. Then the agent uses only high-precision semantic queries (`notebrain search`, `hidden`, `connections`, `backlinks`).
+NoteBrain avoids these problems because it queries a local ChromaDB HNSW vector index. When you use the permission system of OpenCode, you can sandbox the agent. Then the agent uses only semantic queries (`notebrain search`, `hidden`, `connections`, `backlinks`).
 
 ---
 

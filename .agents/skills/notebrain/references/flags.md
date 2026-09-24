@@ -14,16 +14,16 @@ These flags are available only on the commands listed.
 | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
 | `--limit N`             | Maximum total results to return.                                                                                                                                                    | `10`    |
 | `--top-k N`             | Maximum chunks to retain **per note**. Prevents one long note from dominating results.                                                                                              | `3`     |
-| `--section "PATH"`      | Filter results to chunks under a specific heading path (e.g., `"Architecture > Components"`). **Exact equality** with the stored `heading_path` — partial or parent paths return 0 results silently. Copy the full `heading_path` value from a search result. | —       |
+| `--section "PATH"`      | Filter results to chunks under a specific heading path (e.g., `"Architecture > Components"`). **Exact equality** with the stored `heading_path`. Partial or parent paths return 0 results silently. Copy the full `heading_path` value from a search result. | —       |
 | `--tag "TagName"`       | Filter results to notes with this tag.                                                                                                                                              | —       |
 | `--has-tasks`           | Only return chunks containing task lists (checkboxes).                                                                                                                              | off     |
 | `--has-code`            | Only return chunks containing fenced code blocks.                                                                                                                                   | off     |
 | `--with-pdf`            | Include PDF text extraction results in the search. Defaults to false (Markdown-only).                                                                                               | `false` |
 | `--min-score F`         | Suppress results below this similarity score (0.0–1.0). Use to filter weak matches (e.g. `0.3` for meaningful hits, `0.5` for precision). Also available on `hidden` and `boosted`. | `0`     |
-| `--group-by-note`       | Collapse results to one row per note: keeps the best-scoring chunk, drops the rest. When a note has multiple matching chunks, the surviving row gains `extra: "N matching chunks"`. Text/TSV/JSON all flow through this — handy for note-level result lists. | `false` |
+| `--group-by-note`       | Collapse results to one row per note: keeps the best-scoring chunk, drops the rest. When a note has multiple matching chunks, the surviving row gains `extra: "N matching chunks"`. Text/TSV/JSON all flow through this, handy for note-level result lists. | `false` |
 | `--exclude-notes "SLUG"` | Exclude notes from results. Accepts a note slug, title, or path, resolved automatically; repeat the flag or use comma-separated values. Unknown notes are skipped with a warning.   | —       |
 
-> **Lexical fallback:** when semantic retrieval returns zero results — or every result is below `--min-score` — `search` retries with a token-based scan (titles, paths, tags, first-chunk text). Rows arrive `"lexical": true`, `score: 0`. No lexical fallback for `boosted` or `hidden`. Full behavior: [SKILL.md](../SKILL.md).
+> **Lexical fallback:** when semantic retrieval returns zero results, or every result is below `--min-score`, `search` retries with a token-based scan (titles, paths, tags, first-chunk text). Rows arrive `"lexical": true`, `score: 0`. No lexical fallback for `boosted` or `hidden`. Full behavior: [SKILL.md](../SKILL.md).
 
 > Note: To execute multi-query search with multi-hit boosting, pass multiple positional query arguments: `notebrain search "query1" "query2" --format json`. When a title contains a literal comma, escape it with a backslash (`\,`) so it is not split into separate exclude values.
 
@@ -32,8 +32,8 @@ These flags are available only on the commands listed.
 | Flag               | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                         | Default |
 | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
 | `--limit N`        | Maximum number of hidden connections to return.                                                                                                                                                                                                                                                                                                                                                                                                 | `10`    |
-| `--deep`           | Analyze each chunk individually for granular section-level matches using stored vectors (no re-embedding required). **Requires the target note to have indexed chunks.** If resolution fails, the error names the resolved slug: `note "<slug>" has no indexed chunks ... run 'notebrain ingest' ...` — re-resolve the slug via `search` first if the note demonstrably has chunks. | `false` |
-| `--candidate-chunks N` | Chunks to evaluate per candidate note in `--deep` mode. The old `--top-k` alias was removed — this is the only flag.                                                                                                                                                                                                                                                                                                                           | `3`     |
+| `--deep`           | Analyze each chunk individually for granular section-level matches using stored vectors (no re-embedding required). **Requires the target note to have indexed chunks.** If resolution fails, the error names the resolved slug: `note "<slug>" has no indexed chunks ... run 'notebrain ingest' ...`. Re-resolve the slug via `search` first if the note demonstrably has chunks. | `false` |
+| `--candidate-chunks N` | Chunks to evaluate per candidate note in `--deep` mode. The old `--top-k` alias was removed; this is the only flag.                                                                                                                                                                                                                                                                                                                           | `3`     |
 | `--include-linked` | Include notes that are already linked directly/indirectly, while still excluding self-references.                                                                                                                                                                                                                                                                                                                                               | `false` |
 
 ### `connections`
@@ -50,13 +50,13 @@ These flags are available only on the commands listed.
 | `--shared`       | Treat the query as a note slug/title to find notes sharing its tags.                                      | `false` |
 | `--children`     | Include child tags in hierarchical structure (e.g. searching 'kubernetes' also matches 'kubernetes/cka'). | `false` |
 | `--min-shared N` | Minimum number of shared tags required to include a result (only applies when --shared is active).        | `1`     |
-| `--limit N`      | Maximum number of results (0 = no limit for `--list`; searches default to 50). A `limit` key in config overrides this default — pass `--limit 0` explicitly for a full `--list` enumeration. | `0`     |
+| `--limit N`      | Maximum number of results (0 = no limit for `--list`; searches default to 50). A `limit` key in config overrides this default, so pass `--limit 0` explicitly for a full `--list` enumeration. | `0`     |
 
-> Tag input is normalized: the `#` prefix is optional and matching is case-insensitive, so `tags "Kubernetes"` and `tags "#kubernetes"` are equivalent. Without `--children` the match is **exact** — `tags "k8s"` does not match the tag `kubernetes`. `--children` enables hierarchical prefix matching (`kubernetes` also matches `kubernetes/cka`).
+> Tag input is normalized: the `#` prefix is optional and matching is case-insensitive, so `tags "Kubernetes"` and `tags "#kubernetes"` are equivalent. Without `--children` the match is **exact**: `tags "k8s"` does not match the tag `kubernetes`. `--children` enables hierarchical prefix matching (`kubernetes` also matches `kubernetes/cka`).
 >
-> When a tag search finds nothing, the CLI prints a "Did you mean: #go, #golang?" hint (Levenshtein-based, text output only — machine formats stay clean). Tag counts from `--list` are per-note (a note counts once even with many chunks).
+> When a tag search finds nothing, the CLI prints a "Did you mean: #go, #golang?" hint (Levenshtein-based, text output only; machine formats stay clean). Tag counts from `--list` are per-note (a note counts once even with many chunks).
 >
-> `tags --list` output shapes: text `#tag<TAB>(N notes)`, tsv `tag<TAB>count` with a header row, json `{"command":"tags --list","total":N,"tags":[{"tag":"...","count":N}]}` — all JSONPath-queryable.
+> `tags --list` output shapes: text `#tag<TAB>(N notes)`, tsv `tag<TAB>count` with a header row, json `{"command":"tags --list","total":N,"tags":[{"tag":"...","count":N}]}`. All JSONPath-queryable.
 
 ### `boosted`
 
@@ -71,10 +71,10 @@ These flags are available only on the commands listed.
 
 | Flag        | Purpose                                                                                                  | Default |
 | ----------- | -------------------------------------------------------------------------------------------------------- | ------- |
-| `--meta`    | Header only: title, path, tags, and total chunk count — no note text. Cheap way to read tags/slug/path. | `false` |
+| `--meta`    | Header only: title, path, tags, and total chunk count, with no note text. Cheap way to read tags/slug/path. | `false` |
 | `--head N`  | Return only the first N chunks of text. `Chunks` still reports the full total.                            | `0`     |
 
-Takes a single positional argument: `<slug>` (note slug, title, or file path — auto-resolved). Without flags, `get` returns the full reconstructed note. `--meta`/`--head` are mutually independent modes; `--head 0` means full note. Text vs machine formats: [SKILL.md](../SKILL.md) (output format discipline).
+Takes a single positional argument: `<slug>` (note slug, title, or file path, auto-resolved). Without flags, `get` returns the full reconstructed note. `--meta`/`--head` are mutually independent modes; `--head 0` means full note. Text vs machine formats: [SKILL.md](../SKILL.md) (output format discipline).
 
 ### `refs`
 
@@ -86,7 +86,7 @@ Takes a single positional argument: `<slug>` (note slug, title, or file path —
 | `--only-external-links` | Limit to external http(s) website links.                                                                                     | `false` |
 | `--include-missing` | Include references whose file is missing from the vault (broken links). Hidden by default.                                  | `false` |
 
-Takes a single positional argument: `<note>` (note slug, title, or file path — auto-resolved, markdown notes only; PDF extractions error out). No kind flags = every kind; combine `--only-*` flags to union kinds. Scope and freshness semantics: [SKILL.md](../SKILL.md).
+Takes a single positional argument: `<note>` (note slug, title, or file path, auto-resolved, markdown notes only; PDF extractions error out). No kind flags = every kind; combine `--only-*` flags to union kinds. Scope and freshness semantics: [SKILL.md](../SKILL.md).
 
 ## Global Flags (Available on Subcommands)
 
@@ -96,7 +96,7 @@ These flags work on `search`, `backlinks`, `connections`, `hidden`, `tags`, `boo
 
 | Flag               | Purpose                                                                                                                                                                                                                                                                                                                                                   | Default |
 | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| `--format FORMAT`  | Output format: `json` (structured envelope), `tsv` (tab-separated, no key names), `text` (standard text). The built-in default is `text`, but this skill mandates that agents pass `json` or `tsv` explicitly on every call — `text` is for human-facing display only (see [schema.md](schema.md)). | `text`  |
+| `--format FORMAT`  | Output format: `json` (structured envelope), `tsv` (tab-separated, no key names), `text` (standard text). The built-in default is `text`, but this skill mandates that agents pass `json` or `tsv` explicitly on every call. `text` is for human-facing display only (see [schema.md](schema.md)). | `text`  |
 | `--show-file-path` | Include the `file_path` field in output (use `--show-file-path=false` to hide).                                                                                                                                                                                                                                                                           | `true`  |
 | `--jsonpath PATH`  | Extract specific JSON elements with JSONPath (e.g., `"$.results[*].note_slug"`). Drops the JSON envelope entirely. Dialect and valid/missing-path behavior: see the note below the table. For multi-field extraction use `--format tsv` or two `--jsonpath` calls. | —       |
 | `--include-text`   | Include the matched markdown text chunk in results. Omit during initial structure-mapping to save tokens.                                                                                                                                                                                                                                                 | off     |

@@ -64,7 +64,7 @@ notebrain stats --format=json
 4. **Reuse previous graph results.**
    - Reuse `connections`, `backlinks`, and `hidden` results retrieved earlier in the conversation unless the vault was re-indexed or the user explicitly requests a refresh.
 
-5. **Token-Efficient Extraction (`--jsonpath` & `tsv`)**: Make `--jsonpath` your default tool for extracting targeted data! Instead of loading bulky JSON envelopes into context, append `--jsonpath` to extract exact scalar strings or arrays directly:
+5. **Token-Efficient Extraction (`--jsonpath` & `tsv`)**: Use `--jsonpath` by default for targeted extraction. Instead of loading bulky JSON envelopes into context, append `--jsonpath` to extract exact scalar strings or arrays directly:
    - Extract matching text snippets: `--jsonpath="$.results[*].text"`
    - Extract surrounding chunk context: `--jsonpath="$.results[*].context"`
    - Extract note slugs for graph mapping: `--jsonpath="$.results[*].note_slug"`

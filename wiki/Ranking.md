@@ -13,7 +13,7 @@ The `search` command and the `boosted` command use a two-tier ranking. The ranki
 1. Primary sort key: the count of matched query topics, descending.
 2. Secondary sort key: the best similarity score, descending.
 
-A result that matches two topics ranks above a result that matches one topic with a higher score. This behavior highlights bridging concepts. It is the multi-hit boosting behavior.
+A result that matches two topics ranks above a result that matches one topic with a higher score.
 
 ### Multi-Query Flow
 
@@ -126,5 +126,5 @@ The `connections` command stops the BFS at the hop limit. The default limit is 2
 
 ## 4. Related Documents
 
-- [Architecture](Architecture.md) — the storage layer, the collections, and the metadata schema.
-- [Commands](Commands.md) — the command-line interface and the flag reference.
+- [Architecture](Architecture.md): the storage layer, the collections, and the metadata schema.
+- [Commands](Commands.md): the command-line interface and the flag reference.

@@ -6,7 +6,7 @@ NoteBrain CLI turns an Obsidian vault into a local semantic search engine. It re
 
 ## 1. System Architecture Diagram
 
-This diagram shows the high-level architecture of NoteBrain CLI. It shows the data flow between the CLI layer, the core processing engines, the embedder, and the embedded ChromaDB storage layer.
+Data flows from the CLI layer through the core processing engines and the embedder into the embedded ChromaDB storage layer.
 
 ```mermaid
 graph TD
@@ -161,14 +161,14 @@ This collection stores directed edges. These edges represent wikilinks between n
 ## 4. Subsystems and Components
 
 - **CLI Layer (`cmd/`)**: Kong builds this layer for command-line parsing and flag resolution. The CLI supports a strict hierarchy. CLI flags override the TOML configuration file (`~/.notebrain/config/config.toml`). The configuration file overrides the defaults.
-- **Configuration (`internal/configfile`)**: This subsystem loads the TOML configuration with Kong resolvers. Key names are case-insensitive. The names `snake_case` and `kebab-case` match the same key.
-- **Embedder (`internal/embedder`)**: This subsystem runs the local embedding model. It uses the ONNX Runtime with the `all-MiniLM-L6-v2` model. The model produces 384-dimensional vectors.
-- **Parser (`internal/parser`)**: This subsystem reads Markdown files from the vault. It extracts YAML frontmatter and properties. It parses wikilinks and standard links. It identifies task checkboxes and tables. It splits note text into semantic chunks by heading. It preserves structural Markdown across chunk boundaries. This structure includes lists, task checkboxes, blockquotes, callouts, and tables. Code blocks never split across chunks.
-- **PDF Extraction (`internal/pdfextract`)**: This subsystem extracts text from PDFs with a WASM-compiled PDFium backend. It uses a pool of worker instances.
-- **LLM Conversion (`internal/llmparse`)**: This subsystem converts the raw PDF text into structured Markdown. It calls an LLM API (DeepSeek, OpenRouter, OpenAI, Gemini, or Ollama). The converted Markdown shares the same chunk layout as markdown notes.
-- **Ingest (`internal/ingest`)**: This subsystem coordinates the ingestion pipeline. It walks the vault. It parses files. It generates embeddings. It skips unchanged files by content hash. It applies one atomic batch update to the store.
+- **Configuration (`internal/configfile`)**: Loads the TOML configuration with Kong resolvers. Key names are case-insensitive. The names `snake_case` and `kebab-case` match the same key.
+- **Embedder (`internal/embedder`)**: Runs the local embedding model. It uses the ONNX Runtime with the `all-MiniLM-L6-v2` model. The model produces 384-dimensional vectors.
+- **Parser (`internal/parser`)**: Reads Markdown files from the vault. It extracts YAML frontmatter and properties. It parses wikilinks and standard links. It identifies task checkboxes and tables. It splits note text into semantic chunks by heading. It preserves structural Markdown across chunk boundaries. This structure includes lists, task checkboxes, blockquotes, callouts, and tables. Code blocks never split across chunks.
+- **PDF Extraction (`internal/pdfextract`)**: Extracts text from PDFs with a WASM-compiled PDFium backend. It uses a pool of worker instances.
+- **LLM Conversion (`internal/llmparse`)**: Converts the raw PDF text into structured Markdown. It calls an LLM API (DeepSeek, OpenRouter, OpenAI, Gemini, or Ollama). The converted Markdown shares the same chunk layout as markdown notes.
+- **Ingest (`internal/ingest`)**: Coordinates the ingestion pipeline. It walks the vault. It parses files. It generates embeddings. It skips unchanged files by content hash. It applies one atomic batch update to the store.
 - **Store (`internal/store`)**: This is the ChromaDB wrapper. It abstracts collection creation, chunk upsert, and link deduplication. It exposes all graph and semantic queries.
-- **Logging (`internal/logging`)**: This subsystem writes log records to a rotating file. The default file size limit is 10 MiB. The tool keeps 5 backups. A mutex makes the writer safe for concurrent writes.
+- **Logging (`internal/logging`)**: Writes log records to a rotating file. The default file size limit is 10 MiB. The tool keeps 5 backups. A mutex makes the writer safe for concurrent writes.
 
 ---
 
@@ -202,7 +202,7 @@ The tool warns once when a user limit exceeds a cap. Internal fetch multipliers 
 
 ## 7. AI Agent Integration and Optimization
 
-NoteBrain serves as a fast, local knowledge retriever for autonomous AI agents. The following query features optimize agent efficiency, token usage, and search accuracy.
+NoteBrain retrieves knowledge locally for autonomous AI agents. The query features below cut token use and improve search accuracy.
 
 ### 1. `--context-window` (Sliding Semantic Context)
 

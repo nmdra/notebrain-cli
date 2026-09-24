@@ -4,7 +4,7 @@ This reference documents the structure of NoteBrain's output in each format. Rea
 
 ## Output Formats (`--format`)
 
-The CLI's built-in default is `text`, but the skill mandates machine formats for agents — `text` is for human-facing display only. The rules live in [SKILL.md](../SKILL.md) (output format discipline); the per-command mapping is below.
+The CLI's built-in default is `text`, but the skill mandates machine formats for agents. `text` is for human-facing display only. The rules live in [SKILL.md](../SKILL.md) (output format discipline); the per-command mapping is below.
 
 ### Per-command preference
 
@@ -16,7 +16,7 @@ The CLI's built-in default is `text`, but the skill mandates machine formats for
 | `tags` (search/shared/children) | `json` | `tags` arrays need `--show-tags`; `tsv` also works. |
 | `refs` | `tsv` (audit) / `json` (inventory) | `tsv` exposes the `missing` column for broken-link audits; `json` keeps `path`/`kind` structured. |
 | `get --meta` | `json` + `--jsonpath` | `--jsonpath="$.note.tags"` etc.; no body fetched. |
-| `get` (full note) | `text` — only for human display | The reconstructed note is the artifact a human reads; the agent should not need the full body for parsing. |
+| `get` (full note) | `text` (only for human display) | The reconstructed note is the artifact a human reads; the agent should not need the full body for parsing. |
 | `stats` | `json` | `--jsonpath="$.chunks"` for the preflight check. |
 
 ## JSON Envelope Structure
@@ -43,14 +43,14 @@ Each item in the `results` array may contain:
 | `file_path`       | Always (unless `--show-file-path=false`)           | Relative file path within the vault. Included by default; hide with `--show-file-path=false` to save tokens.          |
 | `file_type`       | Always                                             | Source format: `"md"` for markdown notes, `"pdf"` for PDF extractions (returned only with `--with-pdf`). Not affected by `--show-file-path=false`. |
 | `score`           | Always                                             | Similarity score (0–1) for semantic search; hop count for graph connections. JSON rounds to 4 decimals; TSV prints 6. |
-| `chunk_index`     | search, hidden, boosted — **unless 0**             | Which chunk of the note matched the query (0-indexed). Omitted when the match landed on chunk 0 (Go `omitempty`), so absence is normal. |
-| `tags`            | When `--show-tags` is passed and the note has tags | Array of tag strings, bare and lowercase (e.g., `["kubernetes"]` — no `#` prefix). Omitted entirely for untagged notes. |
+| `chunk_index`     | search, hidden, boosted (unless 0)                   | Which chunk of the note matched the query (0-indexed). Omitted when the match landed on chunk 0 (Go `omitempty`), so absence is normal. |
+| `tags`            | When `--show-tags` is passed and the note has tags | Array of tag strings, bare and lowercase (e.g., `["kubernetes"]`, no `#` prefix). Omitted entirely for untagged notes. |
 | `heading_path`    | When chunk is under a heading                      | Breadcrumb path hierarchy (e.g., `"Section > Subsection"`).                                                           |
 | `text`            | When `--include-text` is passed (or enabled via config) | The matched chunk's full markdown text, preserving code blocks and formatting.                                  |
 | `context`         | When `--context-window N` > 0 (or enabled via config) | Array of ±N adjacent chunk texts around the match (excluding the matched chunk itself).                           |
 | `extra`           | backlinks, connections, boosted, search (`--group-by-note`) | Command-specific metadata: backlinks → link display text; connections → `"N hop(s)"`; boosted → `"graph-boosted"` (only on graph-linked results); search with `--group-by-note` → `"N matching chunks"` when the note matched multiple chunks. Absent for `tags`, `hidden`, and non-boosted `boosted` rows. |
 | `lexical`         | search lexical fallback only                                | `true` when the row came from the token-based lexical fallback (no semantic match cleared the bar). Such rows carry `"score": 0`, no `chunk_index`, no `text`, and rank below any semantic rows. Absent on semantic rows. |
-| `is_phantom`      | Only when the note **is** a phantom                | `true` if the note is an uncreated phantom link without a `.md` file on disk. Absent for real notes — do not treat absence as a broken flag. Visible with `--skip-phantom=false`. |
+| `is_phantom`      | Only when the note **is** a phantom                | `true` if the note is an uncreated phantom link without a `.md` file on disk. Absent for real notes; do not treat absence as a broken flag. Visible with `--skip-phantom=false`. |
 | `matched_queries` | hidden `--deep`, multi-query                       | Array of queries or section headings (`§ <HeadingPath>`) that matched this candidate.                                 |
 
 ## Example Outputs
@@ -128,7 +128,7 @@ Tag matching and normalization semantics: see `tags` in [flags.md](flags.md).
 
 ### Full Note Retrieval (`get`)
 
-`get` does **not** use the `results` envelope — it returns a `note` object wrapping the full reconstructed note:
+`get` does **not** use the `results` envelope. It returns a `note` object wrapping the full reconstructed note:
 
 `notebrain get "architecture/event-driven-systems" --format=json`
 
@@ -160,7 +160,7 @@ The `note` object shape is the same for the `get` modes: default returns the ful
 
 ### `refs`
 
-`refs` uses its own envelope — a `refs` array (not `results`):
+`refs` uses its own envelope: a `refs` array (not `results`):
 
 `notebrain refs "architecture/event-driven-systems" --format=json`
 
@@ -194,11 +194,11 @@ The `note` object shape is the same for the `get` modes: default returns the ful
 | `refs[].path`   | Absolute vault path for attachments; the full URL for external links.                                                    |
 | `refs[].relative_path` | Vault-relative path (`/`-separated). Omitted for external links.                                                  |
 | `refs[].kind`   | `image`, `pdf`, `other`, or `external-links`.                                                                            |
-| `refs[].missing`| `true` when the file is not on disk (only visible with `--include-missing`). External links always carry `false` — they are never missing and never contacted over the network. |
+| `refs[].missing`| `true` when the file is not on disk (only visible with `--include-missing`). External links always carry `false`; they are never missing and never contacted over the network. |
 
 Rows are deduped by resolved path (or exact URL) in first-occurrence order. No kind flags = every kind.
 
-TSV shape — header `path<TAB>kind<TAB>missing<TAB>relative_path`; the `missing` cell shows `false` for external links:
+TSV shape: header `path<TAB>kind<TAB>missing<TAB>relative_path`. The `missing` cell shows `false` for external links:
 
 <!-- markdownlint-disable MD010 -->
 ```text
@@ -209,7 +209,7 @@ https://martinfowler.com/articles/eda.html	external-links	false
 ```
 <!-- markdownlint-enable MD010 -->
 
-Text format prints one row per reference: `[kind] path (missing)` — e.g. `[image] /home/user/vault/broken.png (missing)`. Empty result prints `No references found`.
+Text format prints one row per reference: `[kind] path (missing)`, e.g. `[image] /home/user/vault/broken.png (missing)`. Empty result prints `No references found`.
 
 ### TSV Format
 
@@ -238,11 +238,11 @@ First line is the header row (always emitted). Columns are tab-separated. Tags a
 }
 ```
 
-Use this for pre-flight checks — `chunks` is `0` when the vault isn't indexed (procedure: [SKILL.md](../SKILL.md)).
+Use this for pre-flight checks. `chunks` is `0` when the vault isn't indexed (procedure: [SKILL.md](../SKILL.md)).
 
 ## Extracting Fields via `--jsonpath`
 
-Use `--jsonpath` to extract exactly the fields you need without loading the full JSON envelope. Dialect rules (dotted paths, `[*]`, `[0]`; no filters/pipes/bracket keys) and shorthand normalization live in [flags.md](flags.md) — read those before writing expressions.
+Use `--jsonpath` to extract exactly the fields you need without loading the full JSON envelope. Dialect rules (dotted paths, `[*]`, `[0]`; no filters/pipes/bracket keys) and shorthand normalization live in [flags.md](flags.md). Read those before writing expressions.
 
 ```bash
 # Note slugs only (newline-separated)
