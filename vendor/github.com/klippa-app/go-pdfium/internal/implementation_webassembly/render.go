@@ -5,11 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"image"
-	"image/color"
-	"image/draw"
 	"image/jpeg"
 	"image/png"
-	"io/ioutil"
 	"math"
 	"os"
 	"unsafe"
@@ -219,6 +216,21 @@ func (p *PdfiumImplementation) RenderPageInDPI(request *requests.RenderPageInDPI
 	p.Lock()
 	defer p.Unlock()
 
+	rendered, err := p.renderPageInDPI(request)
+	if err != nil {
+		return nil, err
+	}
+
+	return &responses.RenderPageInDPI{
+		CleanupFunc: rendered.cleanup,
+		Result:      rendered.singlePage(),
+	}, nil
+}
+
+// The internal render methods return the rendered pages, which include the
+// guest pixel offset and the cleanup function that releases the bitmap. The
+// caller must hold the instance lock from before the call until after cleanup.
+func (p *PdfiumImplementation) renderPageInDPI(request *requests.RenderPageInDPI) (*renderedPages, error) {
 	if request.DPI == 0 {
 		return nil, errors.New("no DPI given")
 	}
@@ -228,29 +240,13 @@ func (p *PdfiumImplementation) RenderPageInDPI(request *requests.RenderPageInDPI
 		return nil, err
 	}
 
-	index, pageToRender, err := p.buildRenderPageInDPI(request)
+	_, pageToRender, err := p.buildRenderPageInDPI(request)
 	if err != nil {
 		return nil, err
 	}
 
 	// Render a single page.
-	result, cleanupFunc, err := p.renderPages([]renderPage{*pageToRender}, 0)
-	if err != nil {
-		return nil, err
-	}
-
-	return &responses.RenderPageInDPI{
-		CleanupFunc: cleanupFunc,
-		Result: responses.RenderPage{
-			Page:              index,
-			Image:             result.Image,
-			RenderedImage:     result.RenderedImage,
-			PointToPixelRatio: pageToRender.PointToPixelRatio,
-			Width:             pageToRender.Width,
-			Height:            pageToRender.Height,
-			HasTransparency:   result.Pages[0].HasTransparency,
-		},
-	}, nil
+	return p.renderPages([]renderPage{*pageToRender}, 0)
 }
 
 // RenderPagesInDPI renders a list of pages in a specific dpi, the result is an image.
@@ -258,6 +254,18 @@ func (p *PdfiumImplementation) RenderPagesInDPI(request *requests.RenderPagesInD
 	p.Lock()
 	defer p.Unlock()
 
+	rendered, err := p.renderPagesInDPI(request)
+	if err != nil {
+		return nil, err
+	}
+
+	return &responses.RenderPagesInDPI{
+		CleanupFunc: rendered.cleanup,
+		Result:      rendered.RenderPages,
+	}, nil
+}
+
+func (p *PdfiumImplementation) renderPagesInDPI(request *requests.RenderPagesInDPI) (*renderedPages, error) {
 	if len(request.Pages) == 0 {
 		return nil, errors.New("no pages given")
 	}
@@ -291,15 +299,7 @@ func (p *PdfiumImplementation) RenderPagesInDPI(request *requests.RenderPagesInD
 		pages[i] = *pageToRender
 	}
 
-	result, cleanupFunc, err := p.renderPages(pages, request.Padding)
-	if err != nil {
-		return nil, err
-	}
-
-	return &responses.RenderPagesInDPI{
-		CleanupFunc: cleanupFunc,
-		Result:      *result,
-	}, nil
+	return p.renderPages(pages, request.Padding)
 }
 
 // calculateRenderImageSize calculates the pixel size of a page when it has to
@@ -322,6 +322,18 @@ func (p *PdfiumImplementation) RenderPageInPixels(request *requests.RenderPageIn
 	p.Lock()
 	defer p.Unlock()
 
+	rendered, err := p.renderPageInPixels(request)
+	if err != nil {
+		return nil, err
+	}
+
+	return &responses.RenderPageInPixels{
+		CleanupFunc: rendered.cleanup,
+		Result:      rendered.singlePage(),
+	}, nil
+}
+
+func (p *PdfiumImplementation) renderPageInPixels(request *requests.RenderPageInPixels) (*renderedPages, error) {
 	if request.Width == 0 && request.Height == 0 {
 		return nil, errors.New("no width or height given")
 	}
@@ -331,29 +343,13 @@ func (p *PdfiumImplementation) RenderPageInPixels(request *requests.RenderPageIn
 		return nil, err
 	}
 
-	index, pageToRender, err := p.buildRenderPageInPixels(request)
+	_, pageToRender, err := p.buildRenderPageInPixels(request)
 	if err != nil {
 		return nil, err
 	}
 
 	// Render a single page.
-	result, cleanupFunc, err := p.renderPages([]renderPage{*pageToRender}, 0)
-	if err != nil {
-		return nil, err
-	}
-
-	return &responses.RenderPageInPixels{
-		CleanupFunc: cleanupFunc,
-		Result: responses.RenderPage{
-			Page:              index,
-			Image:             result.Image,
-			RenderedImage:     result.RenderedImage,
-			PointToPixelRatio: pageToRender.PointToPixelRatio,
-			Width:             pageToRender.Width,
-			Height:            pageToRender.Height,
-			HasTransparency:   result.Pages[0].HasTransparency,
-		},
-	}, nil
+	return p.renderPages([]renderPage{*pageToRender}, 0)
 }
 
 // RenderPagesInPixels renders a list of pages in a specific pixel size, the result is an image.
@@ -363,6 +359,18 @@ func (p *PdfiumImplementation) RenderPagesInPixels(request *requests.RenderPages
 	p.Lock()
 	defer p.Unlock()
 
+	rendered, err := p.renderPagesInPixels(request)
+	if err != nil {
+		return nil, err
+	}
+
+	return &responses.RenderPagesInPixels{
+		CleanupFunc: rendered.cleanup,
+		Result:      rendered.RenderPages,
+	}, nil
+}
+
+func (p *PdfiumImplementation) renderPagesInPixels(request *requests.RenderPagesInPixels) (*renderedPages, error) {
 	if len(request.Pages) == 0 {
 		return nil, errors.New("no pages given")
 	}
@@ -396,15 +404,7 @@ func (p *PdfiumImplementation) RenderPagesInPixels(request *requests.RenderPages
 		pages[i] = *pageToRender
 	}
 
-	result, cleanupFunc, err := p.renderPages(pages, request.Padding)
-	if err != nil {
-		return nil, err
-	}
-
-	return &responses.RenderPagesInPixels{
-		CleanupFunc: cleanupFunc,
-		Result:      *result,
-	}, nil
+	return p.renderPages(pages, request.Padding)
 }
 
 type renderPage struct {
@@ -440,8 +440,57 @@ func validateRenderImageFormat(imageFormat requests.RenderImageFormat) error {
 	return errors.New("invalid ImageFormat given")
 }
 
+// renderedPages retains the guest pixel offset alongside the public image.
+// The offset stays valid across memory growth, until cleanup releases the bitmap.
+type renderedPages struct {
+	responses.RenderPages
+	pixelsPtr uint64
+	cleanup   func()
+}
+
+// singlePage returns the response of a render that contains exactly one page.
+func (r *renderedPages) singlePage() responses.RenderPage {
+	page := r.Pages[0]
+	return responses.RenderPage{
+		Page:              page.Page,
+		Image:             r.Image,
+		RenderedImage:     r.RenderedImage,
+		PointToPixelRatio: page.PointToPixelRatio,
+		Width:             page.Width,
+		Height:            page.Height,
+		HasTransparency:   page.HasTransparency,
+	}
+}
+
+// hasTransparency reports whether any of the rendered pages has transparency.
+func (r *renderedPages) hasTransparency() bool {
+	for _, page := range r.Pages {
+		if page.HasTransparency {
+			return true
+		}
+	}
+
+	return false
+}
+
+// toFileResponse builds the RenderToFile response for the rendered pages. The
+// point to pixel ratio is only set for a render of a single page.
+func (r *renderedPages) toFileResponse(singlePage bool) *responses.RenderToFile {
+	resp := &responses.RenderToFile{
+		Width:  r.Width,
+		Height: r.Height,
+		Pages:  r.Pages,
+	}
+
+	if singlePage {
+		resp.PointToPixelRatio = r.Pages[0].PointToPixelRatio
+	}
+
+	return resp
+}
+
 // renderPages renders a list of pages, the result is an image.
-func (p *PdfiumImplementation) renderPages(pages []renderPage, padding int) (*responses.RenderPages, func(), error) {
+func (p *PdfiumImplementation) renderPages(pages []renderPage, padding int) (*renderedPages, error) {
 	totalWidth := 0
 	totalHeight := 0
 
@@ -460,7 +509,7 @@ func (p *PdfiumImplementation) renderPages(pages []renderPage, padding int) (*re
 	}
 
 	if totalWidth < 1 || totalHeight < 1 {
-		return nil, nil, errors.New("could not render an empty image")
+		return nil, errors.New("could not render an empty image")
 	}
 
 	// The image format has been validated by the caller, all pages are
@@ -491,7 +540,7 @@ func (p *PdfiumImplementation) renderPages(pages []renderPage, padding int) (*re
 		// by FPDFBitmap_Destroy.
 		res, err := p.call("FPDFBitmap_CreateEx", uint64(totalWidth), uint64(totalHeight), uint64(enums.FPDF_BITMAP_FORMAT_GRAY), 0, 0)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 
 		bitmap = res[0]
@@ -508,12 +557,12 @@ func (p *PdfiumImplementation) renderPages(pages []renderPage, padding int) (*re
 		// around when we read the buffer back, which would leave us with a much
 		// too small view of the bitmap instead of an error.
 		if int64(img.Stride)*int64(totalHeight) > math.MaxUint32 {
-			return nil, nil, errors.New("the image to render is too large")
+			return nil, errors.New("the image to render is too large")
 		}
 
 		res, err := p.call("FPDFBitmap_Create", uint64(totalWidth), uint64(totalHeight), uint64(1))
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 
 		bitmap = res[0]
@@ -524,7 +573,7 @@ func (p *PdfiumImplementation) renderPages(pages []renderPage, padding int) (*re
 	// the dimensions overflow. Rendering into a null bitmap would silently give
 	// us an image full of garbage.
 	if bitmap == 0 {
-		return nil, nil, errors.New("could not create bitmap, the image to render is most likely too large")
+		return nil, errors.New("could not create bitmap, the image to render is most likely too large")
 	}
 
 	releaseFunc := func() {
@@ -546,7 +595,7 @@ func (p *PdfiumImplementation) renderPages(pages []renderPage, padding int) (*re
 		index, hasTransparency, err := p.renderPage(bitmap, pages[i], currentOffset, imageFormat)
 		if err != nil {
 			releaseFunc()
-			return nil, nil, err
+			return nil, err
 		}
 		pagesInfo[i].Page = index
 		pagesInfo[i].HasTransparency = hasTransparency
@@ -560,7 +609,7 @@ func (p *PdfiumImplementation) renderPages(pages []renderPage, padding int) (*re
 		res, err := p.call("FPDFBitmap_GetStride", bitmap)
 		if err != nil {
 			releaseFunc()
-			return nil, nil, err
+			return nil, err
 		}
 
 		imgGray.Stride = int(*(*int32)(unsafe.Pointer(&res[0])))
@@ -573,7 +622,7 @@ func (p *PdfiumImplementation) renderPages(pages []renderPage, padding int) (*re
 	// known here because PDFium decides it.
 	if imageSize > math.MaxUint32 {
 		releaseFunc()
-		return nil, nil, errors.New("the image to render is too large")
+		return nil, errors.New("the image to render is too large")
 	}
 
 	size := uint32(imageSize)
@@ -582,14 +631,14 @@ func (p *PdfiumImplementation) renderPages(pages []renderPage, padding int) (*re
 	res, err := p.call("FPDFBitmap_GetBuffer", bitmap)
 	if err != nil {
 		releaseFunc()
-		return nil, nil, err
+		return nil, err
 	}
 
 	// Create a view of the underlying memory, not a copy.
 	data, success := p.Module.Memory().Read(uint32(res[0]), size)
 	if !success {
 		releaseFunc()
-		return nil, nil, errors.New("could not get bitmap buffer")
+		return nil, errors.New("could not get bitmap buffer")
 	}
 
 	var renderedImage image.Image
@@ -601,13 +650,17 @@ func (p *PdfiumImplementation) renderPages(pages []renderPage, padding int) (*re
 		renderedImage = img
 	}
 
-	return &responses.RenderPages{
-		Image:         img,
-		RenderedImage: renderedImage,
-		Pages:         pagesInfo,
-		Width:         totalWidth,
-		Height:        totalHeight,
-	}, releaseFunc, nil
+	return &renderedPages{
+		RenderPages: responses.RenderPages{
+			Image:         img,
+			RenderedImage: renderedImage,
+			Pages:         pagesInfo,
+			Width:         totalWidth,
+			Height:        totalHeight,
+		},
+		pixelsPtr: res[0],
+		cleanup:   releaseFunc,
+	}, nil
 }
 
 // renderPage renders a specific page in a specific size on a bitmap.
@@ -733,127 +786,73 @@ func (p *PdfiumImplementation) renderPage(bitmap uint64, pageToRender renderPage
 	return pageHandle.index, hasTransparency, nil
 }
 
-func (p *PdfiumImplementation) RenderToFile(request *requests.RenderToFile) (*responses.RenderToFile, error) {
-	var renderedImage image.Image
+// renderForFile runs the render operation of a RenderToFile request and builds
+// the response for it. The caller must hold the instance lock.
+func (p *PdfiumImplementation) renderForFile(request *requests.RenderToFile) (*renderedPages, *responses.RenderToFile, error) {
+	var rendered *renderedPages
+	var err error
+	singlePage := false
 
-	var myResp *responses.RenderToFile
-	hasTransparency := false
+	switch {
+	case request.RenderPageInDPI != nil:
+		rendered, err = p.renderPageInDPI(request.RenderPageInDPI)
+		singlePage = true
+	case request.RenderPagesInDPI != nil:
+		rendered, err = p.renderPagesInDPI(request.RenderPagesInDPI)
+	case request.RenderPageInPixels != nil:
+		rendered, err = p.renderPageInPixels(request.RenderPageInPixels)
+		singlePage = true
+	case request.RenderPagesInPixels != nil:
+		rendered, err = p.renderPagesInPixels(request.RenderPagesInPixels)
+	default:
+		return nil, nil, errors.New("no render operation given")
+	}
 
-	if request.RenderPageInDPI != nil {
-		resp, err := p.RenderPageInDPI(request.RenderPageInDPI)
-		if err != nil {
-			return nil, err
-		}
-		defer resp.Cleanup()
+	if err != nil {
+		return nil, nil, err
+	}
 
-		renderedImage = resp.Result.RenderedImage
-		hasTransparency = resp.Result.HasTransparency
-		myResp = &responses.RenderToFile{
-			Width:             resp.Result.Width,
-			Height:            resp.Result.Height,
-			PointToPixelRatio: resp.Result.PointToPixelRatio,
-			Pages: []responses.RenderPagesPage{
-				{
-					Page:              resp.Result.Page,
-					PointToPixelRatio: resp.Result.PointToPixelRatio,
-					Width:             resp.Result.Width,
-					Height:            resp.Result.Height,
-					X:                 0,
-					Y:                 0,
-					HasTransparency:   resp.Result.HasTransparency,
-				},
-			},
-		}
-	} else if request.RenderPagesInDPI != nil {
-		resp, err := p.RenderPagesInDPI(request.RenderPagesInDPI)
-		if err != nil {
-			return nil, err
-		}
-		defer resp.Cleanup()
+	return rendered, rendered.toFileResponse(singlePage), nil
+}
 
-		renderedImage = resp.Result.RenderedImage
+// renderAndEncode renders the pages of a RenderToFile request and encodes the
+// image in the requested output format.
+//
+// The instance lock is held for the whole operation: the render helpers expect
+// it, the JPEG encoder borrows the bitmap in guest memory, and the bitmap is
+// released at the end. Writing the encoded image to its output target does not
+// touch the instance, so RenderToFile does that after the lock is released.
+// This keeps the lock free for other work, like the form fill timer callback
+// which skips its tick when the instance is busy.
+func (p *PdfiumImplementation) renderAndEncode(request *requests.RenderToFile) (*bytes.Buffer, *responses.RenderToFile, error) {
+	p.Lock()
+	defer p.Unlock()
 
-		for _, page := range resp.Result.Pages {
-			if page.HasTransparency {
-				hasTransparency = true
-			}
-		}
+	rendered, myResp, err := p.renderForFile(request)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer rendered.cleanup()
 
-		myResp = &responses.RenderToFile{
-			Width:  resp.Result.Width,
-			Height: resp.Result.Height,
-			Pages:  resp.Result.Pages,
-		}
-	} else if request.RenderPageInPixels != nil {
-		resp, err := p.RenderPageInPixels(request.RenderPageInPixels)
-		if err != nil {
-			return nil, err
-		}
-		defer resp.Cleanup()
+	renderedImage := rendered.RenderedImage
 
-		renderedImage = resp.Result.RenderedImage
-		hasTransparency = resp.Result.HasTransparency
-		myResp = &responses.RenderToFile{
-			Width:             resp.Result.Width,
-			Height:            resp.Result.Height,
-			PointToPixelRatio: resp.Result.PointToPixelRatio,
-			Pages: []responses.RenderPagesPage{
-				{
-					Page:              resp.Result.Page,
-					PointToPixelRatio: resp.Result.PointToPixelRatio,
-					Width:             resp.Result.Width,
-					Height:            resp.Result.Height,
-					X:                 0,
-					Y:                 0,
-					HasTransparency:   resp.Result.HasTransparency,
-				},
-			},
-		}
-	} else if request.RenderPagesInPixels != nil {
-		resp, err := p.RenderPagesInPixels(request.RenderPagesInPixels)
-		if err != nil {
-			return nil, err
-		}
-		defer resp.Cleanup()
-
-		renderedImage = resp.Result.RenderedImage
-
-		for _, page := range resp.Result.Pages {
-			if page.HasTransparency {
-				hasTransparency = true
-			}
-		}
-
-		myResp = &responses.RenderToFile{
-			Width:  resp.Result.Width,
-			Height: resp.Result.Height,
-			Pages:  resp.Result.Pages,
-		}
-	} else {
-		return nil, errors.New("no render operation given")
+	// If any of the pages have transparency, flatten the image onto a white
+	// background like a PDF viewer would. This is also to fix transparency JPEG
+	// rendering, when you render a JPG image in Go, it will make the
+	// transparent background black.
+	// The blend is done in place on the bitmap's pixel view, which is a live
+	// window into WASM memory. That keeps the pixel offset valid so the JPEG
+	// encoder can still borrow the bitmap instead of allocating and copying a
+	// second full-size buffer. This is safe because no WASM call happens
+	// between the render returning and this blend, so the view cannot have
+	// gone stale.
+	// Grayscale images have no alpha channel and are always rendered on a
+	// white background, so they don't need this.
+	if renderedImageRGBA, isRGBA := renderedImage.(*image.RGBA); rendered.hasTransparency() && isRGBA {
+		renderutil.CompositeOnWhiteInPlace(renderedImageRGBA)
 	}
 
 	var imgBuf bytes.Buffer
-
-	// If any of the pages have transparency, place a white background under
-	// the image like a PDF viewer would. This is also to fix transparency JPEG
-	// rendering, when you render a JPG image in Go, it will make the
-	// transparent background black.
-	// Grayscale images have no alpha channel and are always rendered on a
-	// white background, so they don't need this.
-	if renderedImageRGBA, isRGBA := renderedImage.(*image.RGBA); hasTransparency && isRGBA {
-		imageWithWhiteBackground := image.NewRGBA(renderedImageRGBA.Bounds())
-		draw.Draw(imageWithWhiteBackground, imageWithWhiteBackground.Bounds(), image.NewUniform(color.White), image.Point{}, draw.Src)
-		// PDFium's FPDFBitmap_BGRA has straight (non-premultiplied) alpha.
-		// Wrap as NRGBA so draw.Over uses the correct straight-alpha compositing formula.
-		straightAlphaSrc := &image.NRGBA{
-			Pix:    renderedImageRGBA.Pix,
-			Stride: renderedImageRGBA.Stride,
-			Rect:   renderedImageRGBA.Rect,
-		}
-		draw.Draw(imageWithWhiteBackground, imageWithWhiteBackground.Bounds(), straightAlphaSrc, straightAlphaSrc.Bounds().Min, draw.Over)
-		renderedImage = imageWithWhiteBackground
-	}
 
 	if request.OutputFormat == requests.RenderToFileOutputFormatJPG {
 		opt := image_jpeg.Options{
@@ -868,9 +867,9 @@ func (p *PdfiumImplementation) RenderToFile(request *requests.RenderToFile) (*re
 		}
 
 		for {
-			err := p.encodeJPEG(&imgBuf, renderedImage, opt)
+			err := p.encodeJPEG(&imgBuf, renderedImage, rendered.pixelsPtr, opt)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 
 			if request.MaxFileSize == 0 || int64(imgBuf.Len()) < request.MaxFileSize {
@@ -880,7 +879,7 @@ func (p *PdfiumImplementation) RenderToFile(request *requests.RenderToFile) (*re
 			opt.Quality -= 10
 
 			if opt.Quality <= 45 {
-				return nil, errors.New("PDF image would exceed maximum filesize")
+				return nil, nil, errors.New("PDF image would exceed maximum filesize")
 			}
 
 			imgBuf.Reset()
@@ -892,14 +891,23 @@ func (p *PdfiumImplementation) RenderToFile(request *requests.RenderToFile) (*re
 
 		err := encoder.Encode(&imgBuf, renderedImage)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		if request.MaxFileSize != 0 && int64(imgBuf.Len()) > request.MaxFileSize {
-			return nil, errors.New("PDF image would exceed maximum filesize")
+			return nil, nil, errors.New("PDF image would exceed maximum filesize")
 		}
 	} else {
-		return nil, errors.New("invalid output format given")
+		return nil, nil, errors.New("invalid output format given")
+	}
+
+	return &imgBuf, myResp, nil
+}
+
+func (p *PdfiumImplementation) RenderToFile(request *requests.RenderToFile) (*responses.RenderToFile, error) {
+	imgBuf, myResp, err := p.renderAndEncode(request)
+	if err != nil {
+		return nil, err
 	}
 
 	if request.OutputTarget == requests.RenderToFileOutputTargetBytes {
@@ -914,7 +922,7 @@ func (p *PdfiumImplementation) RenderToFile(request *requests.RenderToFile) (*re
 			}
 			targetFile = existingFile
 		} else {
-			tempFile, err := ioutil.TempFile("", "")
+			tempFile, err := os.CreateTemp("", "")
 			if err != nil {
 				return nil, err
 			}
