@@ -61,7 +61,7 @@ type Pdfium interface {
 	Kill() error
 
 	// GetImplementation returns the specific runtime implementation.
-	GetImplementation() interface{}
+	GetImplementation() any
 
 	// End instance functions.
 
@@ -384,6 +384,8 @@ type Pdfium interface {
 	FPDF_SetPrintMode(request *requests.FPDF_SetPrintMode) (*responses.FPDF_SetPrintMode, error)
 
 	// FPDF_RenderPage renders contents of a page to a device (screen, bitmap, or printer).
+	// The device context is given as the HDC value from the Windows API
+	// (uintptr, syscall.Handle or unsafe.Pointer), see requests.FPDF_RenderPage.
 	// This feature does not work on multi-threaded usage as you will need to give a device handle.
 	// Windows only!
 	FPDF_RenderPage(request *requests.FPDF_RenderPage) (*responses.FPDF_RenderPage, error)
@@ -732,6 +734,16 @@ type Pdfium interface {
 	// Experimental API.
 	FPDFPageObj_GetRotatedBounds(request *requests.FPDFPageObj_GetRotatedBounds) (*responses.FPDFPageObj_GetRotatedBounds, error)
 
+	// FPDFPageObj_GetRenderedStrokePattern returns a bitmap rasterization of the
+	// stroke pattern of the given page object.
+	// To render correctly, the caller must provide the document associated with
+	// the page object. The returned bitmap will be owned by the caller, and
+	// FPDFBitmap_Destroy() must be called on the returned bitmap when it is no
+	// longer needed.
+	// Returns an error when the stroke is not a tiling pattern or on failure.
+	// Experimental API.
+	FPDFPageObj_GetRenderedStrokePattern(request *requests.FPDFPageObj_GetRenderedStrokePattern) (*responses.FPDFPageObj_GetRenderedStrokePattern, error)
+
 	// FPDFPageObj_GetDashPhase returns the line dash phase of the page object.
 	// Experimental API.
 	FPDFPageObj_GetDashPhase(request *requests.FPDFPageObj_GetDashPhase) (*responses.FPDFPageObj_GetDashPhase, error)
@@ -976,7 +988,14 @@ type Pdfium interface {
 
 	// Start fpdf_flatten.h
 
-	// FPDFPage_Flatten makes annotations and form fields become part of the page contents itself
+	// FPDFPage_Flatten makes annotations and form fields become part of the page contents itself.
+	// PDFium parses the content of a page only when the page is loaded, so on
+	// success the page is reloaded behind the given reference (or index):
+	// rendering and text extraction through the same page afterwards show the
+	// flattened result. Form fill environments that have the page loaded are
+	// moved over to the reloaded page. Text pages, page objects and annotations
+	// obtained from the page before flattening keep pointing at the old,
+	// unflattened content and should be re-acquired.
 	FPDFPage_Flatten(request *requests.FPDFPage_Flatten) (*responses.FPDFPage_Flatten, error)
 
 	// End fpdf_flatten.h
