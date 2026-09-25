@@ -21,7 +21,9 @@ const (
 // libjpeg-turbo's encoder (pdfium_jpeg_encode) and the image is a type it
 // can consume directly, the encode runs inside the guest (with the SIMD
 // kernels); otherwise it falls back to image_jpeg.Encode.
-func (p *PdfiumImplementation) encodeJPEG(w io.Writer, m image.Image, opt image_jpeg.Options) error {
+// pixelsPtr is the guest offset of m's pixels, or zero for a Go-owned image.
+// The caller owns the bitmap and must keep it alive until encoding completes.
+func (p *PdfiumImplementation) encodeJPEG(w io.Writer, m image.Image, pixelsPtr uint64, opt image_jpeg.Options) error {
 	encode := p.Fn("pdfium_jpeg_encode")
 	// Guard against custom wasm binaries with an older/newer shim signature:
 	// (data, width, height, stride, format, quality, progressive, out_buf,
@@ -30,6 +32,10 @@ func (p *PdfiumImplementation) encodeJPEG(w io.Writer, m image.Image, opt image_
 		return image_jpeg.Encode(w, m, opt)
 	}
 
+	// pixels is only used for the empty check and for the Go-owned fallback
+	// below. For a rendered bitmap it is a view into guest memory that goes
+	// stale when a later allocation grows the memory, only pixelsPtr survives
+	// that. Do not read it after any call into the guest.
 	var pixels []byte
 	var stride, format int
 	switch img := m.(type) {
@@ -60,22 +66,29 @@ func (p *PdfiumImplementation) encodeJPEG(w io.Writer, m image.Image, opt image_
 		}
 	}
 
-	inPtr, err := p.MallocNoZero(uint64(len(pixels)))
-	if err != nil {
-		return err
-	}
-	defer p.Free(inPtr)
+	// Rendered bitmaps already reside in guest memory. Borrow their offset,
+	// which remains valid even if later allocations grow the guest memory.
+	inPtr := pixelsPtr
+	if inPtr == 0 {
+		var err error
+		inPtr, err = p.MallocNoZero(uint64(len(pixels)))
+		if err != nil {
+			return err
+		}
+		defer p.Free(inPtr)
 
-	// Two output parameters: the buffer pointer and its size.
-	outParams, err := p.Malloc(16)
+		if !p.Module.Memory().Write(uint32(inPtr), pixels) {
+			return errors.New("could not write pixel data to guest memory")
+		}
+	}
+
+	// Two output parameters: the buffer pointer and its size. The shim sets
+	// both before it does anything else, so they don't need to be zeroed.
+	outParams, err := p.MallocNoZero(16)
 	if err != nil {
 		return err
 	}
 	defer p.Free(outParams)
-
-	if !p.Module.Memory().Write(uint32(inPtr), pixels) {
-		return errors.New("could not write pixel data to guest memory")
-	}
 
 	progressive := uint64(0)
 	if opt.Progressive {
