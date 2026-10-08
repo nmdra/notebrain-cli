@@ -79,9 +79,12 @@ notebrain init
 
 This command starts an interactive wizard. The wizard configures your vault path and PDF settings.
 
-**2. Index your vault:**
+**2. Set up the Chroma runtime, then index your vault:**
+
+The one-time runtime download can take several minutes. Let it finish before indexing. Repeat setup after an upgrade if NoteBrain reports a missing runtime. Normal commands do not download the runtime automatically.
 
 ```bash
+NOTEBRAIN_ALLOW_RUNTIME_DOWNLOAD=1 notebrain stats --format=json
 notebrain ingest
 
 # To index PDFs, you must provide an LLM model and an API key (DEEPSEEK_API_KEY, OPENROUTER_API_KEY, etc.):

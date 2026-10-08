@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"maps"
+	"os"
 	"sync"
 
 	chroma "github.com/amikos-tech/chroma-go/pkg/api/v2"
@@ -75,21 +76,36 @@ type Store struct {
 // Option configures Store when calling Open.
 type Option func(*Store)
 
+func persistentClientOptions(path, libraryPath string, allowDownload bool) []chroma.PersistentClientOption {
+	options := []chroma.PersistentClientOption{
+		chroma.WithPersistentPath(path),
+		chroma.WithPersistentLibraryAutoDownload(allowDownload),
+		chroma.WithPersistentAllowReset(true),
+		chroma.WithPersistentClientOption(
+			chroma.WithDatabaseAndTenant("default_database", "default_tenant"),
+		),
+	}
+	if libraryPath != "" {
+		options = append(options, chroma.WithPersistentLibraryPath(libraryPath))
+	}
+	return options
+}
+
 // Open creates or opens the persistent ChromaDB store at path.
 func Open(ctx context.Context, path string, opts ...Option) (*Store, error) {
+	libraryPath, allowDownload, err := runtimeLibraryOptions()
+	if err != nil {
+		return nil, fmt.Errorf("chroma open %s: %w", path, err)
+	}
+	if allowDownload {
+		fmt.Fprintln(os.Stderr, "Chroma runtime download/setup is enabled. This can take minutes; do not interrupt it.")
+	}
 	var client chroma.Client
 	var chunks chroma.Collection
 	var links chroma.Collection
-	var err error
 
 	suppressOutputs(func() {
-		client, err = chroma.NewPersistentClient(
-			chroma.WithPersistentPath(path),
-			chroma.WithPersistentAllowReset(true),
-			chroma.WithPersistentClientOption(
-				chroma.WithDatabaseAndTenant("default_database", "default_tenant"),
-			),
-		)
+		client, err = chroma.NewPersistentClient(persistentClientOptions(path, libraryPath, allowDownload)...)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("chroma open %s: %w", path, err)

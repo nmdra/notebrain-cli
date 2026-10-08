@@ -57,6 +57,28 @@ NoteBrain uses a TOML file for persistent configuration. The default location is
 
 By default, NoteBrain stores the local ChromaDB database at `~/.notebrain/chroma`. You can override any setting with command-line flags (for example, `--chroma-path`, `--vault-path`, `--format`).
 
+## Chroma Runtime Setup and Recovery
+
+Store commands require the local Chroma runtime library. Normal commands check that the library is available before opening the database. They do not download it automatically.
+
+For first-time setup, or after a dependency upgrade, explicitly allow the runtime download:
+
+```bash
+NOTEBRAIN_ALLOW_RUNTIME_DOWNLOAD=1 notebrain stats --format=json
+```
+
+This command downloads and verifies the runtime for the version used by the binary. It can take several minutes. Let it finish before running other store commands. After setup, omit the environment variable.
+
+The runtime cache is separate from your indexed data:
+
+```text
+~/.cache/chroma/local_shim/<version>/<platform>/
+```
+
+If the reported `.download.lock` exists, read the process ID stored in that file and check whether the process is running. Wait if it is running. Otherwise, confirm that no runtime download is active, then remove only that lock file. Run the setup command again. Do not delete the database or use a library from a different runtime version.
+
+You can supply an existing compatible runtime with `CHROMA_LIB_PATH=/absolute/path/to/libchroma_shim.so`. NoteBrain checks that this file is readable and non-empty before opening the store.
+
 ## ONNX Model Recovery
 
 Semantic commands use the local `all-MiniLM-L6-v2` model. The model cache is:
