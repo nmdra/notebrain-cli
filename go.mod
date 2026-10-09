@@ -11,7 +11,7 @@ require (
 	github.com/charmbracelet/x/ansi v0.11.8
 	github.com/charmbracelet/x/term v0.2.2
 	github.com/jotaen/kong-completion v0.0.14
-	github.com/klippa-app/go-pdfium v1.20.3
+	github.com/klippa-app/go-pdfium v1.21.1
 	github.com/pelletier/go-toml/v2 v2.4.3
 	github.com/posener/complete v1.2.3
 	github.com/soypat/goldmark-latex v0.1.4

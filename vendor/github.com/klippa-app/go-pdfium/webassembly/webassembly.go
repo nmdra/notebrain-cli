@@ -3,7 +3,6 @@ package webassembly
 import (
 	goctx "context"
 	"crypto/rand"
-	_ "embed"
 	"errors"
 	"fmt"
 	"io"
@@ -11,10 +10,12 @@ import (
 	"path/filepath"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/klippa-app/go-pdfium"
 	"github.com/klippa-app/go-pdfium/internal/implementation_webassembly"
+	"github.com/klippa-app/go-pdfium/internal/pdfium_wasm"
 	"github.com/klippa-app/go-pdfium/webassembly/imports"
 
 	"github.com/google/uuid"
@@ -25,13 +26,10 @@ import (
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 )
 
-//go:embed pdfium.wasm
-var pdfiumWasm []byte
-
 type worker struct {
 	Context   goctx.Context
 	Cancel    goctx.CancelFunc
-	Functions map[string]api.Function
+	Functions map[string]implementation_webassembly.Function
 	Module    api.Module
 	Instance  *implementation_webassembly.PdfiumImplementation
 }
@@ -73,7 +71,7 @@ var multiThreadedMutex = &sync.Mutex{}
 // available. So it's important that you close instances when you're done with them.
 func Init(config Config) (pdfium.Pool, error) {
 	if config.WASM == nil {
-		config.WASM = pdfiumWasm
+		config.WASM = pdfium_wasm.Module
 	}
 	return initWithConfig(config)
 }
@@ -181,17 +179,18 @@ func initWithConfig(config Config) (pdfium.Pool, error) {
 
 			newWorker.Module = mod
 
-			malloc := mod.ExportedFunction("malloc")
+			module := imports.NewModule(mod)
+			malloc := module.ExportedFunction("malloc")
 			if malloc == nil {
 				return nil, fmt.Errorf("could not find malloc in exported methods")
 			}
 
-			free := mod.ExportedFunction("free")
-			if malloc == nil {
+			free := module.ExportedFunction("free")
+			if free == nil {
 				return nil, fmt.Errorf("could not find free in exported methods")
 			}
 
-			newWorker.Functions = map[string]api.Function{
+			newWorker.Functions = map[string]implementation_webassembly.Function{
 				"malloc": malloc,
 				"free":   free,
 			}
@@ -201,7 +200,7 @@ func initWithConfig(config Config) (pdfium.Pool, error) {
 				return nil, fmt.Errorf("could not call FPDF_InitLibrary: %w", err)
 			}
 
-			newWorker.Instance = implementation_webassembly.GetInstance(newWorker.Context, newWorker.Functions, newWorker.Module)
+			newWorker.Instance = implementation_webassembly.GetInstance(newWorker.Context, newWorker.Functions, module)
 
 			return newWorker, nil
 		}, func(ctx goctx.Context, object *pool.PooledObject) error {
@@ -342,8 +341,10 @@ type pdfiumInstance struct {
 	worker      *worker
 	pool        *pdfiumPool
 	instanceRef string
-	closed      bool
-	lock        *sync.Mutex
+	// closed is atomic because Kill deliberately does not take the instance
+	// lock (a stuck call may hold it) while the generated methods read it.
+	closed atomic.Bool
+	lock   *sync.Mutex
 }
 
 // Close will close the instance and will clean up the underlying PDFium resources
@@ -351,7 +352,7 @@ type pdfiumInstance struct {
 func (i *pdfiumInstance) Close() (err error) {
 	i.lock.Lock()
 
-	if i.closed {
+	if i.closed.Load() {
 		i.lock.Unlock()
 		return errors.New("instance is already closed")
 	}
@@ -374,7 +375,7 @@ func (i *pdfiumInstance) Close() (err error) {
 		delete(i.pool.instanceRefs, i.instanceRef)
 		i.pool.lock.Unlock()
 		i.pool = nil
-		i.closed = true
+		i.closed.Store(true)
 		i.lock.Unlock()
 	}()
 
@@ -386,7 +387,7 @@ func (i *pdfiumInstance) Close() (err error) {
 func (i *pdfiumInstance) Kill() (err error) {
 	// Kill should not be protected by a lock, since Kill is a last-effort
 	// to "recover" a broken process.
-	if i.closed {
+	if i.closed.Load() {
 		return errors.New("instance is already closed")
 	}
 
@@ -409,7 +410,7 @@ func (i *pdfiumInstance) Kill() (err error) {
 	err = i.pool.workerPool.InvalidateObject(goctx.Background(), i.worker)
 
 	i.pool = nil
-	i.closed = true
+	i.closed.Store(true)
 
 	return err
 }

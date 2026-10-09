@@ -677,6 +677,90 @@ We actively monitor PDFium API additions/changes/deletions and apply them in the
 
 The WebAssembly build will always be the latest PDFium version that we added support for.
 
+### WebAssembly with Wago (experimental)
+
+Next to wazero there is an experimental backend that runs the same embedded PDFium WebAssembly module with the
+[Wago runtime](https://github.com/wago-org/wago), a pure Go ahead-of-time compiler. It lives in the
+`experimental/wago` package and exposes the same pool API as the `webassembly` package, so switching between the two
+is a matter of changing the import and the `Init` call:
+
+```go
+package renderer
+
+import (
+	"log"
+	"time"
+
+	"github.com/klippa-app/go-pdfium"
+	"github.com/klippa-app/go-pdfium/experimental/wago"
+)
+
+var pool pdfium.Pool
+var instance pdfium.Pdfium
+
+func init() {
+	var err error
+	pool, err = wago.Init(wago.Config{
+		MinIdle:  1,
+		MaxIdle:  1,
+		MaxTotal: 1,
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	instance, err = pool.GetInstance(time.Second * 30)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+```
+
+Wago compiles the module about ten times faster than wazero's compiler and runs it a bit faster, but it is still in
+beta and this backend is experimental for the following reasons:
+
+- It needs a very recent wago: releases up to `v0.1.0-beta.9` could not compile the PDFium module on arm64 and
+  miscompiled parts of it on both architectures. Those bugs were fixed on wago's main branch in September 2026 and
+  go-pdfium pins a commit that passes the complete go-pdfium test suite on amd64 and arm64. Do not downgrade the
+  dependency.
+- One known problem remains on arm64: wago's `memory.fill` clobbers a register that is still in use, which PDFium hits
+  in `std::fill_n` on a `std::vector<bool>`. In a sequence of 1,000 real world documents rendered on one long running
+  instance, 2 documents came out differently from wazero because of it (a different sequence of 5,000 documents had
+  no mismatch). linux/amd64 is not affected. This has been reported to wago with a 30 line reproducer.
+- The API of Wago itself is not stable yet.
+
+Filesystem access works through Wago's WASI plugin. Use `Mounts` in the config to choose which host directories PDFium
+can see, by default the root of the disk is mounted read/write like in the wazero backend. All paths have to be
+absolute POSIX paths inside a mount. `Kill` only interrupts a call that is running inside PDFium when
+`InterruptibleCalls` is enabled in the config, which costs a little on every call.
+
+Please be aware that Wago and its WASI plugin come with the `Apache License 2.0` license.
+
+### WebAssembly with wazy (experimental)
+
+There is also an experimental backend on the [wazy runtime](https://github.com/samyfodil/wazy), a pure Go runtime
+derived from wazero that keeps the same API and adds WebAssembly 3.0 and component model support. It lives in the
+`experimental/wazy` package, takes the same configuration as the `webassembly` package (with wazy's `RuntimeConfig`
+and `FSConfig` types), runs the complete go-pdfium test suite with the same results as wazero on amd64 and arm64, and
+also has an interpreter for other platforms:
+
+```go
+pool, err := wazy.Init(wazy.Config{
+	MinIdle:  1,
+	MaxIdle:  1,
+	MaxTotal: 1,
+})
+```
+
+It is marked experimental because wazy itself is young and its API may still change. Like wazero it comes with the
+`Apache License 2.0` license. A comparison of the runtimes, including a 5,000 document real world corpus, is in
+[experimental/BENCHMARKS.md](experimental/BENCHMARKS.md).
+
+Both wazero and wazy compile the module with a single goroutine by default, which takes about a second on a fast
+machine. Both can compile in parallel when the context passed as `Context` in the config carries the number of
+workers: `experimental.WithCompilationWorkers(ctx, n)` from wazero, or `api.WithCompilationWorkers(ctx, n)` from wazy.
+With four workers the pool starts about three times faster.
+
 ## `io.ReadSeeker` and `io.Writer`
 
 Document loading allows you to load a document with a `io.ReadSeeker`. Please be aware that this only works efficiently
@@ -691,17 +775,27 @@ matter.
 
 ## Improving JPEG rendering speed
 
-By default, this library renders images with the `image/jpeg` package that comes with Go to make distribution as simple
-as possible. However, this package is quite slow compared to other native libraries like libjpeg and libjpeg-turbo, you
-can enable the usage of libjpeg-turbo by using the build tag `pdfium_use_turbojpeg`, this will require you to have the
-package `libturbojpeg-dev` installed during build time and the `libturbojpeg` package during runtime and build time.
+### CGO
+
+By default, the CGO implementation encodes JPEG images with the `image/jpeg` package that comes with Go to make
+distribution as simple as possible. However, this package is quite slow compared to native libraries like libjpeg and
+libjpeg-turbo. You can enable the usage of libjpeg-turbo with the build tag `pdfium_use_turbojpeg`, this requires the
+package `libturbojpeg-dev` to be installed during build time and the `libturbojpeg` package during build time and
+runtime.
 
 Speed improvements that can be expected are significant, for example: on a simple PDF the full process of rendering a
-page is 3x as fast compared to a build without libjpeg-turbo.
+page is 3x as fast compared to a build without libjpeg-turbo. On the CGO implementation, progressive JPEG output
+(`Progressive` in `RenderToFile`) requires this build tag; without it the option is ignored and a baseline JPEG is
+written.
 
-This is supported in both the CGO and WebAssembly implementation, please note that the WebAssembly implementation also
-uses CGO for libjpeg-turbo for now. There are plans to compile libjpeg-turbo to WebAssembly for the WebAssembly
-implementation to keep the WebAssembly implementation actually full WebAssembly.
+### WebAssembly
+
+The WebAssembly implementation does not need the build tag or any native library. The bundled PDFium module contains
+libjpeg-turbo compiled to WebAssembly, including its SIMD kernels, and exports its encoder. Rendered pages are encoded
+to JPEG inside the WebAssembly module directly from the rendered bitmap, so the pixels are never copied out into Go
+first, and progressive JPEG output is supported out of the box. When a custom module without the encoder export is
+used, or for image types the encoder cannot consume directly, the implementation falls back to the same encoder the
+CGO implementation uses.
 
 ## Support Policy
 
