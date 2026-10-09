@@ -119,13 +119,14 @@ github.com/jolestar/go-commons-pool/v2/concurrent
 # github.com/jotaen/kong-completion v0.0.14
 ## explicit; go 1.25
 github.com/jotaen/kong-completion
-# github.com/klippa-app/go-pdfium v1.20.3
+# github.com/klippa-app/go-pdfium v1.21.1
 ## explicit; go 1.26.0
 github.com/klippa-app/go-pdfium
 github.com/klippa-app/go-pdfium/enums
 github.com/klippa-app/go-pdfium/errors
 github.com/klippa-app/go-pdfium/internal/image/image_jpeg
 github.com/klippa-app/go-pdfium/internal/implementation_webassembly
+github.com/klippa-app/go-pdfium/internal/pdfium_wasm
 github.com/klippa-app/go-pdfium/internal/renderutil
 github.com/klippa-app/go-pdfium/internal/textextract
 github.com/klippa-app/go-pdfium/references
