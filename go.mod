@@ -7,11 +7,11 @@ require (
 	github.com/PaesslerAG/jsonpath v0.1.1
 	github.com/alecthomas/kong v1.16.1
 	github.com/amikos-tech/chroma-go v0.4.1
-	github.com/bmatcuk/doublestar/v4 v4.10.2
-	github.com/charmbracelet/x/ansi v0.11.8
+	github.com/bmatcuk/doublestar/v4 v4.10.3
+	github.com/charmbracelet/x/ansi v0.11.9
 	github.com/charmbracelet/x/term v0.2.2
 	github.com/jotaen/kong-completion v0.0.14
-	github.com/klippa-app/go-pdfium v1.21.1
+	github.com/klippa-app/go-pdfium v1.21.3
 	github.com/pelletier/go-toml/v2 v2.4.3
 	github.com/posener/complete v1.2.3
 	github.com/soypat/goldmark-latex v0.1.4
@@ -20,7 +20,7 @@ require (
 	go.abhg.dev/goldmark/hashtag v0.4.0
 	go.abhg.dev/goldmark/mermaid v0.6.0
 	go.abhg.dev/goldmark/wikilink v0.6.0
-	golang.org/x/sys v0.48.0
+	golang.org/x/sys v0.49.0
 )
 
 require (
