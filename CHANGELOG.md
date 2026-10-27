@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [v2.14.0] - 2026-10-27
+
+### Added
+- Add `notebrain doctor --fix` to download and verify missing ONNX model artifacts without resetting the database, replacing healthy files, or removing existing download locks
+
+### Changed
+- **Breaking:** Store commands no longer download a missing Chroma runtime automatically; run `NOTEBRAIN_ALLOW_RUNTIME_DOWNLOAD=1 notebrain stats --format=json` to install it explicitly, or configure an existing runtime with `CHROMA_LIB_PATH`
+
+### Fixed
+- Keep the persisted-default embedding function regression test offline and resolve CI lint failures
+
+### Security
+- Restrict model archive extraction to fixed output filenames and reject traversal paths, absolute paths, Windows paths, and non-regular model artifacts
+- Verify the model archive against a pinned SHA-256 checksum before installing recovered artifacts
+
 ## [v2.13.0] - 2026-08-15
 
 ### Added
@@ -360,3 +377,6 @@ This marks the official stable release of **NoteBrain CLI v1.0.0**! This release
   - `reset`: Completely purges the embedded vector database.
 - **Automated CI/CD**: Added `GoReleaser` and GitHub Actions configuration for automated, cryptographically signed binary distribution and SBOM generation.
 - **Documentation**: Comprehensive README and `wiki/` documentation covering Installation, Commands, and Architecture.
+
+[Unreleased]: https://github.com/nmdra/notebrain-cli/compare/v2.14.0...HEAD
+[v2.14.0]: https://github.com/nmdra/notebrain-cli/compare/v2.13.1...v2.14.0
