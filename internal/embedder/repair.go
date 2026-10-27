@@ -118,18 +118,25 @@ func repairModel(ctx context.Context, paths modelPaths, url, checksum string) (r
 		if err != nil {
 			return fmt.Errorf("read model archive: %w", err)
 		}
-		clean := path.Clean(h.Name)
-		if path.IsAbs(clean) || clean == ".." || strings.HasPrefix(clean, "../") || strings.ContainsAny(h.Name, "\\\\:") {
+		// Reject traversal before normalization, which can hide internal '..'
+		// components. Also reject Windows separators and drive paths on all OSes.
+		if strings.Contains(h.Name, "..") || path.IsAbs(h.Name) || strings.ContainsAny(h.Name, "\\\\:") {
 			return fmt.Errorf("unsafe model archive entry %q", h.Name)
 		}
-		name := path.Base(clean)
-		if name != modelFileName && name != tokenizerFileName {
+		// Never use an archive-derived string as an output path. Map supported
+		// archive entries to fixed local filenames instead.
+		clean := path.Clean(h.Name)
+		var name string
+		switch clean {
+		case modelFileName, "onnx/" + modelFileName:
+			name = modelFileName
+		case tokenizerFileName, "onnx/" + tokenizerFileName:
+			name = tokenizerFileName
+		default:
+			if base := path.Base(clean); base == modelFileName || base == tokenizerFileName {
+				return fmt.Errorf("unexpected artifact path %q", h.Name)
+			}
 			continue
-		}
-		// Chroma's archive stores these artifacts under onnx/. Flat archives are
-		// also safe, but arbitrary nested paths must not match by basename alone.
-		if clean != name && clean != "onnx/"+name {
-			return fmt.Errorf("unexpected artifact path %q", h.Name)
 		}
 		if h.Typeflag != tar.TypeReg || h.Size <= 0 || found[name] {
 			return fmt.Errorf("invalid or duplicate model archive artifact %q", h.Name)

@@ -205,12 +205,14 @@ func warnIgnoredOutputFlags(w io.Writer, format, jsonpath, cmdName string) {
 	}
 }
 
+const commandDoctor = "doctor"
+
 // textOnlyCommands are the commands whose output is inherently textual and
 // never honors --format/--jsonpath.
 var textOnlyCommands = map[string]bool{
 	groupIngest:     true,
 	"reset":         true,
-	"doctor":        true,
+	commandDoctor:   true,
 	"doctor-probe":  true,
 	"init":          true,
 	"version":       true,

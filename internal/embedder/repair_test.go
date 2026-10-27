@@ -91,6 +91,24 @@ func TestRepairModelInstallsArchiveLayout(t *testing.T) {
 	assertRepairClean(t, p)
 }
 
+func TestRepairModelInstallsFlatLayout(t *testing.T) {
+	p := repairPaths(t)
+	url, sum := repairServer(t, repairArchive(t,
+		repairEntry{modelFileName, "model", 0},
+		repairEntry{tokenizerFileName, "tokenizer", 0},
+	))
+	if err := repairModel(context.Background(), p, url, sum); err != nil {
+		t.Fatal(err)
+	}
+	for file, want := range map[string]string{p.modelPath: "model", p.tokenizerPath: "tokenizer"} {
+		got, err := os.ReadFile(file)
+		if err != nil || string(got) != want {
+			t.Fatalf("artifact %s = %q, %v", file, got, err)
+		}
+	}
+	assertRepairClean(t, p)
+}
+
 func TestRepairModelChecksumFailureLeavesCacheUntouched(t *testing.T) {
 	p := repairPaths(t)
 	if err := os.MkdirAll(filepath.Dir(p.modelPath), 0755); err != nil {
@@ -177,13 +195,18 @@ func TestRepairModelRejectsUnsafeOrIncompleteArchive(t *testing.T) {
 	model := repairEntry{"onnx/model.onnx", "model", 0}
 	tokenizer := repairEntry{"onnx/tokenizer.json", "tokenizer", 0}
 	tests := map[string][]repairEntry{
-		"incomplete":   {model},
-		"empty":        {model, {"onnx/tokenizer.json", "", 0}},
-		"traversal":    {model, tokenizer, {"../../escape", "bad", 0}},
-		"absolute":     {model, tokenizer, {"/tmp/escape", "bad", 0}},
-		"symlink":      {model, {"onnx/tokenizer.json", "", tar.TypeSymlink}},
-		"duplicate":    {model, tokenizer, model},
-		"wrong layout": {{"unexpected/model.onnx", "model", 0}, tokenizer},
+		"incomplete":           {model},
+		"empty":                {model, {"onnx/tokenizer.json", "", 0}},
+		"traversal":            {model, tokenizer, {"../../escape", "bad", 0}},
+		"absolute":             {model, tokenizer, {"/tmp/escape", "bad", 0}},
+		"normalized traversal": {{"onnx/../model.onnx", "model", 0}, tokenizer},
+		"nested traversal":     {{"extra/../onnx/model.onnx", "model", 0}, tokenizer},
+		"windows traversal":    {model, tokenizer, {`..\escape`, "bad", 0}},
+		"windows absolute":     {model, tokenizer, {`C:\escape`, "bad", 0}},
+		"hardlink":             {model, {"onnx/tokenizer.json", "", tar.TypeLink}},
+		"symlink":              {model, {"onnx/tokenizer.json", "", tar.TypeSymlink}},
+		"duplicate":            {model, tokenizer, model},
+		"wrong layout":         {{"unexpected/model.onnx", "model", 0}, tokenizer},
 	}
 	for name, entries := range tests {
 		t.Run(name, func(t *testing.T) {
