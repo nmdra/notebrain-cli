@@ -108,8 +108,7 @@ func TestBuildHandler(t *testing.T) {
 
 func TestParseAndRunUsageError(t *testing.T) {
 	err := parseAndRun(context.Background(), "v", "c", "d", nil, []string{"--bogus-flag"})
-	var uerr *UsageError
-	if !errors.As(err, &uerr) {
+	if _, ok := errors.AsType[*UsageError](err); !ok {
 		t.Fatalf("expected UsageError, got %T: %v", err, err)
 	}
 }
@@ -128,8 +127,7 @@ func TestParseAndRunJSONUsageError(t *testing.T) {
 	_ = w.Close()
 	out, _ := io.ReadAll(r)
 
-	var uerr *UsageError
-	if !errors.As(parseErr, &uerr) {
+	if _, ok := errors.AsType[*UsageError](parseErr); !ok {
 		t.Fatalf("expected UsageError, got %T: %v", parseErr, parseErr)
 	}
 	if !strings.Contains(string(out), `"error"`) {

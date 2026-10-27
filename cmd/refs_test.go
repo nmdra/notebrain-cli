@@ -418,15 +418,13 @@ func TestRefsUsageErrors(t *testing.T) {
 
 	t.Run("missing vault path", func(t *testing.T) {
 		err := (&RefsCmd{Note: "router"}).Run(&Globals{Ctx: context.Background()})
-		var usage *UsageError
-		if !errors.As(err, &usage) {
+		if _, ok := errors.AsType[*UsageError](err); !ok {
 			t.Errorf("expected UsageError, got %T: %v", err, err)
 		}
 	})
 	t.Run("missing note", func(t *testing.T) {
 		err := (&RefsCmd{}).Run(refsTestGlobals(t.TempDir()))
-		var usage *UsageError
-		if !errors.As(err, &usage) {
+		if _, ok := errors.AsType[*UsageError](err); !ok {
 			t.Errorf("expected UsageError, got %T: %v", err, err)
 		}
 	})
