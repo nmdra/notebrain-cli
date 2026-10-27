@@ -108,8 +108,7 @@ func TestTagsNoQueryRequiresList(t *testing.T) {
 	withFakeStore(t, fs)
 
 	err := (&TagsCmd{}).Run(&Globals{Ctx: context.Background()})
-	var usageErr *UsageError
-	if !errors.As(err, &usageErr) {
+	if _, ok := errors.AsType[*UsageError](err); !ok {
 		t.Fatalf("expected UsageError, got %v", err)
 	}
 	if !strings.Contains(err.Error(), "--list") {

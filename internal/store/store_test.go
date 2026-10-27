@@ -2,6 +2,8 @@ package store
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 
 	chroma "github.com/amikos-tech/chroma-go/pkg/api/v2"
@@ -90,6 +92,26 @@ func (defaultNamedEmbeddingFunction) SupportedSpaces() []embeddings.DistanceMetr
 }
 
 func TestStoreOpen_ReopensPersistedDefaultEmbeddingFunction(t *testing.T) {
+	// Keep the installed Chroma runtime available after isolating HOME. Block
+	// the model cache with a regular file so schema decoding cannot download
+	// ONNX artifacts while seeding or reopening the legacy configuration.
+	runtimePath, _, err := runtimeLibraryOptions()
+	if err != nil || runtimePath == "" {
+		t.Fatalf("test requires an installed Chroma runtime: %v", err)
+	}
+	t.Setenv("CHROMA_LIB_PATH", runtimePath)
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	// A missing explicit ONNX runtime fails before its bootstrap downloader.
+	t.Setenv("CHROMAGO_ONNX_RUNTIME_PATH", filepath.Join(home, "missing-onnx-runtime.so"))
+	cache := filepath.Join(home, ".cache", "chroma")
+	if err := os.MkdirAll(cache, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cache, "onnx_models"), []byte("downloads disabled in this test"), 0600); err != nil {
+		t.Fatal(err)
+	}
+
 	ctx := context.Background()
 	path := t.TempDir()
 

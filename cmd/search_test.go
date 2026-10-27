@@ -33,8 +33,7 @@ func TestSearchSemanticModelUnavailable(t *testing.T) {
 	if !errors.Is(err, embedder.ErrModelUnavailable) {
 		t.Fatalf("error = %v, want ErrModelUnavailable", err)
 	}
-	var availabilityErr *embedder.ModelAvailabilityError
-	if !errors.As(err, &availabilityErr) {
+	if _, ok := errors.AsType[*embedder.ModelAvailabilityError](err); !ok {
 		t.Fatalf("error = %v, want ModelAvailabilityError", err)
 	}
 }
@@ -200,8 +199,7 @@ func TestResolveExcludes(t *testing.T) {
 		// suffix match is ambiguous and resolution must fail.
 		c := &SearchCmd{ExcludeNotes: []string{"note"}}
 		_, err := c.resolveExcludes(ctx, st)
-		var usageErr *UsageError
-		if !errors.As(err, &usageErr) {
+		if _, ok := errors.AsType[*UsageError](err); !ok {
 			t.Fatalf("expected UsageError, got %v", err)
 		}
 		if !strings.Contains(err.Error(), "multiple") {

@@ -13,6 +13,11 @@ import (
 const defaultRuntimeVersion = "v0.3.4"
 const runtimeDownloadEnv = "NOTEBRAIN_ALLOW_RUNTIME_DOWNLOAD"
 const runtimeOSWindows = "windows"
+const runtimeOSDarwin = "darwin"
+const runtimeArchAMD64 = "amd64"
+const runtimeLibraryLinux = "libchroma_shim.so"
+const runtimeLibraryDarwin = "libchroma_shim.dylib"
+const runtimeLibraryWindows = "chroma_shim.dll"
 
 // ErrRuntimeUnavailable identifies a local Chroma runtime that is not ready.
 var ErrRuntimeUnavailable = errors.New("chroma runtime is unavailable")
@@ -58,12 +63,12 @@ func resolveRuntimeLibrary(explicit, optIn string, homeDir func() (string, error
 	}
 	fileName := ""
 	switch {
-	case goos == "linux" && goarch == "amd64":
-		fileName = "libchroma_shim.so"
-	case goos == "darwin" && goarch == "arm64":
-		fileName = "libchroma_shim.dylib"
-	case goos == runtimeOSWindows && goarch == "amd64":
-		fileName = "chroma_shim.dll"
+	case goos == "linux" && goarch == runtimeArchAMD64:
+		fileName = runtimeLibraryLinux
+	case goos == runtimeOSDarwin && goarch == "arm64":
+		fileName = runtimeLibraryDarwin
+	case goos == runtimeOSWindows && goarch == runtimeArchAMD64:
+		fileName = runtimeLibraryWindows
 	default:
 		return "", false, &RuntimeAvailabilityError{Detail: fmt.Sprintf("unsupported default runtime platform %s-%s", goos, goarch)}
 	}
@@ -85,12 +90,12 @@ func resolveRuntimeLibrary(explicit, optIn string, homeDir func() (string, error
 // checkExplicitRuntime follows the local loader's directory and extensionless
 // candidates. Bare library names can use the system loader search path.
 func checkExplicitRuntime(path, goos string) error {
-	extension, defaultName := ".so", "libchroma_shim.so"
+	extension, defaultName := ".so", runtimeLibraryLinux
 	switch goos {
-	case "darwin":
-		extension, defaultName = ".dylib", "libchroma_shim.dylib"
+	case runtimeOSDarwin:
+		extension, defaultName = ".dylib", runtimeLibraryDarwin
 	case runtimeOSWindows:
-		extension, defaultName = ".dll", "chroma_shim.dll"
+		extension, defaultName = ".dll", runtimeLibraryWindows
 	}
 	if !strings.ContainsAny(path, `/\\`) && filepath.Ext(path) == extension {
 		return nil
