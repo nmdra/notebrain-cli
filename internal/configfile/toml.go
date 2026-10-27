@@ -57,6 +57,11 @@ func TOMLResolver(r io.Reader) (kong.Resolver, error) {
 	return kong.ResolverFunc(func(_ *kong.Context, _ *kong.Path, flag *kong.Flag) (any, error) {
 		name := flag.Name
 
+		// Repair requires explicit command-line consent, never a saved default.
+		if name == "fix" {
+			return nil, nil
+		}
+
 		if val, ok := parsed[name]; ok {
 			return val, nil
 		}

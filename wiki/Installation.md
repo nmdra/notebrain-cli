@@ -100,7 +100,17 @@ Run the diagnostic command before you run a semantic command:
 notebrain doctor
 ```
 
-If the model is missing, download and verify the pinned Chroma archive:
+If the model is missing, let NoteBrain download and verify the pinned Chroma archive:
+
+```bash
+notebrain doctor --fix
+```
+
+`doctor` does not download the model unless you pass `--fix`. Repair requires network access and can take several minutes. It verifies the archive's SHA-256 checksum before it installs missing or empty model files, preserves existing readable non-empty model files, and checks model availability again. It does not reset or delete the ChromaDB database, repair database corruption, or remove existing download locks. If the download fails, fix the reported network or file-permission issue and run the command again.
+
+After doctor passes, retry `notebrain ingest` or your semantic command.
+
+For manual recovery, download and verify the pinned Chroma archive:
 
 ```bash
 archive=/tmp/notebrain-onnx.tar.gz
@@ -123,7 +133,7 @@ If NoteBrain reports a stale lock, confirm that the reported process ID is not r
 
 ```bash
 rm ~/.cache/chroma/onnx_models/.download.lock
-notebrain doctor
+notebrain doctor --fix
 ```
 
 Do not remove the ChromaDB directory. The lock file and model cache are separate from the indexed vault data.

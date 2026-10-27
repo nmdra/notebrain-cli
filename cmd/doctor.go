@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -9,7 +10,11 @@ import (
 	"github.com/nmdra/notebrain-cli/v2/internal/embedder"
 )
 
-type DoctorCmd struct{}
+type DoctorCmd struct {
+	Fix bool `help:"Download and verify missing ONNX model files. Does not reset the database or remove existing download locks."`
+
+	repairModel func(context.Context) error
+}
 
 func (c *DoctorCmd) Run(globals *Globals) error {
 	initStyles()
@@ -45,6 +50,24 @@ func (c *DoctorCmd) Run(globals *Globals) error {
 	// opens Chroma without initializing the semantic embedder, so doctor can
 	// report both database and model problems without hanging in a downloader.
 	modelErr := checkModelAvailabilityFn()
+	if modelErr != nil && c.Fix {
+		availabilityErr, ok := errors.AsType[*embedder.ModelAvailabilityError](modelErr)
+		if ok && availabilityErr.Reason == embedder.AvailabilityMissingArtifacts {
+			printWarning("ONNX model recovery", "downloading and verifying the pinned model archive; this may take several minutes")
+			repair := c.repairModel
+			if repair == nil {
+				repair = embedder.RepairModel
+			}
+			if err := repair(globals.Ctx); err != nil {
+				printError("ONNX model recovery", err.Error())
+				if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+					return fmt.Errorf("doctor model repair: %w", err)
+				}
+			} else {
+				modelErr = checkModelAvailabilityFn()
+			}
+		}
+	}
 	if modelErr == nil {
 		printSuccess("ONNX model", "available")
 	} else {
@@ -60,7 +83,7 @@ func (c *DoctorCmd) Run(globals *Globals) error {
 			case embedder.AvailabilityInvalidLock:
 				printWarning("ONNX model recovery", "inspect the lock metadata and remove it only after confirming no download is active")
 			default:
-				printWarning("ONNX model recovery", "restore the missing files, then rerun doctor")
+				printWarning("ONNX model recovery", "run `notebrain doctor --fix` to download and restore the missing files, then rerun doctor")
 			}
 		} else {
 			printError("ONNX model", modelErr.Error())
@@ -70,12 +93,12 @@ func (c *DoctorCmd) Run(globals *Globals) error {
 	err := os.MkdirAll(chromaPath, 0755)
 	if err != nil {
 		printError("ChromaDB Path", fmt.Sprintf("Cannot create/access directory %q: %v", chromaPath, err))
-		return nil
+		return fmt.Errorf("doctor: access ChromaDB path: %w", err)
 	}
 	testFile := filepath.Join(chromaPath, ".notebrain_test_write")
 	if err := os.WriteFile(testFile, []byte("test"), 0600); err != nil {
 		printError("ChromaDB Path", fmt.Sprintf("Directory %q is not writable: %v", chromaPath, err))
-		return nil
+		return fmt.Errorf("doctor: write ChromaDB path: %w", err)
 	}
 	os.Remove(testFile)
 	printSuccess("ChromaDB Path", fmt.Sprintf("Writable (%s)", chromaPath))
