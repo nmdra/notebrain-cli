@@ -13,6 +13,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"golang.org/x/sys/unix"
 )
 
 func TestStoreLockAliasesAndCancellation(t *testing.T) {
@@ -32,6 +34,10 @@ func TestStoreLockAliasesAndCancellation(t *testing.T) {
 	defer first.close()
 	if canonical != path {
 		t.Fatalf("canonical=%q", canonical)
+	}
+	flags, err := unix.FcntlInt(first.file.Fd(), unix.F_GETFD, 0)
+	if err != nil || flags&unix.FD_CLOEXEC == 0 {
+		t.Fatalf("lock descriptor must not survive exec: flags=%#x, err=%v", flags, err)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
@@ -162,7 +168,8 @@ func TestMCPPreflightOpenFailureReleasesLock(t *testing.T) {
 }
 
 func TestStoreCloseIdempotent(t *testing.T) {
-	lock, _, err := acquireStoreLock(context.Background(), filepath.Join(t.TempDir(), "store"), false)
+	path := filepath.Join(t.TempDir(), "store")
+	lock, _, err := acquireStoreLock(t.Context(), path, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,7 +177,18 @@ func TestStoreCloseIdempotent(t *testing.T) {
 	if err := s.Close(); err != nil {
 		t.Fatal(err)
 	}
+	// A repeated Close cannot release a subsequent holder's lock.
+	replacement, _, err := acquireStoreLock(t.Context(), path, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer replacement.close()
 	if err := s.Close(); err != nil {
 		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
+	defer cancel()
+	if _, _, err := acquireStoreLock(ctx, path, false); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("replacement lock did not remain held: %v", err)
 	}
 }

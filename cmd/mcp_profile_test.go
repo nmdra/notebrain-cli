@@ -87,6 +87,24 @@ func TestMCPChildDefaultConfigIsolation(t *testing.T) {
 	}
 }
 
+func TestMCPConfigCannotSelectChildRoute(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	file := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(file, []byte("mcp_child = true\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	withFakeStore(t, &fakeStore{stats: &store.Stats{}})
+	out := captureStdout(t, func() {
+		err := ParseAndRun(t.Context(), "test", "none", "now", nil, []string{"stats", "--config=" + file, "--format=json"})
+		if err != nil {
+			t.Errorf("configuration activated child-only preflight: %v", err)
+		}
+	})
+	if !strings.Contains(out, `"command": "stats"`) {
+		t.Errorf("ordinary CLI output = %q", out)
+	}
+}
+
 func TestMCPChildRequiresPrivateConfigAndAllowlist(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	private := filepath.Join(t.TempDir(), "profile.toml")
