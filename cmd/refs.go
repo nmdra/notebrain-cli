@@ -89,10 +89,17 @@ func (c *RefsCmd) Run(globals *Globals) error {
 		return fmt.Errorf("note %q is a PDF; refs are listed for markdown notes", c.Note)
 	}
 
-	absPath := filepath.Join(vaultPath, meta.FilePath)
-	body, err := os.ReadFile(absPath)
+	root, err := os.OpenRoot(vaultPath)
 	if err != nil {
-		return fmt.Errorf("read note file %q: %w (is --vault-path pointing at the right vault?)", absPath, err)
+		return fmt.Errorf("open vault %q: %w (is --vault-path pointing at the right vault?)", vaultPath, err)
+	}
+	defer func() { _ = root.Close() }()
+
+	// Indexed paths are untrusted. A rooted read rejects traversal and symlinks
+	// that escape the vault without a check-then-open race.
+	body, err := root.ReadFile(filepath.FromSlash(meta.FilePath))
+	if err != nil {
+		return fmt.Errorf("read note file %q: %w (is --vault-path pointing at the right vault?)", meta.FilePath, err)
 	}
 
 	entries := c.resolveRefs(vaultPath, meta.FilePath, parser.ExtractReferences(string(body)))

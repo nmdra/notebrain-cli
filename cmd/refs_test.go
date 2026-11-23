@@ -402,6 +402,72 @@ func TestRefsPDFNoteError(t *testing.T) {
 	}
 }
 
+func TestRefsIndexedNoteCannotEscapeVault(t *testing.T) {
+	parent := t.TempDir()
+	vaultDir := filepath.Join(parent, "vault")
+	if err := os.Mkdir(vaultDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	outside := filepath.Join(parent, "outside.md")
+	if err := os.WriteFile(outside, []byte("[secret](https://outside.example/secret)"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("../outside.md", filepath.Join(vaultDir, "escape.md")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(parent, filepath.Join(vaultDir, "escape-dir")); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, notePath := range []string{outside, "../outside.md", "escape.md", "escape-dir/outside.md"} {
+		t.Run(notePath, func(t *testing.T) {
+			withFakeStore(t, &fakeStore{noteMeta: &store.NoteContent{
+				NoteSlug: "outside", Title: "Outside", FilePath: notePath,
+			}})
+			var runErr error
+			out := captureStdout(t, func() {
+				runErr = (&RefsCmd{Note: "outside", IncludeMissing: true}).Run(refsTestGlobals(vaultDir))
+			})
+			if runErr == nil {
+				t.Errorf("outside indexed note %q must return an error, output: %s", notePath, out)
+			}
+			if out != "" {
+				t.Errorf("outside indexed note must produce no reference output: %s", out)
+			}
+		})
+	}
+}
+
+func TestRefsIndexedNoteWithinVault(t *testing.T) {
+	vaultDir := writeRefsTestVault(t)
+	if err := os.Symlink("router.md", filepath.Join(vaultDir, "Notes", "alias.md")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("Notes", filepath.Join(vaultDir, "alias-dir")); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, notePath := range []string{"Notes/router.md", "Notes/alias.md", "alias-dir/router.md"} {
+		t.Run(notePath, func(t *testing.T) {
+			withFakeStore(t, &fakeStore{noteMeta: &store.NoteContent{
+				NoteSlug: "router", Title: "Router", FilePath: notePath,
+			}})
+			globals := refsTestGlobals(vaultDir)
+			globals.Format = formatJSON
+			out := captureStdout(t, func() {
+				if err := (&RefsCmd{Note: "router"}).Run(globals); err != nil {
+					t.Errorf("valid indexed note %q: %v", notePath, err)
+				}
+			})
+			for _, want := range []string{`"note_slug": "router"`, `"total": 8`, `"path": "https://example.com/docs"`} {
+				if !strings.Contains(out, want) {
+					t.Errorf("valid indexed note output missing %s:\n%s", want, out)
+				}
+			}
+		})
+	}
+}
+
 func TestRefsNoteFileMissingError(t *testing.T) {
 	vaultDir := t.TempDir()
 	fs := &fakeStore{noteMeta: &store.NoteContent{NoteSlug: "ghost", Title: "Ghost", FilePath: "Notes/ghost.md"}}
