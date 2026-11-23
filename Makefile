@@ -1,4 +1,4 @@
-.PHONY: build test test-cover test-pkg lint vendor clean
+.PHONY: build test test-cover test-pkg mcp-test lint vendor clean
 
 # Build with embedded persistent client (requires CGO)
 build:
@@ -16,6 +16,10 @@ test-cover:
 # Run tests for a specific package (usage: make test-pkg PKG=./internal/parser)
 test-pkg:
 	go test -v -count=1 $(PKG)
+
+# Offline MCP protocol, process, and storage-lock checks
+mcp-test:
+	CGO_ENABLED=1 go test -race -short . ./cmd ./internal/mcpbridge ./internal/store -run 'Test(MCP|StoreLock)' -count=1 -timeout=180s
 
 # Lint changed packages only
 lint:

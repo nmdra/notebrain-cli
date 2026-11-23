@@ -1,8 +1,11 @@
 # AI Agent Skill Usage
 
-NoteBrain has a built-in AI agent skill: `notebrain-assistant`. This skill operates with AI coding assistants and autonomous agents (for example, Google Antigravity, Opencode, Claude Code, and Pi). The skill gives agents semantic search and knowledge graph traversal for your Obsidian vault.
+Choose the skill that matches how your agent connects to NoteBrain:
 
-## Location of the Skill
+- **MCP:** [notebrain-mcp](../.agents/skills/notebrain-mcp/SKILL.md) calls the MCP tools directly. Set up the [MCP server](MCP.md), then load this skill instead of the CLI skill for MCP-only sessions.
+- **CLI:** `notebrain-assistant` runs the `notebrain` binary. The rest of this guide covers the CLI skill.
+
+## Location of the CLI Skill
 
 The skill instructions and the evaluation workspace are in the project root:
 

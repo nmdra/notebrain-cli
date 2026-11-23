@@ -1,9 +1,11 @@
 package cmd
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/posener/complete"
 )
@@ -17,7 +19,14 @@ func predictNoteSlugs(_ complete.Args) []string {
 	if err != nil {
 		return nil
 	}
-	cmd := exec.Command(exe, "suggest-notes")
+	return predictNoteSlugsExec(exe)
+}
+
+func predictNoteSlugsExec(exe string) []string {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, exe, "suggest-notes")
+	cmd.WaitDelay = 100 * time.Millisecond
 	cmd.Env = stripCompletionEnv()
 	out, err := cmd.Output()
 	if err != nil {

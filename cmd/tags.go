@@ -101,7 +101,7 @@ func (c *TagsCmd) Run(globals *Globals) error {
 		return err
 	}
 
-	commandName := "tags"
+	commandName := groupTags
 	title := fmt.Sprintf("Notes containing tag: %q", c.Query)
 	if c.Children {
 		commandName = "tags --children"

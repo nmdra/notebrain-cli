@@ -2,7 +2,7 @@
 
 NoteBrain is a Go CLI tool. It makes your [Obsidian](https://obsidian.md/) vault a fully offline knowledge backend for AI coding agents. NoteBrain indexes markdown notes and PDFs into a local [ChromaDB](https://www.trychroma.com/) vector database. It provides semantic search, wikilink graph traversal, and hidden connection discovery. It gives structured output. AI agents, shell pipelines, and LLM tool workflows can use this output directly.
 
-NoteBrain includes an [AI agent skill](wiki/Skill_Usage.md) and an [OpenCode Agent Configuration](wiki/OpenCode_Integration.md). You can use them to integrate with autonomous coding agents (for example, [OpenCode](https://opencode.ai), [Pi agent](https://pi.dev), and Claude Code). This setup decreases token usage and latency.
+NoteBrain includes a [local MCP server](wiki/MCP.md), an [AI agent skill](wiki/Skill_Usage.md), and an [OpenCode Agent Configuration](wiki/OpenCode_Integration.md). You can use them to integrate with autonomous coding agents (for example, [OpenCode](https://opencode.ai), [Pi agent](https://pi.dev), and Claude Code). This setup decreases token usage and latency.
 
 <img src="https://github.com/egonelbre/gophers/blob/master/.thumb/animation/gopher-dance-long.gif?raw=true" alt="Gopher Dancing" width="30"/> [![Go Version](https://img.shields.io/github/go-mod/go-version/nmdra/notebrain-cli)](https://github.com/nmdra/notebrain-cli/blob/master/go.mod)
 [![Go Reference](https://pkg.go.dev/badge/github.com/nmdra/notebrain-cli.svg)](https://pkg.go.dev/github.com/nmdra/notebrain-cli/v2)
@@ -34,7 +34,7 @@ NoteBrain includes an [AI agent skill](wiki/Skill_Usage.md) and an [OpenCode Age
 - **Full Note Retrieval**: Get the complete note from the indexed content.
 - **Reference Listing**: List a note's local attachments (images, PDFs, archives) and external website links with `notebrain refs`, filterable by kind (`--only-images`, `--only-pdf`, or `--only-external-links`).
 - **Structured Output**: Export results as JSON or TSV. Use built-in JSONPath queries for automation.
-- **AI Agent Integration**: NoteBrain has a built-in AI agent skill for autonomous knowledge retrieval.
+- **AI Agent Integration**: Use the built-in agent skill or connect a local MCP client with [`notebrain mcp serve`](wiki/MCP.md).
 - **Terminal Hyperlinks**: Use OSC 8 hyperlinks to open notes from supported terminals.
 - **Obsidian-Aware Indexing**: NoteBrain obeys your Obsidian configuration. It ignores excluded files and attachment folders.
 - **Optional PDF Support**: Get text from PDFs. NoteBrain uses an LLM API to read scanned documents.
@@ -147,8 +147,9 @@ notebrain refs "$SLUG" --only-images --jsonpath='$.refs[*].path'
 
 **7. Automate indexing:** Set a cron job or systemd timer to keep your index current. Read [Scheduled Ingestion](wiki/Scheduled_Ingestion.md).
 
-**8. Integration with AI Agents:**
-Use the built-in [AI agent skill](wiki/Skill_Usage.md) and [OpenCode Agent Configuration](wiki/OpenCode_Integration.md) to retrieve knowledge.
+**8. Connect an MCP client:** Set its server command to `notebrain` and its arguments to `["mcp", "serve"]`. The client starts NoteBrain over stdio and discovers the nine retrieval tools. See [MCP setup](wiki/MCP.md) for the JSON configuration and a first tool call.
+
+If your client uses shell commands instead of MCP, use the built-in [AI agent skill](wiki/Skill_Usage.md) or [OpenCode Agent Configuration](wiki/OpenCode_Integration.md).
 
 > [!TIP]
 > Use the [Pi Agent](https://pi.dev) with the provided skill. The agent gives better results with low-cost models (for example, [DeepSeek V4 Flash](https://www.deepseek.com/), [tencent hy3](https://hy.tencent.com/), or [Gemini Flash 3.6](https://ai.google.dev/gemini-api/docs/flash)). It does not consume unnecessary tokens. It increases cache hit rates and decreases costs.
@@ -187,6 +188,7 @@ NoteBrain stores persistent data in `~/.notebrain/`:
 | Path                              | Contents                                                 |
 | --------------------------------- | -------------------------------------------------------- |
 | `~/.notebrain/chroma/`            | ChromaDB vector store (embeddings, metadata, link graph) |
+| `~/.notebrain/.notebrain-store-*.lock` | Advisory lock for the default store. Leave it in place while any NoteBrain process might use that store. |
 | `~/.notebrain/config/config.toml` | User configuration file                                  |
 
 To uninstall NoteBrain, remove the `notebrain` binary and delete the `~/.notebrain/` directory.
@@ -197,6 +199,7 @@ To uninstall NoteBrain, remove the `notebrain` binary and delete the `~/.notebra
 | ---------------------------------------------------------- | ------------------------------------------------------------------------ |
 | [Installation](wiki/Installation.md)                       | Prerequisites, pre-built binaries, and compilation commands              |
 | [Commands Reference](wiki/Commands.md)                     | Full CLI command and flag information                                    |
+| [MCP Server](wiki/MCP.md)                                   | Client setup, tool arguments, shared store locking, and troubleshooting  |
 | [Architecture](wiki/Architecture.md)                       | Internal functions: chunking pipeline, embeddings, and ChromaDB schema   |
 | [Ranking](wiki/Ranking.md)                                 | How NoteBrain ranks search and hidden connection results                 |
 | [PDF Ingestion](wiki/PDF_Ingestion.md)                     | LLM-based text extraction from PDF attachments                          |

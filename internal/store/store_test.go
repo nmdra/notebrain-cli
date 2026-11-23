@@ -11,6 +11,9 @@ import (
 )
 
 func TestStoreOpenClose(t *testing.T) {
+	if testing.Short() {
+		t.Skip("native Chroma integration requires a provisioned runtime")
+	}
 	ctx := context.Background()
 
 	// Open store with temp dir
@@ -38,6 +41,9 @@ func TestStoreOpenClose(t *testing.T) {
 }
 
 func TestStoreOpen_UsesNonDownloadingEmbeddingFunction(t *testing.T) {
+	if testing.Short() {
+		t.Skip("native Chroma integration requires a provisioned runtime")
+	}
 	st, err := Open(context.Background(), t.TempDir())
 	if err != nil {
 		t.Fatalf("Open failed without ONNX model: %v", err)
@@ -92,6 +98,9 @@ func (defaultNamedEmbeddingFunction) SupportedSpaces() []embeddings.DistanceMetr
 }
 
 func TestStoreOpen_ReopensPersistedDefaultEmbeddingFunction(t *testing.T) {
+	if testing.Short() {
+		t.Skip("native Chroma integration requires a provisioned runtime")
+	}
 	// Keep the installed Chroma runtime available after isolating HOME. Block
 	// the model cache with a regular file so schema decoding cannot download
 	// ONNX artifacts while seeding or reopening the legacy configuration.
@@ -157,6 +166,9 @@ func TestStoreOpen_ReopensPersistedDefaultEmbeddingFunction(t *testing.T) {
 }
 
 func TestStats_UniqueNotesCount(t *testing.T) {
+	if testing.Short() {
+		t.Skip("native Chroma integration requires a provisioned runtime")
+	}
 	ctx := context.Background()
 	st, err := Open(ctx, t.TempDir())
 	if err != nil {
@@ -217,6 +229,9 @@ func TestStats_UniqueNotesCount(t *testing.T) {
 }
 
 func TestStoreReset(t *testing.T) {
+	if testing.Short() {
+		t.Skip("native Chroma integration requires a provisioned runtime")
+	}
 	ctx := context.Background()
 	st, err := Open(ctx, t.TempDir())
 	if err != nil {
@@ -231,6 +246,9 @@ func TestStoreReset(t *testing.T) {
 }
 
 func TestStoreOpen_StrictPersistentOnly(t *testing.T) {
+	if testing.Short() {
+		t.Skip("native Chroma integration requires a provisioned runtime")
+	}
 	ctx := context.Background()
 	path := t.TempDir()
 

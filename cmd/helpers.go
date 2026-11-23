@@ -46,6 +46,9 @@ type embedderAPI interface {
 // openStore opens the persistent ChromaDB store using global configuration.
 // It is a package variable so tests can substitute a fake store.
 var openStore = func(ctx context.Context, globals *Globals) (storeAPI, error) {
+	if globals.MCPChild {
+		return store.Open(ctx, globals.ChromaPath, store.WithExistingDatabaseFile())
+	}
 	return store.Open(ctx, globals.ChromaPath)
 }
 

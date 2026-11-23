@@ -28,7 +28,9 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/signal"
 	"runtime/debug"
+	"syscall"
 
 	"github.com/charmbracelet/x/term"
 
@@ -69,12 +71,17 @@ func runMain(args []string) (code int) {
 		}
 	}
 
-	ctx := context.Background()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 	err := cmd.ParseAndRun(ctx, version, commit, date, defaultConfigFile, args)
 	if err == nil {
 		return exitOK
 	}
 
+	if child, ok := errors.AsType[*cmd.MCPChildError](err); ok {
+		printFatalError(child)
+		return child.Status
+	}
 	if _, ok := errors.AsType[*cmd.UsageError](err); ok {
 		return exitUsage
 	}

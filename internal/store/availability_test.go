@@ -100,8 +100,8 @@ func TestOpenMissingRuntimeFailsBeforeClient(t *testing.T) {
 		t.Fatalf("Open = %v, %v", st, err)
 	}
 	entries, err := os.ReadDir(home)
-	if err != nil || len(entries) != 0 {
-		t.Fatalf("Open created cache or database: %v, %v", entries, err)
+	if err != nil || len(entries) != 1 || !strings.HasPrefix(entries[0].Name(), ".notebrain-store-") || !strings.HasSuffix(entries[0].Name(), ".lock") {
+		t.Fatalf("Open created something other than its stable lock file: %v, %v", entries, err)
 	}
 }
 

@@ -16,8 +16,11 @@ jobs:
   lint:
     uses: ./.github/workflows/lint.yml
 
+  mcp:
+    uses: ./.github/workflows/mcp.yml
+
   release:
-    needs: lint
+    needs: [lint, mcp]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code

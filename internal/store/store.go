@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"os"
@@ -60,11 +61,15 @@ func cloneMetaMap(m map[string]any) map[string]any {
 
 // Store wraps two ChromaDB collections.
 type Store struct {
-	client          chroma.Client
-	chunks          chroma.Collection
-	links           chroma.Collection
-	mu              sync.RWMutex
-	SkipAttachments bool
+	client               chroma.Client
+	chunks               chroma.Collection
+	links                chroma.Collection
+	mu                   sync.RWMutex
+	SkipAttachments      bool
+	lifetimeLock         *storeLock
+	existingDatabaseFile bool
+	closeOnce            sync.Once
+	closeErr             error
 
 	// linkResolver is a lazily built link-target resolution table, reused
 	// across commands within one Store lifetime (see linkResolverLocked).
@@ -92,7 +97,30 @@ func persistentClientOptions(path, libraryPath string, allowDownload bool) []chr
 }
 
 // Open creates or opens the persistent ChromaDB store at path.
-func Open(ctx context.Context, path string, opts ...Option) (*Store, error) {
+func Open(ctx context.Context, path string, opts ...Option) (_ *Store, openErr error) {
+	st := &Store{SkipAttachments: true}
+	for _, opt := range opts {
+		opt(st)
+	}
+	lock, canonical, err := acquireStoreLock(ctx, path, st.existingDatabaseFile)
+	if err != nil {
+		return nil, err
+	}
+	st.lifetimeLock = lock
+	path = canonical
+	defer func() {
+		if openErr != nil {
+			openErr = errors.Join(openErr, st.Close())
+		}
+	}()
+	if st.existingDatabaseFile {
+		if preflightErr := CheckExistingDatabase(ctx, path); preflightErr != nil {
+			return nil, preflightErr
+		}
+	}
+	if contextErr := ctx.Err(); contextErr != nil {
+		return nil, fmt.Errorf("chroma open: %w", contextErr)
+	}
 	libraryPath, allowDownload, err := runtimeLibraryOptions()
 	if err != nil {
 		return nil, fmt.Errorf("chroma open %s: %w", path, err)
@@ -107,6 +135,7 @@ func Open(ctx context.Context, path string, opts ...Option) (*Store, error) {
 	suppressOutputs(func() {
 		client, err = chroma.NewPersistentClient(persistentClientOptions(path, libraryPath, allowDownload)...)
 	})
+	st.client = client
 	if err != nil {
 		return nil, fmt.Errorf("chroma open %s: %w", path, err)
 	}
@@ -124,7 +153,6 @@ func Open(ctx context.Context, path string, opts ...Option) (*Store, error) {
 		}
 	})
 	if err != nil {
-		_ = client.Close()
 		return nil, fmt.Errorf("get/create chunks collection: %w", err)
 	}
 
@@ -141,20 +169,24 @@ func Open(ctx context.Context, path string, opts ...Option) (*Store, error) {
 		}
 	})
 	if err != nil {
-		_ = client.Close()
 		return nil, fmt.Errorf("get/create links collection: %w", err)
 	}
 
-	st := &Store{client: client, chunks: chunks, links: links, SkipAttachments: true}
-	for _, opt := range opts {
-		opt(st)
-	}
+	st.chunks, st.links = chunks, links
 	return st, nil
 }
 
 // Close releases all resources.
 func (s *Store) Close() error {
-	return s.client.Close()
+	s.closeOnce.Do(func() {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		if s.client != nil {
+			s.closeErr = s.client.Close()
+		}
+		s.closeErr = errors.Join(s.closeErr, s.lifetimeLock.close())
+	})
+	return s.closeErr
 }
 
 // Reset drops and recreates both collections. Used by `notebrain reset`.

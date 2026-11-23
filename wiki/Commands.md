@@ -137,6 +137,16 @@ If multiple notes have the same title or filename in different directories, Note
 
 ## Command Reference
 
+### `mcp serve`
+
+Start a local stdio MCP server with nine retrieval tools. The client starts one process per connection. The server does not listen on a network socket.
+
+```sh
+notebrain mcp serve [--max-concurrent-requests=4]
+```
+
+The concurrency limit accepts 1 to 16 active calls per server. Extra calls return a busy error. Calls and ordinary CLI commands share a lock for the same store. See [MCP setup and limits](MCP.md) for the client configuration and tool list.
+
 ### `ingest`
 
 This command indexes markdown files from your Obsidian vault. It parses Wikilinks and tags. It divides the contents into chunks. Then it makes local vector embeddings.
