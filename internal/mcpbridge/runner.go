@@ -91,12 +91,12 @@ func (r *Runner) Execute(ctx context.Context, call Call) ([]byte, error) {
 		delete(profile, k)
 	}
 	if call.Command == commandSearch {
-		if value, ok := effective["exclude-notes"]; ok {
+		if value, ok := effective[flagExcludeNotes]; ok {
 			var values []string
 			if err := json.Unmarshal([]byte(value), &values); err != nil {
 				return nil, fmt.Errorf("invalid exclusion profile")
 			}
-			profile["exclude-notes"] = values
+			profile[flagExcludeNotes] = values
 		}
 	}
 	data, err := toml.Marshal(profile)
@@ -125,7 +125,7 @@ func (r *Runner) Execute(ctx context.Context, call Call) ([]byte, error) {
 	sort.Strings(keys)
 	for _, k := range keys {
 		v := call.Overrides[k]
-		if k == "exclude-notes" {
+		if k == flagExcludeNotes {
 			continue
 		}
 		args = append(args, "--"+k+"="+v)

@@ -12,10 +12,30 @@ import (
 )
 
 const (
-	commandSearch = "search"
-	commandTags   = "tags"
-	commandStats  = "stats"
-	fieldQueries  = "queries"
+	commandSearch      = "search"
+	commandGet         = "get"
+	commandRefs        = "refs"
+	commandBacklinks   = "backlinks"
+	commandConnections = "connections"
+	commandHidden      = "hidden"
+	commandTags        = "tags"
+	commandBoosted     = "boosted"
+	commandStats       = "stats"
+
+	fieldQueries      = "queries"
+	fieldExcludeNotes = "exclude_notes"
+	fieldNote         = "note"
+	fieldQuery        = "query"
+	flagExcludeNotes  = "exclude-notes"
+	flagBoost         = "boost"
+	flagHead          = "head"
+	flagHops          = "hops"
+	flagLimit         = "limit"
+	flagSeed          = "seed"
+	flagTag           = "tag"
+	flagMinScore      = "min-score"
+	flagSection       = "section"
+	jsonNull          = "null"
 )
 
 // Call is an allowlisted retrieval invocation. Args contains only positional values.
@@ -27,12 +47,15 @@ type Call struct {
 }
 
 var commandFlags = map[string]string{
-	commandSearch: "tag section has-tasks has-code with-pdf exclude-notes limit top-k include-text context-window min-score group-by-note",
-	"get":         "meta head", "refs": "only-images only-pdf only-other only-external-links include-missing",
-	"backlinks": "", "connections": "hops",
-	"hidden":    "deep include-linked candidate-chunks limit include-text context-window min-score group-by-note",
-	commandTags: "list shared for-note children min-shared limit include-text context-window min-score group-by-note",
-	"boosted":   "seed boost with-pdf limit include-text context-window min-score group-by-note", commandStats: "",
+	commandSearch:      "tag section has-tasks has-code with-pdf exclude-notes limit top-k include-text context-window min-score group-by-note",
+	commandGet:         "meta head",
+	commandRefs:        "only-images only-pdf only-other only-external-links include-missing",
+	commandBacklinks:   "",
+	commandConnections: flagHops,
+	commandHidden:      "deep include-linked candidate-chunks limit include-text context-window min-score group-by-note",
+	commandTags:        "list shared for-note children min-shared limit include-text context-window min-score group-by-note",
+	commandBoosted:     "seed boost with-pdf limit include-text context-window min-score group-by-note",
+	commandStats:       "",
 }
 
 // RetrievalFlags returns the sorted canonical config keys supported by this adapter.
@@ -73,11 +96,11 @@ func makeCall(command string, input any, defaults map[string]string) (Call, map[
 	var fields map[string]json.RawMessage
 	_ = json.Unmarshal(raw, &fields)
 	for k, v := range fields {
-		if string(v) == "null" {
+		if string(v) == jsonNull {
 			return call, nil, fmt.Errorf("%s must not be null", k)
 		}
 		var ss []string
-		if k == fieldQueries || k == "exclude_notes" {
+		if k == fieldQueries || k == fieldExcludeNotes {
 			if err := json.Unmarshal(v, &ss); err != nil {
 				return call, nil, fmt.Errorf("invalid %s", k)
 			}
@@ -93,7 +116,7 @@ func makeCall(command string, input any, defaults map[string]string) (Call, map[
 			call.Args = ss
 			continue
 		}
-		if k == "note" || k == "query" {
+		if k == fieldNote || k == fieldQuery {
 			var s string
 			_ = json.Unmarshal(v, &s)
 			call.Args = []string{s}
@@ -103,7 +126,7 @@ func makeCall(command string, input any, defaults map[string]string) (Call, map[
 		if !allowed(command, key) {
 			return call, nil, fmt.Errorf("unsupported field %s", k)
 		}
-		if k == "exclude_notes" {
+		if k == fieldExcludeNotes {
 			call.Overrides[key] = EncodeExclusions(ss)
 		} else {
 			var s string
@@ -134,7 +157,7 @@ func validateCall(c Call, e map[string]string) error {
 	if err := validateStrings(c, e); err != nil {
 		return err
 	}
-	ranges := map[string][2]float64{"limit": {0, 100}, "top-k": {1, 3}, "hops": {1, 3}, "candidate-chunks": {1, 10}, "context-window": {0, 5}, "head": {0, 100}, "min-shared": {1, 100}, "boost": {0, 10}}
+	ranges := map[string][2]float64{flagLimit: {0, 100}, "top-k": {1, 3}, flagHops: {1, 3}, "candidate-chunks": {1, 10}, "context-window": {0, 5}, flagHead: {0, 100}, "min-shared": {1, 100}, flagBoost: {0, 10}}
 	for k, v := range e {
 		if !allowed(c.Command, k) {
 			continue
@@ -144,11 +167,11 @@ func validateCall(c Call, e map[string]string) error {
 		}
 		if r, ok := ranges[k]; ok {
 			n, err := strconv.ParseFloat(v, 64)
-			if err != nil || math.IsNaN(n) || math.IsInf(n, 0) || n < r[0] || n > r[1] || (k != "boost" && n != math.Trunc(n)) {
+			if err != nil || math.IsNaN(n) || math.IsInf(n, 0) || n < r[0] || n > r[1] || (k != flagBoost && n != math.Trunc(n)) {
 				return fmt.Errorf("%s must be in range %g..%g", k, r[0], r[1])
 			}
 		}
-		if k == "min-score" {
+		if k == flagMinScore {
 			n, err := strconv.ParseFloat(v, 64)
 			if err != nil || math.IsNaN(n) || math.IsInf(n, 0) {
 				return fmt.Errorf("min-score must be finite")
@@ -163,7 +186,7 @@ func validateCall(c Call, e map[string]string) error {
 	}
 	switch c.Command {
 	case commandSearch:
-		if !nonblank && strings.TrimSpace(e["tag"]) == "" {
+		if !nonblank && strings.TrimSpace(e[flagTag]) == "" {
 			return fmt.Errorf("search requires a nonblank query or tag")
 		}
 	case commandStats:
@@ -179,7 +202,7 @@ func validateCall(c Call, e map[string]string) error {
 			return fmt.Errorf("%s requires one nonblank note or query", c.Command)
 		}
 	}
-	if c.Command == "boosted" && strings.TrimSpace(e["seed"]) == "" {
+	if c.Command == commandBoosted && strings.TrimSpace(e[flagSeed]) == "" {
 		return fmt.Errorf("boosted requires seed")
 	}
 	return nil
@@ -203,14 +226,14 @@ func validateStrings(c Call, e map[string]string) error {
 	if err := count("positional input", c.Args); err != nil {
 		return err
 	}
-	for _, key := range []string{"tag", "section", "seed"} {
+	for _, key := range []string{flagTag, flagSection, flagSeed} {
 		if allowed(c.Command, key) {
 			if err := count(key, []string{e[key]}); err != nil {
 				return err
 			}
 		}
 	}
-	if text, ok := e["exclude-notes"]; c.Command == commandSearch && ok {
+	if text, ok := e[flagExcludeNotes]; c.Command == commandSearch && ok {
 		var values []string
 		if err := json.Unmarshal([]byte(text), &values); err != nil || values == nil {
 			return fmt.Errorf("exclude-notes requires a JSON array")
@@ -218,7 +241,7 @@ func validateStrings(c Call, e map[string]string) error {
 		if len(values) > 256 {
 			return fmt.Errorf("exclude-notes allows at most 256 values")
 		}
-		if err := count("exclude-notes", values); err != nil {
+		if err := count(flagExcludeNotes, values); err != nil {
 			return err
 		}
 	}
@@ -231,13 +254,13 @@ func validateStrings(c Call, e map[string]string) error {
 func expectedCommand(c Call, e map[string]string) string {
 	name := c.Command
 	switch name {
-	case "connections":
-		hops := e["hops"]
+	case commandConnections:
+		hops := e[flagHops]
 		if hops == "" {
 			hops = "2"
 		}
 		name += " --hops " + hops
-	case "hidden":
+	case commandHidden:
 		if boolValue(e, "deep") {
 			name += " --deep"
 		}

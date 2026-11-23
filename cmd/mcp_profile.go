@@ -45,7 +45,7 @@ func privateProfileLoader(r io.Reader) (kong.Resolver, error) {
 
 func mcpRetrievalCommand(name string) bool {
 	switch name {
-	case "search", "get", "refs", "backlinks", "connections", "hidden", "tags", "boosted", "stats":
+	case groupSearch, groupGet, groupRefs, "backlinks", groupConn, groupHidden, groupTags, groupBoosted, groupStats:
 		return true
 	default:
 		return false

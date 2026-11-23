@@ -46,15 +46,15 @@ func decodeResult(data []byte, command string) (map[string]any, string, error) {
 	switch command {
 	case commandStats:
 		valid = countField("notes") && countField("chunks") && countField("links")
-	case "get":
-		_, ok := object["note"].(map[string]any)
-		valid = stringField("query") && ok
-	case "refs":
+	case commandGet:
+		_, ok := object[fieldNote].(map[string]any)
+		valid = stringField(fieldQuery) && ok
+	case commandRefs:
 		valid = stringField("note_slug") && stringField("title") && countField("total") && arrayField("refs")
 	case "tags --list":
 		valid = countField("total") && arrayField("tags")
 	default:
-		valid = stringField("query") && countField("total") && arrayField("results")
+		valid = stringField(fieldQuery) && countField("total") && arrayField("results")
 	}
 	if !valid {
 		return nil, "", fmt.Errorf("child returned an invalid %s envelope", command)

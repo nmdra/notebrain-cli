@@ -7,6 +7,8 @@ import (
 	"github.com/alecthomas/kong"
 )
 
+const mcpCommandName = "mcp"
+
 type mcpRoute struct {
 	server         bool
 	child          bool
@@ -28,7 +30,7 @@ func traceMCPRoute(version string, args []string) (mcpRoute, error) {
 		return route, fmt.Errorf("trace CLI grammar: %w", err)
 	}
 	for _, path := range trace.Path {
-		if path.Command != nil && path.Command.Name == "mcp" {
+		if path.Command != nil && path.Command.Name == mcpCommandName {
 			route.server = true
 		}
 		if path.Flag != nil {
