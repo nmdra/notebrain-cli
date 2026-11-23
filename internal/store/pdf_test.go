@@ -20,6 +20,9 @@ import (
 //     but it doesn't because the stored target_slug from step 1 doesn't match
 //     the PDF's actual note_slug.
 func TestPDFConnections_TwoStageIngest(t *testing.T) {
+	if testing.Short() {
+		t.Skip("native Chroma integration requires a provisioned runtime")
+	}
 	ctx := context.Background()
 	st, err := Open(ctx, t.TempDir())
 	if err != nil {
@@ -127,6 +130,9 @@ func TestPDFConnections_TwoStageIngest(t *testing.T) {
 // TestPDFConnections_TwoStageIngest_Subfolder tests when the PDF is in a different
 // subfolder than the wikilink text suggests (Obsidian resolves by filename only).
 func TestPDFConnections_TwoStageIngest_Subfolder(t *testing.T) {
+	if testing.Short() {
+		t.Skip("native Chroma integration requires a provisioned runtime")
+	}
 	ctx := context.Background()
 	st, err := Open(ctx, t.TempDir())
 	if err != nil {

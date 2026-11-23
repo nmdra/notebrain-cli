@@ -147,7 +147,7 @@ func probeStoreOpenExec(chromaPath, exe string) probeResult {
 	case err == nil:
 		return probeResult{ok: true, detail: "opened collections and forced HNSW index load"}
 	case ctx.Err() != nil:
-		return probeResult{detail: "timed out after 90s (native loader hung)"}
+		return probeResult{detail: "timed out after 90s (store lock contention or native loader delay)"}
 	}
 	if exitErr, ok := errors.AsType[*exec.ExitError](err); ok {
 		if ws, ok := exitErr.Sys().(syscall.WaitStatus); ok && ws.Signaled() {

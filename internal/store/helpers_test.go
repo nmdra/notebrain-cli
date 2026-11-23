@@ -10,6 +10,9 @@ import (
 // newTestStore opens a fresh temporary store for testing and registers cleanup.
 func newTestStore(t testing.TB) *store.Store {
 	t.Helper()
+	if testing.Short() {
+		t.Skip("native Chroma integration requires a provisioned runtime")
+	}
 	st, err := store.Open(context.Background(), t.TempDir())
 	if err != nil {
 		t.Fatalf("failed to open test store: %v", err)

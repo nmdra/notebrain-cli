@@ -1145,6 +1145,9 @@ func TestMultiSemanticSearch_EmptyAndEdgeCases(t *testing.T) {
 }
 
 func TestStoreOpen_WithSkipAttachments(t *testing.T) {
+	if testing.Short() {
+		t.Skip("native Chroma integration requires a provisioned runtime")
+	}
 	ctx := context.Background()
 	st, err := store.Open(ctx, t.TempDir())
 	if err != nil {
