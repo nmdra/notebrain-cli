@@ -34,7 +34,7 @@ NoteBrain includes an [AI agent skill](wiki/Skill_Usage.md) and an [OpenCode Age
 - **Full Note Retrieval**: Get the complete note from the indexed content.
 - **Reference Listing**: List a note's local attachments (images, PDFs, archives) and external website links with `notebrain refs`, filterable by kind (`--only-images`, `--only-pdf`, or `--only-external-links`).
 - **Structured Output**: Export results as JSON or TSV. Use built-in JSONPath queries for automation.
-- **AI Agent Integration**: NoteBrain has a built-in AI agent skill for autonomous knowledge retrieval.
+- **AI Agent Integration**: Use the built-in agent skill or connect a local MCP client with [`notebrain mcp serve`](wiki/MCP.md).
 - **Terminal Hyperlinks**: Use OSC 8 hyperlinks to open notes from supported terminals.
 - **Obsidian-Aware Indexing**: NoteBrain obeys your Obsidian configuration. It ignores excluded files and attachment folders.
 - **Optional PDF Support**: Get text from PDFs. NoteBrain uses an LLM API to read scanned documents.

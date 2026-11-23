@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Serve nine local retrieval tools over stdio with `notebrain mcp serve`
+
+### Changed
+- Coordinate MCP and CLI access to each Chroma store with a shared Linux file lock; commands can wait behind ingestion or reset
+
+### Security
+- Confine `notebrain refs` note reads to the configured vault
+
 ## [v2.14.0] - 2026-10-27
 
 ### Added
