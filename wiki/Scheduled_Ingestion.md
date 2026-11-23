@@ -1,10 +1,10 @@
 # Scheduled Ingestion and Automation
 
-NoteBrain uses native OS schedulers (for example, **cron** and **systemd service**). It does not run a background daemon that uses CPU and memory.
+NoteBrain uses native OS schedulers such as **cron** and **systemd timers**. The [MCP server](MCP.md) handles retrieval only. It does not index the vault or schedule ingestion.
 
 ## Why OS Schedulers?
 
-- **Zero idle overhead**: NoteBrain uses zero RAM and zero CPU when it does not do an index operation.
+- **No indexing daemon**: The scheduler starts a process for each ingestion run.
 - **Fast incremental indexing**: NoteBrain calculates content hashes and word counts during ingestion. When you run NoteBrain on a schedule, it skips unmodified markdown notes in milliseconds.
 - **Missed runs and wake-from-sleep**: System schedulers manage wake-from-sleep events, missed executions, and log rotation. They do not require custom monitoring.
 
@@ -12,9 +12,13 @@ NoteBrain uses native OS schedulers (for example, **cron** and **systemd service
 
 Run automated ingestion every 3 hours. This interval gives a good balance between fresh indexes and system performance.
 
-## Option 1: Linux and macOS (Cron)
+## Shared Stores With MCP
 
-Cron is available on almost all Unix-like operating systems.
+Use the same current NoteBrain version and the same user account for scheduled ingestion and MCP clients that share a store. These processes take the same advisory lock for the configured `--chroma-path`. Old NoteBrain versions and direct Chroma clients do not take that lock.
+
+Ingestion can make retrieval calls wait. An MCP call has a 90-second deadline that includes waiting for the lock. If ingestion regularly exceeds that deadline, move the scheduled run outside busy retrieval periods. Do not delete the lock file while any client or job can use the store.
+
+## Option 1: Linux (Cron)
 
 1. Open your crontab in your editor:
    ```bash

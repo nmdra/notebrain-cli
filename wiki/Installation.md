@@ -4,7 +4,8 @@
 
 - Go 1.26.4 or higher.
 - `make` (optional, to build from source).
-- A CGO-enabled toolchain (GCC or Clang on Linux or macOS). The embedded vector database requires C and C++ bindings.
+- A CGO-enabled toolchain (GCC or Clang) for source builds. The embedded vector database requires C and C++ bindings.
+- Linux for commands that open the embedded store.
 
 ## Install Pre-built Binaries (Recommended)
 
@@ -12,7 +13,7 @@
 2. Extract the archive.
 3. Put the `notebrain` binary in your `$PATH`.
 
-Note: Pre-built macOS and Windows binaries are not shipped. To use macOS or Windows, build the binary from the source code.
+NoteBrain ships for Linux amd64. Store commands require shared file locking. Builds on platforms without a supported lock implementation cannot open the embedded store.
 
 ## Build from Source
 
@@ -78,6 +79,12 @@ The runtime cache is separate from your indexed data:
 If the reported `.download.lock` exists, read the process ID stored in that file and check whether the process is running. Wait if it is running. Otherwise, confirm that no runtime download is active, then remove only that lock file. Run the setup command again. Do not delete the database or use a library from a different runtime version.
 
 You can supply an existing compatible runtime with `CHROMA_LIB_PATH=/absolute/path/to/libchroma_shim.so`. NoteBrain checks that this file is readable and non-empty before opening the store.
+
+## Connect an MCP Client
+
+Use an installed binary that supports `notebrain mcp serve`. After Chroma runtime setup and `notebrain ingest`, follow the [MCP setup guide](MCP.md). The MCP client must run as the same user as the ingestion job if they share a store. If the client uses a different `PATH` or home directory, set an absolute binary path and supply the correct `--config` and `--chroma-path` as startup arguments.
+
+MCP does not install runtime or model files. Run setup and recovery with the regular CLI.
 
 ## ONNX Model Recovery
 

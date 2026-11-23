@@ -80,6 +80,24 @@ NoteBrain embeds ChromaDB directly into the Go binary. It uses the `chroma-go` l
 
 The tool needs no Docker container and no HTTP vector server. This keeps the tool offline and fast.
 
+On Linux, `store.Open` acquires an exclusive advisory lock based on the canonical store path before it opens Chroma. `Store.Close` releases the lock after native cleanup. Different stores use separate locks. Updated CLI commands and MCP children share this lock, so ingestion, reset, and retrieval cannot open the same store in parallel. This is same-user coordination on a local filesystem, not protection against old binaries or other Chroma clients.
+
+### MCP Retrieval
+
+`notebrain mcp serve` uses the official Go SDK over stdio. The server reads configuration once and does not open Chroma itself. The SDK dispatches calls concurrently. A per-server limit controls admission to retrieval; it does not add a second request dispatcher.
+
+```mermaid
+flowchart TD
+    Client[MCP client] <-->|stdio| Server[NoteBrain server]
+    Server --> Cap[Bounded tool calls]
+    Cap --> Child[Retrieval child]
+    CLI[Ordinary CLI] --> Lock[Per-store lock]
+    Child --> Lock
+    Lock --> DB[Embedded Chroma]
+```
+
+Each admitted call starts an isolated CLI child with fixed startup paths and a private configuration profile. This keeps native output and native crashes out of the protocol process. The child checks that the store exists and returns the CLI JSON envelope. The server validates that envelope and returns it as structured content and JSON text. See the [MCP guide](MCP.md) for client setup and limits.
+
 ---
 
 ## 3. ChromaDB Collections and Schema
