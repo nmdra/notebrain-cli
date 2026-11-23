@@ -58,7 +58,7 @@ func TOMLResolver(r io.Reader) (kong.Resolver, error) {
 		name := flag.Name
 
 		// Repair requires explicit command-line consent, never a saved default.
-		if name == "fix" {
+		if name == "fix" || name == "mcp-child" {
 			return nil, nil
 		}
 

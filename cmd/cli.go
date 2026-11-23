@@ -15,7 +15,6 @@ import (
 	kongcompletion "github.com/jotaen/kong-completion"
 	"github.com/posener/complete"
 
-	"github.com/nmdra/notebrain-cli/v2/internal/configfile"
 	"github.com/nmdra/notebrain-cli/v2/internal/logging"
 )
 
@@ -85,6 +84,8 @@ type Globals struct {
 	VersionString string          `kong:"-"`
 	DefaultConfig []byte          `kong:"-"`
 
+	MCPChild bool `name:"mcp-child" hidden:"" help:"internal: isolated retrieval child"`
+
 	Config kong.ConfigFlag `group:"global" placeholder:"path" help:"path to config file (default: ~/.notebrain/config/config.toml)" type:"path"`
 }
 
@@ -92,6 +93,7 @@ type Globals struct {
 type CLI struct {
 	Globals
 
+	MCP          MCPCmd                    `cmd:"" help:"Serve retrieval tools through the Model Context Protocol"`
 	Ingest       IngestCmd                 `cmd:"" help:"Ingest markdown files from a vault"`
 	Search       SearchCmd                 `cmd:"" help:"Semantic search across indexed notes"`
 	Backlinks    BacklinksCmd              `cmd:"" help:"Find incoming links to a note"`
@@ -206,6 +208,7 @@ func warnIgnoredOutputFlags(w io.Writer, format, jsonpath, cmdName string) {
 }
 
 const commandDoctor = "doctor"
+const cliVersionKey = "version"
 
 // textOnlyCommands are the commands whose output is inherently textual and
 // never honors --format/--jsonpath.
@@ -258,7 +261,22 @@ func parseAndRun(ctx context.Context, version, commit, date string, defaultConfi
 		},
 	}
 
-	parser := kong.Must(&cli,
+	route, err := traceMCPRoute(versionStr, args)
+	if err != nil {
+		return err
+	}
+	var captured []kong.Resolver
+	loader := captureMCPConfig(&captured)
+	configPaths := []string{defaultConfigPath}
+	if route.child {
+		configPaths = nil
+		loader = privateProfileLoader
+	}
+	writers := kong.Writers(os.Stdout, os.Stderr)
+	if route.isolated() {
+		writers = kong.Writers(os.Stderr, os.Stderr)
+	}
+	parser, err := kong.New(&cli,
 		kong.Name("notebrain"),
 		kong.Description(`Index and search your Obsidian vault with semantic intelligence.
 
@@ -286,30 +304,54 @@ Examples:
 			Compact: true,
 			Summary: false,
 		}),
-		kong.Configuration(configfile.IgnoreMissingFileLoader(configfile.TOMLResolver), defaultConfigPath),
-		kong.Vars{"version": versionStr},
+		kong.Configuration(loader, configPaths...),
+		kong.Vars{cliVersionKey: versionStr},
+		writers,
 	)
+	if err != nil {
+		if route.isolated() {
+			fmt.Fprintln(os.Stderr, err)
+			return &UsageError{Err: err}
+		}
+		return fmt.Errorf("configure CLI: %w", err)
+	}
 
-	// Intercept shell completion requests (COMP_LINE env) before parsing args.
-	kongcompletion.Register(parser, completionPredictors()...)
+	// Completion must never intercept a protocol server or retrieval child.
+	if !route.isolated() {
+		kongcompletion.Register(parser, completionPredictors()...)
+	}
 
 	ctxParser, err := parser.Parse(args)
 	if err != nil {
+		if route.isolated() {
+			return route.parseFailure(parser, err)
+		}
 		return usageFailure(parser, err, args)
 	}
 
 	if verr := validateLogLevel(cli.LogLevel); verr != nil {
+		if route.isolated() {
+			parser.Errorf("%s", verr)
+		}
 		return &UsageError{Err: verr}
 	}
 
-	logWriter, err := setupLogging(cli.LogLevel, cli.LogFile, cli.LogMaxSizeMB, cli.LogMaxBackups)
-	if err != nil {
-		return fmt.Errorf("setup logging: %w", err)
+	resolveCLIPaths(&cli.Globals, home)
+	if route.child {
+		return runMCPChild(ctxParser, &cli.Globals, route.explicitConfig)
 	}
-	if logWriter != nil {
-		defer func() { _ = logWriter.Close() }()
+	if route.server {
+		cli.MCP.Serve.version = version
+		cli.MCP.Serve.defaults, err = mcpConfigSnapshot(captured, parser)
+		if err != nil {
+			return fmt.Errorf("snapshot MCP configuration: %w", err)
+		}
+		return ctxParser.Run(&cli.Globals)
 	}
+	return runCLI(ctxParser, &cli.Globals)
+}
 
+func resolveCLIPaths(cli *Globals, home string) {
 	// Resolve vault display name for Obsidian URI generation.
 	// Priority: --vault-name flag / config > basename(vault-path)
 	vaultName := cli.VaultName
@@ -323,12 +365,21 @@ Examples:
 			cli.ChromaPath = filepath.Join(home, cli.ChromaPath[2:])
 		}
 	}
+}
 
+func runCLI(ctxParser *kong.Context, cli *Globals) error {
+	logWriter, err := setupLogging(cli.LogLevel, cli.LogFile, cli.LogMaxSizeMB, cli.LogMaxBackups)
+	if err != nil {
+		return fmt.Errorf("setup logging: %w", err)
+	}
+	if logWriter != nil {
+		defer logWriter.Close()
+	}
 	if isTextOnlyCommand(ctxParser.Command()) {
 		warnIgnoredOutputFlags(os.Stderr, cli.Format, cli.JSONPath, ctxParser.Command())
 	}
 
-	err = ctxParser.Run(&cli.Globals)
+	err = ctxParser.Run(cli)
 	if err != nil {
 		if cli.Format == formatJSON {
 			// Print error as JSON to stdout for agents; main skips the
