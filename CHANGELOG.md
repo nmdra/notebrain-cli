@@ -7,11 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v2.15.0] - 2026-11-23
+
 ### Added
-- Serve nine local retrieval tools over stdio with `notebrain mcp serve`
+- Serve nine local retrieval tools over stdio with `notebrain mcp serve`; see the [MCP setup guide](wiki/MCP.md)
+- Add the compact `notebrain-mcp` agent skill for clients that call MCP tools directly
 
 ### Changed
-- Coordinate MCP and CLI access to each Chroma store with a shared Linux file lock; commands can wait behind ingestion or reset
+- Coordinate MCP and CLI access to each Chroma store with a shared Linux file lock; update all NoteBrain binaries that share the store
+- Require Go 1.27.1 or later for source builds
 
 ### Security
 - Confine `notebrain refs` note reads to the configured vault
@@ -387,5 +391,6 @@ This marks the official stable release of **NoteBrain CLI v1.0.0**! This release
 - **Automated CI/CD**: Added `GoReleaser` and GitHub Actions configuration for automated, cryptographically signed binary distribution and SBOM generation.
 - **Documentation**: Comprehensive README and `wiki/` documentation covering Installation, Commands, and Architecture.
 
-[Unreleased]: https://github.com/nmdra/notebrain-cli/compare/v2.14.0...HEAD
+[Unreleased]: https://github.com/nmdra/notebrain-cli/compare/v2.15.0...HEAD
+[v2.15.0]: https://github.com/nmdra/notebrain-cli/compare/v2.14.0...v2.15.0
 [v2.14.0]: https://github.com/nmdra/notebrain-cli/compare/v2.13.1...v2.14.0
