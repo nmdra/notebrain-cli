@@ -51,7 +51,7 @@ NoteBrain includes a [local MCP server](wiki/MCP.md), an [AI agent skill](wiki/S
 
 ## Prerequisites
 
-- **Go 1.26.4+** <img src="https://github.com/egonelbre/gophers/blob/master/.thumb/animation/gopher-dance-long.gif?raw=true" alt="Gopher Dancing" width="16"/>
+- **Go 1.27.1+** (source builds) <img src="https://github.com/egonelbre/gophers/blob/master/.thumb/animation/gopher-dance-long.gif?raw=true" alt="Gopher Dancing" width="16"/>
 - A CGO-enabled toolchain.
 - Linux. NoteBrain does not test macOS and Windows binaries.
 

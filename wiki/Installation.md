@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Go 1.26.4 or higher.
+- Go 1.27.1 or higher for source builds.
 - `make` (optional, to build from source).
 - A CGO-enabled toolchain (GCC or Clang) for source builds. The embedded vector database requires C and C++ bindings.
 - Linux for commands that open the embedded store.

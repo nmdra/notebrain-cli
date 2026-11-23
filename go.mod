@@ -1,6 +1,6 @@
 module github.com/nmdra/notebrain-cli/v2
 
-go 1.26.4
+go 1.27.1
 
 require (
 	charm.land/lipgloss/v2 v2.1.1
