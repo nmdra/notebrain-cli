@@ -84,7 +84,7 @@ Use an updated NoteBrain binary in every client and scheduled job that shares th
 | Symptom | What to check |
 | --- | --- |
 | The client cannot connect or list tools | Run `notebrain mcp serve --help` to check that the installed binary supports the command. Use an absolute binary path in the client config. Check client logs for stderr diagnostics, including malformed TOML. |
-| `existing store is missing or invalid` | Check the server's `--chroma-path` and configuration. Run `notebrain stats --format=json` with that same path. If the store is new, index the vault with the regular CLI. Do not reset an existing store as a first step. |
+| `existing store is missing or invalid` | Verify that the server's effective `--chroma-path` points to the intended directory and that it already contains `chroma.sqlite3`. Do not use the CLI `stats` command for this check: it can create an empty store at the wrong path. If you have not indexed the vault yet, run `notebrain ingest`. Do not reset an existing store as a first step. |
 | `required local runtime is unavailable` | Follow [Chroma runtime setup](Installation.md#chroma-runtime-setup-and-recovery). If you set `CHROMA_LIB_PATH`, make sure the client process inherits it. |
 | `required local model is unavailable` | Follow [ONNX model recovery](Installation.md#onnx-model-recovery). Discovery, stats, tag-only search, and deep hidden analysis do not require the embedding model. |
 | `server busy` or a timeout | Retry after active calls or ingestion finish. Reduce parallel calls from the client or schedule ingestion for quieter periods. |
